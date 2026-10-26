@@ -2,10 +2,18 @@ name: Bench
 
 # Small benchmark suite (100 MB fixtures) with a regression guard: fails when
 # a flow gets more than 30% slower than bench/baseline/<os>.json.
+# Also runs when the benchmark itself changes, so a new baseline can be recorded.
 on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+    # Path filters only apply to branch pushes; tag pushes always run.
+    branches: ["**"]
+    paths:
+      - "bench/**"
+      - "scripts/bench.mjs"
+      - "src-tauri/tests/it/bench_small.rs"
+      - ".github/workflows/bench.yml"
 
 env:
   CARGO_TERM_COLOR: always

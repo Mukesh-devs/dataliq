@@ -215,4 +215,5 @@ by the Bench workflow itself, because timings from a developer machine don't
 transfer to a CI runner. Without a baseline the workflow only reports (and
 uploads the results to commit as the baseline). The guard keeps the fastest
 of 5 runs and ignores slowdowns under 5 ms, because shared runners are noisy.
-It runs on version tags and on demand, not on every push.
+It runs on version tags, on demand, and on pushes that change the benchmark
+itself (to record a baseline), not on every push.
