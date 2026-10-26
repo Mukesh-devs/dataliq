@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-26
+
+First version: a fast viewer for huge tabular files.
+
 ### Added
 
 - Project scaffold: Tauri v2 + React + TypeScript + Vite + Tailwind CSS.
@@ -20,3 +24,7 @@ All notable changes to this project are documented here. The format follows
 - Excel `.xlsx` and `.xls`: sheet picker, header row detection and choice, typed columns (dates, numbers, booleans), cached formula values, fast streaming preview, background import.
 - Tabs (close button, middle-click, Ctrl+W, Ctrl+Tab / Ctrl+Shift+Tab), open several files at once, recent files, drag and drop, `bigview <files>` from a terminal, single instance (a second launch opens its files in the running app), macOS File menu.
 - Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and CI on Windows, macOS and Linux.
+- Benchmarks: a small suite on 100 MB files with a regression guard (`pnpm bench`, `bench.yml`), on-demand large-file budgets, and a grid scroll check (`pnpm e2e:perf`).
+
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mukesh-dsnl/dataliq/releases/tag/v0.1.0

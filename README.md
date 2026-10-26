@@ -8,8 +8,12 @@ compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
 and no account.
 
-**Status:** early development (v0.1 in progress). See [PROGRESS.md](PROGRESS.md)
-and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
+**Status:** v0.1.0 — the core viewer. Filters, sorting, search and column
+profiles come in v0.2; SQL and export in v0.3. See [CHANGELOG.md](CHANGELOG.md),
+[PROGRESS.md](PROGRESS.md) and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
+
+<!-- Screenshots: light and dark theme with a 50M-row file open. -->
+_Screenshots coming soon._
 
 ## Features
 
@@ -28,7 +32,6 @@ and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
   distinctly from empty text, column resize, range selection and copy, and
   **Go to row** (Ctrl+G).
 - Light and dark themes that follow your OS.
-
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
   running app).
@@ -47,6 +50,19 @@ Use Cmd on macOS, Ctrl elsewhere.
 
 More shortcuts (command palette, find, SQL panel, export) arrive in later versions.
 
+## Performance
+
+Measured on a 4-core Linux machine (details in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
+first rows of a 5 GB CSV in 0.3 s and of a 5 GB `.csv.gz` in about 1 s; full
+import of a 5 GB CSV in 32 s; reopening a cached file in a few milliseconds;
+random pages anywhere in 50M rows in under 25 ms.
+
+## Installing
+
+v0.1.0 has no published installers yet; build from source (below). The
+Linux build produces `.deb`, `.rpm` and `.AppImage` packages, which need
+WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`, preinstalled on most desktops).
+
 ## Building from source
 
 Prerequisites:
@@ -61,6 +77,8 @@ pnpm install
 pnpm tauri dev          # run the app with hot reload
 pnpm tauri build        # build installers into target/release/bundle
 ./scripts/check.sh      # run every check (fmt, clippy, tests, lint, build)
+pnpm fixtures all       # generate the large test files (16+ GB, git-ignored)
+pnpm bench              # small benchmark suite with the regression guard
 ```
 
 ## License
