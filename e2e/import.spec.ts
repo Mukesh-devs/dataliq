@@ -61,10 +61,11 @@ test("the grid loads pages after the import even when the row count is unchanged
   page,
 }) => {
   // Preview and full data both have 3 rows, so the visible region does not
-  // change when the grid switches to the imported dataset.
+  // change when the grid switches to the imported dataset. The import takes
+  // long enough that the preview is reliably seen first.
   await mockTauri(page, {
     dialogPaths: ["/data/comma.csv"],
-    imports: { "/data/comma.csv": { progress: [], rows: 3, stepMs: 300 } },
+    imports: { "/data/comma.csv": { progress: [], rows: 3, stepMs: 1500 } },
     fetchRows: buildPage,
   });
   await page.goto("/");
