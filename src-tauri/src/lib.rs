@@ -22,6 +22,7 @@ use crate::settings::{SETTINGS_FILE, Settings};
 
 /// Builds and runs the Tauri application.
 pub fn run() {
+    let started = std::time::Instant::now();
     let cwd = std::env::current_dir().unwrap_or_default();
     let startup = cli::files_from_args(&std::env::args().collect::<Vec<_>>(), &cwd);
     tauri::Builder::default()
@@ -38,9 +39,11 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .manage(commands::app::StartupFiles(parking_lot::Mutex::new(
-            startup,
-        )))
+        .manage(commands::app::StartupFiles {
+            files: parking_lot::Mutex::new(startup),
+            started,
+            ready: std::sync::Once::new(),
+        })
         .setup(|app| {
             #[cfg(target_os = "macos")]
             menu::install(app)?;
