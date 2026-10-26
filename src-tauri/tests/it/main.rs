@@ -4,7 +4,9 @@
 //! Run everything: `cargo test -p bigview --test it`
 //! On-demand perf checks (need `pnpm fixtures ...`):
 //!   `cargo test -p bigview --test it perf_ -- --ignored --nocapture --test-threads=1`
+//! Small benchmark suite for the CI regression guard: `node scripts/bench.mjs`
 
+mod bench_small;
 mod csv_sources;
 mod engine_query;
 mod excel_sources;

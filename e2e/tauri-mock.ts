@@ -16,7 +16,7 @@ export interface MockOptions {
   /** Give these recorded files a pageable dataset with this many rows. */
   datasets?: Record<string, number>;
   /** Builds Arrow IPC (base64) for `fetch_rows`; runs in Node. */
-  fetchRows?: (start: number, count: number) => string;
+  fetchRows?: (start: number, count: number) => string | Promise<string>;
   /**
    * Simulated background imports by path: progress events to emit (one per
    * `stepMs`) and the final row count. Paths not listed never finish.

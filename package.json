@@ -16,7 +16,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:perf": "playwright test -c playwright.perf.config.ts",
     "fixtures": "cargo run -p gen_fixtures --",
+    "bench": "node scripts/bench.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
