@@ -94,10 +94,13 @@ test("50M rows: scroll frame rate and page wait", async ({ page }) => {
 
   // Steady wheel scrolling (~3 rows per event), the common case.
   const steady = await measure("steady scroll", () => page.mouse.wheel(0, 100), 4000);
+  // Fast scrolling (~60 rows per event): crosses a 500-row page every few events.
+  const fast = await measure("fast scroll", () => page.mouse.wheel(0, 2000), 4000);
   // Fast flinging: big jumps that land on unloaded pages every time.
   const fling = await measure("fast fling", () => page.mouse.wheel(0, 400_000), 4000);
 
   expect(steady.fps).toBeGreaterThan(50);
-  expect(steady.p95).toBeLessThan(100);
+  expect(fast.fps).toBeGreaterThan(50);
+  expect(fast.p95).toBeLessThan(100);
   expect(fling.p95).toBeLessThan(100);
 });
