@@ -208,6 +208,60 @@ fn cancel_leaves_no_broken_cache() {
     assert_eq!(out.dataset.row_count, 8_000_000);
 }
 
+/// A cancel that lands just before the statement starts (where DuckDB's
+/// interrupt is a no-op) or as it finishes must still cancel.
+#[test]
+fn cancel_racing_a_short_import_still_cancels() {
+    let env = env();
+    let path = env.dir.join("small.csv");
+    let e = Arc::new(engine(&env));
+    write_csv(&e, &path, 2000);
+    let c = cache(&env, 1 << 30, true);
+    let source = Source::new(&path, OpenOptions::default())
+        .unwrap()
+        .resolve_dialect(&e)
+        .unwrap();
+    let target = ImportTarget {
+        cache: &c,
+        temp_dir: env.dir.join("tmp-import"),
+    };
+    let mut caught = 0;
+    for i in 0..20 {
+        let job = format!("job{i}");
+        let imports = Arc::new(Imports::default());
+        let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let canceller = {
+            let (imports, finished, job) =
+                (Arc::clone(&imports), Arc::clone(&finished), job.clone());
+            std::thread::spawn(move || {
+                while !finished.load(Ordering::SeqCst) {
+                    if imports.cancel(&job) {
+                        return true;
+                    }
+                    std::hint::spin_loop();
+                }
+                false
+            })
+        };
+        let result = import::import(&e, &imports, &target, &source, &job, &|_| {});
+        finished.store(true, Ordering::SeqCst);
+        if canceller.join().unwrap() {
+            caught += 1;
+            assert!(
+                matches!(result, Err(AppError::Cancelled)),
+                "cancel accepted but import returned {:?}",
+                result.map(|o| o.dataset)
+            );
+            assert_eq!(c.info().entries, 0);
+        } else if let Ok(out) = result {
+            // The import beat the canceller: drop it so the next round imports again.
+            import::close_dataset(&e, &out.dataset.id).unwrap();
+            c.clear(&[]);
+        }
+    }
+    assert!(caught > 0, "the canceller never caught a running import");
+}
+
 #[test]
 fn progress_is_reported_for_long_imports() {
     let env = env();

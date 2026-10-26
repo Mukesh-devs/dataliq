@@ -246,6 +246,11 @@ pub fn import(
             conn.execute("SET enable_progress_bar = true", &[])?;
             conn.execute("SET enable_progress_bar_print = false", &[])?;
             let (reader, params) = source.reader()?;
+            // An interrupt only stops a running statement, so a cancel that
+            // arrived before this point must be checked by hand.
+            if cancelled.load(Ordering::SeqCst) {
+                return Err(AppError::Cancelled);
+            }
             conn.execute(
                 &format!("CREATE TABLE {staging}.main.data AS SELECT * FROM {reader}"),
                 &params,
@@ -280,6 +285,12 @@ pub fn import(
     imports.jobs.lock().remove(job_id);
     let _ = engine.execute_batch(&format!("DETACH DATABASE IF EXISTS {staging}"));
 
+    // A cancel that raced with the end of the import still wins: the user
+    // asked for it, and nothing has been committed to the cache yet.
+    let result = match result {
+        Ok(_) if cancelled.load(Ordering::SeqCst) => Err(AppError::Cancelled),
+        other => other,
+    };
     let rows = match result {
         Ok(rows) => rows,
         Err(e) => {

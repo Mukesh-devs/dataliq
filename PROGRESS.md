@@ -203,7 +203,9 @@ tested, and anything left over.
   `pnpm e2e:perf`) on the generated fixtures.
 - Added the small benchmark suite and regression guard (`pnpm bench`, `bench.yml`, D26) and a
   grid scroll check (`pnpm e2e:perf`); a `frontend ready` startup log for cold-start timing.
-- Fixed: imports waited up to 250 ms for the progress thread to finish polling.
+- Fixed: imports waited up to 250 ms for the progress thread to finish polling; a cancel that
+  landed just before the import statement started (CI caught it) was ignored — now checked
+  before and after, with a race test that fails without the fix. The v0.1.0 tag is on this fix.
 - Measured (docs/BENCHMARKS.md): cold start 0.87 s to UI ready; idle memory 241 MiB PSS / 77 MiB
   private (budget missed on PSS, D25); .deb/.rpm 19.4 MB, AppImage 92.5 MB (D24); grid 60 fps
   with page waits under 80 ms.

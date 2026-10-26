@@ -26,5 +26,10 @@ First version: a fast viewer for huge tabular files.
 - Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and CI on Windows, macOS and Linux.
 - Benchmarks: a small suite on 100 MB files with a regression guard (`pnpm bench`, `bench.yml`), on-demand large-file budgets, and a grid scroll check (`pnpm e2e:perf`).
 
+### Fixed
+
+- Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
+- Imports no longer finish up to 250 ms late waiting for the progress reporter.
+
 [Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/mukesh-dsnl/dataliq/releases/tag/v0.1.0
