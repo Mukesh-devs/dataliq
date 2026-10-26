@@ -75,3 +75,10 @@ our own crate keeps full debug info.
 DuckDB reads `.zst` CSV/JSON through the zstd file system registered by its
 Parquet extension, which we compile in. So `.csv.zst`, `.tsv.zst`,
 `.json.zst` and `.ndjson.zst` are supported in addition to `.gz`.
+
+## D11 — Fixture generator written in Rust
+
+`scripts/gen_fixtures` is a Rust crate rather than a Python script: it reuses
+DuckDB (Parquet) and rust_xlsxwriter (Excel) with no extra toolchain, and works
+the same on all 3 OSes. Text output uses an in-crate SplitMix64 PRNG so files are
+byte-identical everywhere; a test pins the SHA-256 of a small sample.

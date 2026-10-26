@@ -47,3 +47,18 @@ tested, and anything left over.
   engine store with mocked IPC. Benchmark: 0.58 ms per 1,000-row page (docs/BENCHMARKS.md).
   Smoke check: app status bar shows "Ready · DuckDB v1.5.6"; settings.json and log file created.
 - Left over: none.
+
+### Step 4 — Test fixtures ✅
+
+- 26 small committed fixtures in `fixtures/` (see `fixtures/README.md`): delimiters, quoting,
+  BOM, Latin-1, NULL vs empty, mixed types, date formats, header-only, empty, bad rows,
+  500 columns, JSON array / NDJSON / nested, Parquet with many types, multi-sheet .xlsx,
+  `.gz` twins and a truncated `.gz`. `.xls` is added with the Excel step (needs a BIFF writer).
+- `scripts/gen_fixtures` (Rust crate, workspace member): deterministic seeded generator for
+  the large git-ignored set — `pnpm fixtures small|large|verify|list|committed`. Writes
+  `fixtures/generated/manifest.json` (rows, bytes, SHA-256, id sum).
+- Tested: 8 generator tests (pinned SHA-256 of a 1,000-row CSV, determinism, byte-size
+  targets for plain and gzip output, gzip == plain content, NDJSON/Parquet/XLSX row counts
+  via DuckDB, committed fixtures up to date). Smoke: `pnpm fixtures small` generates the
+  100 MB set in 10 s and `verify` passes.
+- Left over: large set is generated on demand (needs ~17 GB of disk).

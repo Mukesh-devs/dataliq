@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-tauri"]
+members = ["src-tauri", "scripts/gen_fixtures"]
 resolver = "3"
 
 # DuckDB (bundled C++) is very slow to run unoptimized; optimize dependencies
@@ -14,3 +14,7 @@ codegen-units = 1
 lto = true
 opt-level = 3
 strip = true
+
+# The fixture generator formats billions of bytes; keep it fast in dev builds.
+[profile.dev.package.gen_fixtures]
+opt-level = 3

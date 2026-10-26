@@ -12,4 +12,5 @@ All notable changes to this project are documented here. The format follows
 - Design system: light/dark themes (follow OS by default), design tokens, bundled Inter and JetBrains Mono.
 - App shell: tabs, sidebar, status bar, empty-state drop zone with recent files.
 - DuckDB engine: memory limit and spill directory from `settings.json`, cancellable queries, results as Arrow IPC bytes decoded in the frontend.
+- Test fixtures: small committed set and a deterministic generator for large files (`pnpm fixtures`).
 - Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and CI on Windows, macOS and Linux.
