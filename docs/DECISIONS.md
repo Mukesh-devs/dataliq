@@ -82,3 +82,30 @@ Parquet extension, which we compile in. So `.csv.zst`, `.tsv.zst`,
 DuckDB (Parquet) and rust_xlsxwriter (Excel) with no extra toolchain, and works
 the same on all 3 OSes. Text output uses an in-crate SplitMix64 PRNG so files are
 byte-identical everywhere; a test pins the SHA-256 of a small sample.
+
+## D12 — Truncated .gz files
+
+DuckDB treats an unexpected end of a gzip stream as the end of the data
+(`CompressedFile::ReadData` stops when the underlying file returns 0 bytes), so
+a truncated `.gz` reads "successfully" with missing rows. The preview shows the
+readable rows; the full import (v0.1 step 7) runs our own gzip integrity check
+(`flate2`, which validates the stream end and CRC) alongside DuckDB and reports
+"This compressed file looks damaged or incomplete" instead of silently
+caching partial data.
+
+## D13 — Delimiter fallback when one row is bad
+
+DuckDB's sniffer requires every sampled row to have the same column count; one
+bad row makes it fall back to a single text column. When auto-detection yields
+a single column whose header contains `,` `;` tab or `|`, we retry with that
+delimiter. The read then fails on the real problem, and we locate the first bad
+line with DuckDB's `store_rejects` tables over the sniffer sample, giving
+"Line 7 has 4 columns, expected 3. Try "Ignore bad rows" in Import settings."
+Messages say "Line" (file line numbers) rather than "Row".
+
+## D14 — UI flows replay recorded backend responses
+
+`e2e/tauri-mock.ts` installs a fake `window.__TAURI_INTERNALS__` and replays
+responses recorded from the real backend (`e2e/recordings/backend.json`,
+written by `src-tauri/tests/ui_recordings.rs`). A normal `cargo test` fails if
+the recordings drift from what the backend returns.

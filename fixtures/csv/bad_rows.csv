@@ -1,4 +1,11 @@
 id,name,amount
 1,Alice,10
-2,Bob,20,extra
+2,Bob,20
 3,Carol,30
+4,Dave,40
+5,Erin,50
+6,Frank,60,extra
+7,Grace,70
+8,Heidi,80
+9,Ivan,90
+10,Judy,100

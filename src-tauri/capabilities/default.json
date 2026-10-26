@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "Minimum permissions for the main window.",
   "windows": ["main"],
-  "permissions": ["core:default", "allow-run-query", "allow-cancel-query"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "allow-run-query",
+    "allow-cancel-query",
+    "allow-open-file",
+    "allow-preview-file"
+  ]
 }

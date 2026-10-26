@@ -30,6 +30,8 @@ sysinfo = { version = "0.39.6", default-features = false, features = ["system"] 
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.5"
 parking_lot = "0.12.5"
+flate2 = "1.1.10"
+tauri-plugin-dialog = "=2.8.2"
 
 [dev-dependencies]
 criterion = "0.8.2"

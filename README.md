@@ -13,8 +13,15 @@ and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
 
 ## Features
 
-_Planned for v0.1:_ open CSV/TSV/JSON/Parquet/Excel (plus `.gz`), instant
-preview, smooth scrolling over 50M+ rows, background import with a disk cache.
+- Open CSV and TSV files, also compressed (`.gz`, `.zst`), with the first
+  1,000 rows on screen in about a second, even for 5 GB `.csv.gz` files.
+- Delimiter, header, quoting and types are detected automatically; override
+  them in **Import settings** (delimiter, header, quote, encoding, skip rows,
+  date format, ignore bad rows).
+- Light and dark themes that follow your OS.
+
+_Coming in v0.1:_ JSON/NDJSON, Parquet and Excel, a virtualized grid for 50M+
+rows, background import with a disk cache, tabs and opening from the terminal.
 
 ## Building from source
 

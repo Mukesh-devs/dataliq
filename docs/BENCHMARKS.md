@@ -23,4 +23,13 @@ _Recorded during v0.1 step 3._
 
 ## Performance budgets
 
-_Measured at the end of each version._
+Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
+
+| Flow | Budget | Measured | When |
+| --- | --- | --- | --- |
+| First rows of a 100 MB CSV (inspect + 1,000-row preview) | — | 0.36 s | v0.1 step 5 |
+| First rows of a 5 GB CSV | < 1 s | 0.30 s | v0.1 step 5 |
+| First rows of a 5 GB .csv.gz (109M rows, ~12.5 GB uncompressed) | < 2 s | 1.23 s (test), 1.04 s in the app | v0.1 step 5 |
+
+Preview numbers come from `cargo test -p bigview --test perf_preview -- --ignored --nocapture`
+(dev profile) and the app's status bar.

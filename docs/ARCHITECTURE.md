@@ -44,6 +44,16 @@ older requests in the same group, so a newer scroll or filter always wins.
 Results travel as raw Arrow IPC stream bytes (`tauri::ipc::Response`), decoded
 in the frontend with `apache-arrow` (`src/lib/arrow.ts`). No JSON for rows.
 
+## Opening a file
+
+`sources::Source` detects the format (`sources/detect.rs`: extension, double
+extensions like `.csv.gz`, and magic bytes), validates user import settings,
+and builds the DuckDB reader call (`read_csv(?, delim = ?, …)`) with every value
+bound. `open_file` returns detected settings (`sniff_csv`), columns and the
+reader SQL; `preview_file` returns the first 1,000 rows as Arrow. The UI runs
+both in parallel. Reader errors are rewritten into plain messages with a fix
+(`sources/friendly.rs`).
+
 ## Data flow
 
 ```

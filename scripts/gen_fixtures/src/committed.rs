@@ -44,9 +44,10 @@ pub const TEXT_FIXTURES: &[(&str, &str)] = &[
     ),
     ("csv/header_only.csv", "id,name,amount\n"),
     ("csv/empty.csv", ""),
+    // Enough good rows for the sniffer to lock onto 3 columns; line 7 has 4.
     (
         "csv/bad_rows.csv",
-        "id,name,amount\n1,Alice,10\n2,Bob,20,extra\n3,Carol,30\n",
+        "id,name,amount\n1,Alice,10\n2,Bob,20\n3,Carol,30\n4,Dave,40\n5,Erin,50\n6,Frank,60,extra\n7,Grace,70\n8,Heidi,80\n9,Ivan,90\n10,Judy,100\n",
     ),
     (
         "json/array.json",
@@ -103,7 +104,11 @@ pub fn write_all(root: &Path) -> io::Result<()> {
     write(root, "csv/latin1.csv", &latin1)?;
 
     // A truncated gzip stream: valid header, cut off mid-data.
-    let full = gzip(TEXT_FIXTURES[0].1.repeat(200).as_bytes())?;
+    let mut long = String::from("id,name,amount\n");
+    for i in 0..5000 {
+        long.push_str(&format!("{i},name {i},{}\n", i * 7 % 1000));
+    }
+    let full = gzip(long.as_bytes())?;
     write(root, "csv/corrupted.csv.gz", &full[..full.len() / 2])?;
 
     // Wide file: 500 columns x 20 rows.

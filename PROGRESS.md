@@ -62,3 +62,27 @@ tested, and anything left over.
   via DuckDB, committed fixtures up to date). Smoke: `pnpm fixtures small` generates the
   100 MB set in 10 s and `verify` passes.
 - Left over: large set is generated on demand (needs ~17 GB of disk).
+
+### Step 5 — CSV/TSV and .gz ✅
+
+- `sources/detect.rs`: format + compression from extension (incl. `.csv.gz`, `.ndjson.zst`)
+  and magic bytes (gzip, zstd, Parquet, zip/xlsx, OLE/xls); content sniffing for unknown names.
+- `sources/csv.rs`: `CsvOptions` (delimiter, header, quote, escape, encoding, skip rows,
+  ignore bad rows, date/timestamp format) → bound `read_csv(?, …)` / `sniff_csv(?, …)` calls.
+- `sources/mod.rs`: `Source` (inspect = sniff + DESCRIBE + reader SQL, preview = first 1,000
+  rows as Arrow), delimiter fallback + first-bad-line diagnosis, friendly errors.
+- Commands `open_file`, `preview_file`; dialog plugin for Open file (`dialog:allow-open`).
+- UI: tabs store opens files (info + preview in parallel), file header with format badge,
+  Import settings popover (detected values as hints), temporary preview table (replaced by
+  the grid in step 6), NULL vs empty string shown differently, status bar timing.
+- Tested: 19 CSV integration tests over every CSV fixture (delimiters, quoting, BOM, Latin-1,
+  NULL vs empty, mixed types, date formats, header-only, empty, bad rows + ignore, 500 columns,
+  `.gz` twins equal plain, gzip without extension, `.zst`, truncated `.gz`, overrides, paths
+  with spaces/quotes/unicode, missing file); unit tests for detection, option building,
+  validation, error messages; Vitest for tabs store, Import settings, FileView, formatting;
+  Playwright flows (open from dialog, Import settings apply, plain errors) on recorded backend
+  responses. Budgets: 5 GB CSV first rows 0.30 s (< 1 s), 5 GB .csv.gz 1.23 s (< 2 s).
+  Smoke (real app, Xvfb + xdotool): opened semicolon.csv via the native dialog (31 ms) and the
+  5 GB .csv.gz (1,000 rows in 1.04 s); Import settings popover shows detected values.
+- Fixed along the way: `Button` now forwards refs (Radix popovers could not position).
+- Left over: truncated-gzip detection happens in the full import (step 7, see D12).

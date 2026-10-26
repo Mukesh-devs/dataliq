@@ -4,6 +4,7 @@ pub mod commands;
 pub mod engine;
 pub mod error;
 pub mod settings;
+pub mod sources;
 
 mod logging;
 
@@ -17,6 +18,7 @@ use crate::settings::{SETTINGS_FILE, Settings};
 /// Builds and runs the Tauri application.
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let paths = app.path();
             let log_guard = logging::init(&paths.app_log_dir()?);
@@ -43,7 +45,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::query::run_query,
-            commands::query::cancel_query
+            commands::query::cancel_query,
+            commands::files::open_file,
+            commands::files::preview_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running BigView");

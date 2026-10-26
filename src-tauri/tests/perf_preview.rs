@@ -1,0 +1,69 @@
+//! Preview speed budgets on generated large files (`pnpm fixtures ...`).
+//! Ignored by default; run with:
+//!   cargo test -p bigview --test perf_preview -- --ignored --nocapture
+
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
+
+use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
+use bigview_lib::settings::Settings;
+use bigview_lib::sources::{OpenOptions, Source};
+
+fn generated(name: &str) -> Option<PathBuf> {
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../fixtures/generated")
+        .join(name);
+    p.is_file().then_some(p)
+}
+
+/// Opens the file the way the UI does (inspect + 1,000-row preview) and
+/// returns the time to first rows.
+fn time_to_first_rows(name: &str) -> Option<Duration> {
+    let path = generated(name)?;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = EngineConfig::from_settings(&Settings::default());
+    cfg.temp_dir = tmp.path().to_path_buf();
+    let engine = Engine::open_in_memory(&cfg).unwrap();
+    let start = Instant::now();
+    let source = Source::new(&path, OpenOptions::default())
+        .unwrap()
+        .resolve_dialect(&engine)
+        .unwrap();
+    let info = source.inspect(&engine).unwrap();
+    let bytes = source
+        .preview_ipc(&engine, 1000, &RequestKey::default())
+        .unwrap();
+    let elapsed = start.elapsed();
+    println!(
+        "{name}: {} columns, {} IPC bytes, first rows in {:.3} s",
+        info.columns.len(),
+        bytes.len(),
+        elapsed.as_secs_f64()
+    );
+    Some(elapsed)
+}
+
+fn check(name: &str, budget: Duration) {
+    match time_to_first_rows(name) {
+        Some(t) => assert!(t < budget, "{name}: {t:?} exceeds budget {budget:?}"),
+        None => eprintln!("{name}: not generated, skipping (run `pnpm fixtures {name}`)"),
+    }
+}
+
+#[test]
+#[ignore = "needs generated fixtures"]
+fn preview_100mb_csv() {
+    check("sales_100mb.csv", Duration::from_secs(1));
+}
+
+#[test]
+#[ignore = "needs generated fixtures"]
+fn preview_5gb_csv() {
+    check("sales_5gb.csv", Duration::from_secs(1));
+}
+
+#[test]
+#[ignore = "needs generated fixtures"]
+fn preview_5gb_csv_gz() {
+    check("sales_5gb.csv.gz", Duration::from_secs(2));
+}
