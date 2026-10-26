@@ -1,0 +1,11 @@
+# Keep LF everywhere so formatters agree across Windows, macOS and Linux.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.gz binary
+*.parquet binary
+*.xlsx binary
+*.xls binary
+*.arrows binary
+*.ps1 text eol=crlf
