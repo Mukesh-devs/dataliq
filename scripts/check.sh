@@ -28,6 +28,9 @@ pnpm typecheck
 step "pnpm test"
 pnpm test
 
+step "pnpm e2e (Playwright)"
+pnpm e2e
+
 if [[ $quick -eq 0 ]]; then
   step "pnpm tauri build --debug"
   pnpm tauri build --debug

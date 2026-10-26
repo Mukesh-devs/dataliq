@@ -66,3 +66,25 @@ jobs:
 
       - name: Tauri debug build
         run: pnpm tauri build --debug
+
+  e2e:
+    name: UI flows (Playwright)
+    # Screenshot baselines are rendered on Ubuntu 24.04 Chromium (see docs/DECISIONS.md).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/

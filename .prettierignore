@@ -1,0 +1,11 @@
+dist
+target
+node_modules
+src-tauri
+pnpm-lock.yaml
+playwright-report
+test-results
+e2e/__screenshots__
+fixtures
+*.md
+.github

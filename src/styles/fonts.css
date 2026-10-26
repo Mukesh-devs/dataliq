@@ -1,0 +1,4 @@
+/* Fonts are bundled from npm (@fontsource) so the app works fully offline. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght-italic.css";

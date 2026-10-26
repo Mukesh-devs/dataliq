@@ -17,6 +17,7 @@ Step "cargo test" { cargo test }
 Step "pnpm lint" { pnpm lint }
 Step "pnpm typecheck" { pnpm typecheck }
 Step "pnpm test" { pnpm test }
+Step "pnpm e2e (Playwright)" { pnpm e2e }
 if (-not $Quick) {
   Step "pnpm tauri build --debug" { pnpm tauri build --debug }
 }

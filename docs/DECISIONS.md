@@ -32,3 +32,18 @@ the Tauri ecosystem.
 compiled from bundled C++ and is far too slow unoptimized; this keeps
 `cargo test` and `tauri build --debug` usable without changing our own crate's
 debug experience.
+
+## D5 — Playwright UI flows run on Linux only
+
+UI flows run against the Vite dev server in Chromium with Tauri IPC mocked, so
+they test our frontend, not the OS webview. Screenshot baselines depend on font
+rasterization, which differs per OS; baselines are rendered on Ubuntu 24.04 and
+the e2e CI job runs there only. Native builds are still checked on all 3 OSes.
+`@playwright/test` is pinned to 1.63.0 to match the Chromium build available in
+the development container.
+
+## D6 — UI settings persisted in local storage (for now)
+
+Theme and density live in a Zustand store persisted to the webview's local
+storage. Backend settings (memory limit, cache) use a JSON settings file from
+step 3; UI settings move there when the settings screen arrives.
