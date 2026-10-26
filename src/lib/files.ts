@@ -178,18 +178,55 @@ export const FILE_EXTENSIONS = [
   "xls",
 ];
 
-/** Shows the native open dialog. Resolves to null when cancelled. */
-export async function pickFile(): Promise<string | null> {
+/** Shows the native open dialog. Resolves to [] when cancelled. */
+export async function pickFiles(): Promise<string[]> {
   const { open } = await import("@tauri-apps/plugin-dialog");
   const picked = await open({
-    multiple: false,
+    multiple: true,
     directory: false,
     filters: [
       { name: "Data files", extensions: FILE_EXTENSIONS },
       { name: "All files", extensions: ["*"] },
     ],
   });
-  return typeof picked === "string" ? picked : null;
+  if (picked === null) return [];
+  return Array.isArray(picked) ? picked : [picked];
+}
+
+/** Files passed on the command line when the app started (returned once). */
+export function takeStartupFiles(): Promise<string[]> {
+  return call<string[]>("take_startup_files");
+}
+
+/** Files forwarded by a second `bigview <files>` launch. */
+export async function onOpenFiles(handler: (paths: string[]) => void): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<string[]>("open-files", (e) => handler(e.payload));
+}
+
+/** macOS File menu actions ("open-file", "close-tab"). */
+export async function onMenu(handler: (id: string) => void): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<string>("menu", (e) => handler(e.payload));
+}
+
+export type DragState = "over" | "none";
+
+/** Files dragged onto the window (Tauri delivers real paths, not File objects). */
+export async function onFileDrop(
+  onState: (state: DragState) => void,
+  onDrop: (paths: string[]) => void,
+): Promise<() => void> {
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  return getCurrentWebview().onDragDropEvent((e) => {
+    const p = e.payload;
+    if (p.type === "enter" || p.type === "over") onState("over");
+    else if (p.type === "leave") onState("none");
+    else if (p.type === "drop") {
+      onState("none");
+      if (p.paths.length > 0) onDrop(p.paths);
+    }
+  });
 }
 
 /** File name from a path on any OS. */

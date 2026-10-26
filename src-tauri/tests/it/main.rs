@@ -1,0 +1,16 @@
+//! All integration tests in one binary: each test binary links DuckDB
+//! statically, so one binary keeps builds fast and `target/` small.
+//!
+//! Run everything: `cargo test -p bigview --test it`
+//! On-demand perf checks (need `pnpm fixtures ...`):
+//!   `cargo test -p bigview --test it perf_ -- --ignored --nocapture --test-threads=1`
+
+mod csv_sources;
+mod engine_query;
+mod excel_sources;
+mod import_cache;
+mod json_parquet_sources;
+mod paging;
+mod perf_import;
+mod perf_preview;
+mod ui_recordings;

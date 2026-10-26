@@ -1,6 +1,6 @@
 //! Records real backend responses for the Playwright UI flows, which run the
 //! frontend against a mocked Tauri IPC (e2e/tauri-mock.ts). Regenerate with
-//! `RECORD_UI=1 cargo test -p bigview --test ui_recordings`; a normal run
+//! `RECORD_UI=1 cargo test -p bigview --test it ui_recordings`; a normal run
 //! checks the recordings are still what the backend returns.
 
 use std::path::PathBuf;

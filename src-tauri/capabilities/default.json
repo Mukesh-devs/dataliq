@@ -17,6 +17,7 @@
     "allow-close-dataset",
     "allow-cache-info",
     "allow-clear-cache",
-    "allow-get-settings"
+    "allow-get-settings",
+    "allow-take-startup-files"
   ]
 }

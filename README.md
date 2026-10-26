@@ -29,7 +29,23 @@ and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
   **Go to row** (Ctrl+G).
 - Light and dark themes that follow your OS.
 
-_Coming in v0.1:_ tabs, recent files, drag and drop, and opening from the terminal.
+- Tabs, recent files and drag and drop; open files from a terminal with
+  `bigview data.csv.gz other.parquet` (a second launch opens them in the
+  running app).
+
+## Keyboard shortcuts
+
+Use Cmd on macOS, Ctrl elsewhere.
+
+| Action | Shortcut |
+| --- | --- |
+| Open file | Ctrl+O |
+| Close tab | Ctrl+W |
+| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab |
+| Go to row | Ctrl+G |
+| Copy selection | Ctrl+C |
+
+More shortcuts (command palette, find, SQL panel, export) arrive in later versions.
 
 ## Building from source
 

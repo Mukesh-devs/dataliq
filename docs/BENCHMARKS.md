@@ -46,9 +46,9 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Reopen a cached file | < 1 s | 1–2 ms | v0.1 step 7 |
 | Peak memory while importing 5 GB | < DuckDB limit + 300 MB (8,045 + 300 MiB) | 1.9 GB (CSV), 3.2 GB (.csv.gz) | v0.1 step 7 |
 
-Import numbers come from `cargo test -p bigview --test perf_import -- --ignored --nocapture
+Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
 so `.csv.gz` imports are bounded by it (plus our parallel integrity check on another core).
 
-Preview numbers come from `cargo test -p bigview --test perf_preview -- --ignored --nocapture`
+Preview numbers come from `cargo test -p bigview --test it perf_preview -- --ignored --nocapture`
 (dev profile) and the app's status bar.

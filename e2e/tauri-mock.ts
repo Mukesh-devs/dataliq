@@ -11,7 +11,7 @@ const recordings = JSON.parse(
 };
 
 export interface MockOptions {
-  /** Paths returned by successive "Open file" dialogs. */
+  /** Paths returned by successive "Open file" dialogs ("a|b" = several files). */
   dialogPaths?: string[];
   /** Give these recorded files a pageable dataset with this many rows. */
   datasets?: Record<string, number>;
@@ -22,6 +22,8 @@ export interface MockOptions {
    * `stepMs`) and the final row count. Paths not listed never finish.
    */
   imports?: Record<string, { progress: number[]; rows: number; stepMs?: number }>;
+  /** Files the app "was started with" (`bigview <files>`). */
+  startupFiles?: string[];
 }
 
 /**
@@ -35,7 +37,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     await page.exposeFunction("__fetchRows", (start: number, count: number) => build(start, count));
   }
   await page.addInitScript(
-    ({ recordings, dialogPaths, datasets, imports }) => {
+    ({ recordings, dialogPaths, datasets, imports, startupFiles }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
@@ -48,6 +50,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
         }
       };
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      // Lets tests deliver backend events, e.g. drag and drop or forwarded files.
+      w.__emit = emit;
       w.__TAURI_INTERNALS__ = {
         metadata: {
           currentWindow: { label: "main" },
@@ -64,8 +68,11 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
           switch (cmd) {
             case "run_query":
               return toBuffer(recordings.version);
-            case "plugin:dialog|open":
-              return dialogPaths.shift() ?? null;
+            case "plugin:dialog|open": {
+              // The app asks for multiple files; a test may queue a list.
+              const next = dialogPaths.shift();
+              return next === undefined ? null : next.split("|");
+            }
             case "open_file": {
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };
               const rows = datasets[String(args.path)];
@@ -80,6 +87,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             }
             case "plugin:event|unlisten":
               return null;
+            case "take_startup_files":
+              return startupFiles.splice(0);
             case "get_settings":
               return { memoryLimitMb: null, cacheEnabled: true, cacheMaxGb: 20, smallFileMb: 0 };
             case "cache_info":
@@ -125,6 +134,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       dialogPaths: options.dialogPaths ?? [],
       datasets: options.datasets ?? {},
       imports: options.imports ?? {},
+      startupFiles: options.startupFiles ?? [],
     },
   );
 }
@@ -146,4 +156,12 @@ export function gridHeader(page: Page, text: string) {
     .getByTestId("data-grid")
     .locator('th[role="columnheader"]')
     .filter({ hasText: new RegExp(`^${text}$`) });
+}
+
+/** Delivers a backend event (as Tauri would) to the page's listeners. */
+export function emitEvent(page: Page, event: string, payload: unknown) {
+  return page.evaluate(
+    ([e, p]) => (window as unknown as { __emit: (e: string, p: unknown) => void }).__emit(e, p),
+    [event, payload] as const,
+  );
 }

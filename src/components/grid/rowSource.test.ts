@@ -97,14 +97,17 @@ describe("PagedRowSource", () => {
     expect(s.errors).toEqual([]);
   });
 
-  it("records fetch errors instead of throwing", async () => {
+  it("reports fetch errors to listeners instead of throwing", async () => {
     const s = new PagedRowSource({
       rowCount: 10,
       columns,
       fetchPage: () => Promise.reject(new Error("boom")),
     });
+    const messages: string[] = [];
+    s.onError((m) => messages.push(m));
     await s.load(0, 10);
     expect(s.errors).toHaveLength(1);
+    expect(messages).toEqual(["boom"]);
     expect(s.getValue(0, 0)).toBe(NOT_LOADED);
   });
 });

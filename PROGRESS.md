@@ -173,3 +173,25 @@ tested, and anything left over.
   0.054 s, import 14.9 s (peak 419 MB). Smoke (real app): multi_sheet.xlsx with picker,
   "4 rows · imported in 14 ms".
 - Left over: none.
+
+### Step 10 — Tabs and opening ✅
+
+- Tabs: close button, middle-click close, busy spinner, Ctrl+W, Ctrl+Tab / Ctrl+Shift+Tab
+  (wrapping), Ctrl+O; the Open dialog accepts several files.
+- Recent files (10, newest first, persisted) in the empty state.
+- Drag and drop via Tauri's webview drag-drop events (real paths): highlighted drop zone, or a
+  "Drop to open in a new tab" overlay when files are open.
+- CLI: `bigview <files>` (relative paths resolved, flags ignored, `--` supported) opens at
+  startup (`take_startup_files`); single instance (tauri-plugin-single-instance): a second
+  launch forwards its files (`open-files` event), focuses the window and exits.
+- macOS File menu (Open…, Close Tab) — D22. Integration tests merged into one binary — D23.
+- Fixed: when the grid's source switched from preview to the imported dataset with the same
+  visible region, no pages were requested (blank cells); the grid now loads the visible rows on
+  every source change and shows page-load errors instead of swallowing them.
+- Tested: CLI parsing unit tests; Vitest (recent files, tabs cycle/close/multi-open, TabBar);
+  Playwright (3 files: two from one dialog + Ctrl+O, Ctrl+Tab / Ctrl+Shift+Tab, Ctrl+W, close
+  buttons, reopen from recent files; drag-and-drop states and drop; startup files and forwarded
+  "open-files"; same-row-count import switch; two concurrent imports). Smoke (real app, Xvfb +
+  D-Bus): `bigview comma.csv` opened at startup; `bigview semicolon.csv records.ndjson` from a
+  second launch exited in 0.06 s and both files opened as tabs in the running app with rows.
+- Left over: file associations are v1.0 (settings/installer).

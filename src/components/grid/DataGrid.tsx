@@ -73,6 +73,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
   const [fontsReady, setFontsReady] = useState(false);
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [selection, setSelection] = useState<GridSelection>(emptySelection);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -109,6 +110,15 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     },
     [source, cellStyle],
   );
+
+  // A new source (e.g. preview -> imported data) must load what is on screen
+  // now: the grid does not report its visible region again if it is unchanged.
+  useEffect(() => {
+    const v = visible.current;
+    source.ensure(v.y, v.y + Math.max(v.height, 50) + 1);
+    setLoadError(null);
+    return source.onError?.((message) => setLoadError(message));
+  }, [source]);
 
   // Redraw only the visible cells of pages that just arrived.
   useEffect(() => {
@@ -180,7 +190,15 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
   const digits = String(source.rowCount).length;
 
   return (
-    <div ref={container} className="min-h-0 flex-1" data-testid="data-grid">
+    <div ref={container} className="relative min-h-0 flex-1" data-testid="data-grid">
+      {loadError && (
+        <div
+          role="alert"
+          className="absolute right-3 bottom-3 z-10 max-w-md rounded-[var(--radius)] border border-border bg-bg px-3 py-2 text-[12px] text-fg-muted shadow-[0_4px_12px_rgb(0_0_0/0.08)]"
+        >
+          Some rows could not be loaded: {loadError}
+        </div>
+      )}
       <DataEditor
         ref={editor}
         width="100%"

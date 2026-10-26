@@ -1,5 +1,5 @@
 //! Full-import timings on generated large files. Ignored by default:
-//!   cargo test -p bigview --test perf_import -- --ignored --nocapture --test-threads=1
+//!   cargo test -p bigview --test it perf_import -- --ignored --nocapture --test-threads=1
 
 use std::path::PathBuf;
 use std::time::Instant;

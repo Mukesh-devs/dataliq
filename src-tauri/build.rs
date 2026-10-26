@@ -15,6 +15,7 @@ fn main() {
             "cache_info",
             "clear_cache",
             "get_settings",
+            "take_startup_files",
         ]),
     ))
     .expect("failed to run tauri-build");

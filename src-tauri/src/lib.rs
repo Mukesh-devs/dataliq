@@ -1,6 +1,7 @@
 //! BigView desktop app: Tauri entry point and module tree.
 
 pub mod cache;
+pub mod cli;
 pub mod commands;
 pub mod engine;
 pub mod error;
@@ -9,19 +10,40 @@ pub mod settings;
 pub mod sources;
 
 mod logging;
+#[cfg(target_os = "macos")]
+mod menu;
 
 use std::sync::Arc;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 use crate::engine::{Engine, EngineConfig};
 use crate::settings::{SETTINGS_FILE, Settings};
 
 /// Builds and runs the Tauri application.
 pub fn run() {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let startup = cli::files_from_args(&std::env::args().collect::<Vec<_>>(), &cwd);
     tauri::Builder::default()
+        // Must be registered first: a second launch forwards its files here
+        // and exits.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            let files = cli::files_from_args(&argv, std::path::Path::new(&cwd));
+            if !files.is_empty() {
+                let _ = app.emit("open-files", files);
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
+        .manage(commands::app::StartupFiles(parking_lot::Mutex::new(
+            startup,
+        )))
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            menu::install(app)?;
             let paths = app.path();
             let log_guard = logging::init(&paths.app_log_dir()?);
             app.manage(log_guard);
@@ -74,7 +96,8 @@ pub fn run() {
             commands::import::close_dataset,
             commands::import::cache_info,
             commands::import::clear_cache,
-            commands::import::get_settings
+            commands::import::get_settings,
+            commands::app::take_startup_files
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

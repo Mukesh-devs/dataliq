@@ -56,3 +56,44 @@ test("cancelling an import keeps the preview", async ({ page }) => {
   expect(cancelled).toBe(true);
   await expect(gridCell(page, "München")).toBeAttached();
 });
+
+test("the grid loads pages after the import even when the row count is unchanged", async ({
+  page,
+}) => {
+  // Preview and full data both have 3 rows, so the visible region does not
+  // change when the grid switches to the imported dataset.
+  await mockTauri(page, {
+    dialogPaths: ["/data/comma.csv"],
+    imports: { "/data/comma.csv": { progress: [], rows: 3, stepMs: 300 } },
+    fetchRows: buildPage,
+  });
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  await expect(gridCell(page, "Alice")).toBeAttached();
+  await expect(page.getByRole("status")).toContainText("3 rows · imported in");
+  await expect(gridCell(page, "name 1")).toBeAttached();
+  await expect(gridCell(page, "name 3")).toBeAttached();
+});
+
+test("several files imported at once all load their rows", async ({ page }) => {
+  await mockTauri(page, {
+    startupFiles: ["/data/comma.csv", "/data/semicolon.csv"],
+    imports: {
+      "/data/comma.csv": { progress: [], rows: 3, stepMs: 200 },
+      "/data/semicolon.csv": { progress: [], rows: 3, stepMs: 400 },
+    },
+    fetchRows: buildPage,
+  });
+  await page.goto("/");
+  await expect(page.getByRole("tab", { name: "semicolon.csv" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("status")).toContainText("3 rows · imported in");
+  await expect(gridCell(page, "name 1")).toBeAttached();
+  await page.getByRole("tab", { name: "comma.csv" }).click();
+  await expect(gridCell(page, "name 2")).toBeAttached();
+});

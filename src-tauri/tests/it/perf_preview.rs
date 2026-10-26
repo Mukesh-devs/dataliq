@@ -1,6 +1,6 @@
 //! Preview speed budgets on generated large files (`pnpm fixtures ...`).
 //! Ignored by default; run with:
-//!   cargo test -p bigview --test perf_preview -- --ignored --nocapture
+//!   cargo test -p bigview --test it perf_preview -- --ignored --nocapture
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};

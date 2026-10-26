@@ -12,6 +12,7 @@ import {
   type OpenOptions,
   type SourceInfo,
 } from "../lib/files";
+import { useRecent } from "./recent";
 
 export type TabStatus = "loading" | "ready" | "error";
 
@@ -53,6 +54,10 @@ interface TabsState {
   setActive: (id: string) => void;
   /** Opens a file in a new tab (or focuses it if already open). */
   openPath: (path: string) => Promise<void>;
+  /** Opens several files; the last one becomes active. */
+  openPaths: (paths: string[]) => Promise<void>;
+  /** Activates the next (+1) or previous (-1) tab, wrapping around. */
+  cycle: (step: 1 | -1) => void;
   /** Re-opens a tab's file with new import settings. */
   reopen: (id: string, options: OpenOptions) => Promise<void>;
   cancelImport: (id: string) => Promise<void>;
@@ -150,6 +155,7 @@ export const useTabs = create<TabsState>()((set, get) => {
         set({ activeId: existing.id });
         return;
       }
+      useRecent.getState().add(path);
       const id = `tab-${nextId++}`;
       const options: OpenOptions = {};
       set((s) => ({
@@ -157,6 +163,19 @@ export const useTabs = create<TabsState>()((set, get) => {
         activeId: id,
       }));
       await load(id, path, options);
+    },
+    openPaths: async (paths) => {
+      await Promise.all(paths.map((p) => get().openPath(p)));
+      const last = paths.at(-1);
+      const tab = last && get().tabs.find((t) => t.path === last);
+      if (tab) set({ activeId: tab.id });
+    },
+    cycle: (step) => {
+      const { tabs, activeId } = get();
+      if (tabs.length === 0) return;
+      const i = tabs.findIndex((t) => t.id === activeId);
+      const next = tabs[(i + step + tabs.length) % tabs.length];
+      if (next) set({ activeId: next.id });
     },
     reopen: async (id, options) => {
       const tab = find(id);

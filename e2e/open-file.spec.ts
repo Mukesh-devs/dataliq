@@ -75,10 +75,10 @@ test("Excel files show a sheet picker and header row choice", async ({ page }) =
     .getByRole("main")
     .getByRole("button", { name: /Open file/ })
     .click();
-  await expect(page.getByLabel("Sheet")).toHaveValue("Orders");
-  await expect(page.getByLabel("Header row")).toHaveValue("1");
+  await expect(page.getByLabel("Sheet", { exact: true })).toHaveValue("Orders");
+  await expect(page.getByLabel("Header row", { exact: true })).toHaveValue("1");
   await expect(gridCell(page, "Alice")).toBeAttached();
-  await page.getByLabel("Sheet").selectOption("Notes");
+  await page.getByLabel("Sheet", { exact: true }).selectOption("Notes");
   const lastOpen = await page.evaluate(() =>
     (window as unknown as { __invokes: { cmd: string; args: { options: unknown } }[] }).__invokes
       .filter((i) => i.cmd === "open_file")

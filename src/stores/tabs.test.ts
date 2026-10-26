@@ -159,3 +159,33 @@ describe("tabs store: opening files", () => {
     expect(activeId).toBe(tabs[0]?.id);
   });
 });
+
+describe("tabs store: several tabs", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("opens several files, activates the last and cycles with wrap-around", async () => {
+    mockBackend(() => new Promise(() => {}));
+    await useTabs.getState().openPaths(["/d/a.csv", "/d/b.csv", "/d/c.csv"]);
+    const ids = useTabs.getState().tabs.map((t) => t.id);
+    expect(useTabs.getState().tabs.map((t) => t.title)).toEqual(["a.csv", "b.csv", "c.csv"]);
+    expect(useTabs.getState().activeId).toBe(ids[2]);
+    useTabs.getState().cycle(1);
+    expect(useTabs.getState().activeId).toBe(ids[0]);
+    useTabs.getState().cycle(-1);
+    expect(useTabs.getState().activeId).toBe(ids[2]);
+  });
+
+  it("closing the active tab activates its neighbour", async () => {
+    mockBackend(() => new Promise(() => {}));
+    await useTabs.getState().openPaths(["/d/a.csv", "/d/b.csv", "/d/c.csv"]);
+    const [a, b, c] = useTabs.getState().tabs.map((t) => t.id);
+    useTabs.getState().setActive(b!);
+    useTabs.getState().close(b!);
+    expect(useTabs.getState().activeId).toBe(c);
+    useTabs.getState().close(c!);
+    expect(useTabs.getState().activeId).toBe(a);
+    useTabs.getState().close(a!);
+    expect(useTabs.getState().activeId).toBeNull();
+  });
+});

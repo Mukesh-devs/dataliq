@@ -19,6 +19,8 @@ export interface RowSource {
   load(start: number, end: number): Promise<void>;
   /** Called with the row range of each page that arrives. */
   subscribe(listener: (start: number, end: number) => void): () => void;
+  /** Called with a message when a page fails to load. */
+  onError?(listener: (message: string) => void): () => void;
   dispose(): void;
 }
 
@@ -72,6 +74,7 @@ export class PagedRowSource implements RowSource {
   private readonly pages = new Map<number, Table>();
   private readonly inflight = new Map<number, Promise<void>>();
   private readonly listeners = new Set<(start: number, end: number) => void>();
+  private readonly errorListeners = new Set<(message: string) => void>();
   private disposed = false;
   /** Number of fetches issued, for tests and diagnostics. */
   fetches = 0;
@@ -127,6 +130,8 @@ export class PagedRowSource implements RowSource {
       })
       .catch((err: unknown) => {
         this.errors.push(err);
+        const message = err instanceof Error ? err.message : String(err);
+        for (const l of this.errorListeners) l(message);
       })
       .finally(() => this.inflight.delete(index));
     this.inflight.set(index, promise);
@@ -165,9 +170,15 @@ export class PagedRowSource implements RowSource {
     return () => this.listeners.delete(listener);
   }
 
+  onError(listener: (message: string) => void): () => void {
+    this.errorListeners.add(listener);
+    return () => this.errorListeners.delete(listener);
+  }
+
   dispose(): void {
     this.disposed = true;
     this.listeners.clear();
+    this.errorListeners.clear();
     this.pages.clear();
   }
 }

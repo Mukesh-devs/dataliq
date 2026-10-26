@@ -175,3 +175,17 @@ values. Fully empty rows are skipped. The header row is the first non-empty
 all-text row, skipping title rows that have fewer cells than the rows below;
 users can pick another row or "No header row". The legacy `.xls` fixture is
 written by `scripts/make_xls.py` (xlwt), since no Rust crate writes BIFF8.
+
+## D22 — Native menu on macOS only
+
+macOS apps are expected to have a menu bar (and it provides Copy/Paste in
+text fields), so BigView installs the standard menu plus File > Open… /
+Close Tab there. On Windows and Linux a menu bar would add a row of chrome
+the layout doesn't have; the same actions are on the keyboard (Ctrl+O,
+Ctrl+W, Ctrl+Tab), in the tab bar, and in the command palette (v0.2).
+
+## D23 — One integration-test binary
+
+Every Rust integration-test binary links DuckDB statically (~100 MB each).
+All integration tests live in `src-tauri/tests/it/` as modules of one binary,
+which cut `target/` growth and link time considerably.
