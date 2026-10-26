@@ -86,3 +86,26 @@ tested, and anything left over.
   5 GB .csv.gz (1,000 rows in 1.04 s); Import settings popover shows detected values.
 - Fixed along the way: `Button` now forwards refs (Radix popovers could not position).
 - Left over: truncated-gzip detection happens in the full import (step 7, see D12).
+
+### Step 6 — Data grid ✅
+
+- Glide Data Grid (`src/components/grid/DataGrid.tsx`) over a `RowSource`:
+  `StaticRowSource` (preview) or `PagedRowSource` (backend pages of 500 rows, LRU of 64
+  pages, de-duplicated requests, prefetch one page each side, redraws only affected cells).
+- Type-aware cells (`cells.ts`): numbers right-aligned and exact (BigInt), booleans as
+  checkboxes, dates/timestamps formatted, NULL as faded italic `null`, empty string as faded
+  `""`, long text truncated for display but copied in full. Header type icons, theme from the
+  CSS tokens (light/dark), density-aware row height, row numbers, column resize, range
+  selection, copy as TSV (pages loaded on demand for copy).
+- Backend: dataset registry + `fetch_rows(datasetId, start, count)` paging by rowid ranges
+  with bound parameters (`engine/datasets.rs`), `quote_ident` helper (`engine/sql.rs`).
+- Go to row (Ctrl+G) with a proportional scroll mapping (`scrollToRow.ts`) — Glide's own
+  `scrollTo` is wrong beyond the browser's ~33M px height cap.
+- Tested: row-source unit tests (LRU, de-dupe, last page, errors, 50M-row stride scroll),
+  cell mapping, scroll mapping; Rust paging tests (exact pages at start/middle/end, partial
+  last page, cap, unknown dataset) + 50M-row on-demand test (6.3 ms per random page);
+  Playwright on a mocked 50M-row dataset: first rows, wheel-scroll top to bottom with no
+  errors and the last row loaded, go to row 25,000,000, copy a range as TSV.
+  Smoke (real app): 5 GB .csv.gz preview in the canvas grid, scrolling and range selection.
+- Left over: the full dataset (and thus paging in the real app) arrives with step 7's import;
+  column header mini-histograms are v0.2.

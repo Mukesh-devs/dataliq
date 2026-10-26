@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockTauri } from "./tauri-mock";
+import { gridCell, gridHeader, mockTauri } from "./tauri-mock";
 
 test("open a CSV from the dialog and see the preview", async ({ page }) => {
   await mockTauri(page, { dialogPaths: ["/data/semicolon.csv"] });
@@ -13,8 +13,8 @@ test("open a CSV from the dialog and see the preview", async ({ page }) => {
     "aria-selected",
     "true",
   );
-  await expect(page.getByRole("columnheader", { name: "city" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "München" })).toBeVisible();
+  await expect(gridHeader(page, "city")).toBeAttached();
+  await expect(gridCell(page, "München")).toBeAttached();
   await expect(page.getByRole("status")).toContainText("3 preview rows");
 });
 

@@ -15,7 +15,9 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
   if (!tab) parts.push("Ready");
   else if (tab.status === "loading") parts.push(`Opening ${tab.title}…`);
   else if (tab.status === "error") parts.push("Could not open file");
-  else if (tab.preview) {
+  else if (tab.info?.dataset) {
+    parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
+  } else if (tab.preview) {
     parts.push(`${formatCount(tab.preview.numRows)} preview rows`);
     if (tab.previewMs !== undefined) parts.push(formatDuration(tab.previewMs));
   }

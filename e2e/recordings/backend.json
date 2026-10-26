@@ -21,6 +21,7 @@
           }
         ],
         "compression": "none",
+        "dataset": null,
         "fileName": "comma.csv",
         "format": "csv",
         "path": "/data/comma.csv",
@@ -56,6 +57,7 @@
           }
         ],
         "compression": "none",
+        "dataset": null,
         "fileName": "nulls.csv",
         "format": "csv",
         "path": "/data/nulls.csv",
@@ -91,6 +93,7 @@
           }
         ],
         "compression": "gzip",
+        "dataset": null,
         "fileName": "quoted.csv.gz",
         "format": "csv",
         "path": "/data/quoted.csv.gz",
@@ -130,6 +133,7 @@
           }
         ],
         "compression": "none",
+        "dataset": null,
         "fileName": "semicolon.csv",
         "format": "csv",
         "path": "/data/semicolon.csv",

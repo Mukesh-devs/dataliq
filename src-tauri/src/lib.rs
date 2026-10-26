@@ -46,6 +46,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::query::run_query,
             commands::query::cancel_query,
+            commands::query::fetch_rows,
             commands::files::open_file,
             commands::files::preview_file
         ])

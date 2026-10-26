@@ -58,6 +58,8 @@ pub struct SourceInfo {
     pub columns: Vec<ColumnMeta>,
     /// The table expression used to read the file, for "Copy as SQL".
     pub reader_sql: String,
+    /// Set once the full data can be paged (after import, or at once for Parquet).
+    pub dataset: Option<crate::engine::Dataset>,
 }
 
 /// A file plus the options to read it: everything needed to build its SQL.
@@ -298,6 +300,7 @@ impl Source {
             sniffed,
             columns,
             reader_sql: self.reader_display_sql()?,
+            dataset: None,
             path: self.path.clone(),
         })
     }

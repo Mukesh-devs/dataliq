@@ -8,6 +8,7 @@
     "dialog:allow-open",
     "allow-run-query",
     "allow-cancel-query",
+    "allow-fetch-rows",
     "allow-open-file",
     "allow-preview-file"
   ]

@@ -5,6 +5,7 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "run_query",
             "cancel_query",
+            "fetch_rows",
             "open_file",
             "preview_file",
         ]),

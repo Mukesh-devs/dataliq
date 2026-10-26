@@ -109,3 +109,21 @@ Messages say "Line" (file line numbers) rather than "Row".
 responses recorded from the real backend (`e2e/recordings/backend.json`,
 written by `src-tauri/tests/ui_recordings.rs`). A normal `cargo test` fails if
 the recordings drift from what the backend returns.
+
+## D15 — Playwright runs against the production bundle
+
+The plan says UI flows run against the Vite dev server. Glide Data Grid's
+`useDebouncedMemo` sets a `mountedRef` to false in an effect cleanup and never
+resets it, so under React StrictMode's dev-only double mount the grid's
+accessible cell mirror (`role="gridcell"`) never renders. Production builds
+are unaffected. Playwright therefore runs `vite build` + `vite preview`, which
+also tests the bundle that ships.
+
+## D16 — Go to row bypasses Glide's `scrollTo`
+
+Browsers cap element heights at ~33M px; 50M rows × 28 px is 1.4B px. Glide
+compensates by mapping scroll positions proportionally after big jumps, but
+its own `scrollTo` (and scroll-to-selected-cell) adds a relative delta that the
+mapping then misreads, landing at the end of the table. `scrollToRow.ts`
+computes the real scrollTop for the wanted virtual position, and the cell is
+selected only after the jump has rendered.

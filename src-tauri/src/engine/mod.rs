@@ -2,8 +2,10 @@
 //! memory limit + spill directory from settings, and cancellable requests.
 
 mod cancel;
+pub mod datasets;
 mod ipc;
 mod param;
+pub mod sql;
 
 use std::path::PathBuf;
 
@@ -13,6 +15,7 @@ use duckdb::{Config, Connection};
 use parking_lot::Mutex;
 
 pub use cancel::RequestRegistry;
+pub use datasets::{Dataset, Datasets};
 pub use ipc::batches_to_ipc;
 pub use param::Param;
 
@@ -60,6 +63,8 @@ pub struct Engine {
     /// share the same database; DuckDB connections are not `Sync`.
     root: Mutex<Connection>,
     requests: RequestRegistry,
+    /// Tables the grid can page through.
+    pub datasets: Datasets,
 }
 
 impl Engine {
@@ -80,6 +85,7 @@ impl Engine {
         Ok(Engine {
             root: Mutex::new(conn),
             requests: RequestRegistry::default(),
+            datasets: Datasets::default(),
         })
     }
 

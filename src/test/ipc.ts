@@ -28,4 +28,5 @@ export const sampleInfo = {
     { name: "name", type: "VARCHAR" },
   ],
   readerSql: "read_csv('/data/sales.csv.gz', compression = 'gzip')",
+  dataset: null,
 };

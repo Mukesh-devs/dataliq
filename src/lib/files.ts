@@ -38,6 +38,12 @@ export interface ColumnMeta {
   type: string;
 }
 
+/** Full data that the grid can page through. */
+export interface DatasetInfo {
+  id: string;
+  rowCount: number;
+}
+
 export interface SourceInfo {
   path: string;
   fileName: string;
@@ -47,6 +53,7 @@ export interface SourceInfo {
   sniffed: SniffedCsv | null;
   columns: ColumnMeta[];
   readerSql: string;
+  dataset: DatasetInfo | null;
 }
 
 export function openFile(path: string, options: OpenOptions): Promise<SourceInfo> {
@@ -60,6 +67,12 @@ export async function previewFile(
   requestId?: string,
 ): Promise<Table> {
   const bytes = await call<ArrayBuffer>("preview_file", { path, options, requestId });
+  return decodeIpc(bytes);
+}
+
+/** Rows [start, start + count) of a dataset. */
+export async function fetchRows(datasetId: string, start: number, count: number): Promise<Table> {
+  const bytes = await call<ArrayBuffer>("fetch_rows", { datasetId, start, count });
   return decodeIpc(bytes);
 }
 

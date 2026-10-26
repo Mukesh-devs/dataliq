@@ -1,8 +1,14 @@
 import { CircleAlert, LoaderCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { describeColumns } from "../../lib/arrow";
+import { fetchRows } from "../../lib/files";
 import { formatBytes } from "../../lib/format";
+import { isMac } from "../../lib/platform";
 import type { Tab } from "../../stores/tabs";
+import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
+import { GoToRow } from "../grid/GoToRow";
+import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { ImportSettings } from "../import/ImportSettings";
-import { PreviewTable } from "../preview/PreviewTable";
 
 interface FileViewProps {
   tab: Tab;
@@ -11,11 +17,45 @@ interface FileViewProps {
 
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
 
+/** Full dataset when available (paged from the backend), else the preview. */
+function useRowSource(tab: Tab): RowSource | null {
+  const datasetId = tab.info?.dataset?.id;
+  const rowCount = tab.info?.dataset?.rowCount;
+  const source = useMemo(() => {
+    if (!tab.preview) return null;
+    if (datasetId !== undefined && rowCount !== undefined) {
+      return new PagedRowSource({
+        rowCount,
+        columns: describeColumns(tab.preview),
+        fetchPage: (start, count) => fetchRows(datasetId, start, count),
+      });
+    }
+    return new StaticRowSource(tab.preview);
+  }, [tab.preview, datasetId, rowCount]);
+  useEffect(() => () => source?.dispose(), [source]);
+  return source;
+}
+
 export function FileView({ tab, onReopen }: FileViewProps) {
+  const source = useRowSource(tab);
+  const grid = useRef<DataGridHandle>(null);
+  const [goToOpen, setGoToOpen] = useState(false);
   const showSettings =
     isCsv(tab) || (tab.status === "error" && /\.(csv|tsv|txt|tab)/i.test(tab.path));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "g" && source) {
+        e.preventDefault();
+        setGoToOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [source]);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="truncate font-medium text-fg" title={tab.path}>
           {tab.title}
@@ -47,8 +87,16 @@ export function FileView({ tab, onReopen }: FileViewProps) {
             <p className="text-fg-muted">{tab.error}</p>
           </div>
         </div>
-      ) : tab.preview ? (
-        <PreviewTable table={tab.preview} />
+      ) : source ? (
+        <>
+          <DataGrid ref={grid} source={source} />
+          <GoToRow
+            open={goToOpen}
+            onOpenChange={setGoToOpen}
+            rowCount={source.rowCount}
+            onGo={(row) => grid.current?.scrollToRow(row - 1)}
+          />
+        </>
       ) : (
         <div className="flex flex-1 items-center justify-center gap-2 text-fg-muted">
           <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading {tab.title}…

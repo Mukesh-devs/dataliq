@@ -42,6 +42,28 @@ pub async fn run_query(
     Ok(Response::new(bytes))
 }
 
+/// Rows `[start, start + count)` of an open dataset as Arrow IPC bytes.
+#[tauri::command]
+pub async fn fetch_rows(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    start: u64,
+    count: u64,
+    request_id: Option<String>,
+) -> Result<Response> {
+    let engine = Arc::clone(&engine);
+    let key = RequestKey {
+        id: request_id,
+        group: None,
+    };
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        engine.fetch_rows(&dataset_id, start, count, &key)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("query task failed: {e}")))??;
+    Ok(Response::new(bytes))
+}
+
 /// Cancels a running request by id. Returns whether it was running.
 #[tauri::command]
 pub fn cancel_query(engine: State<'_, Arc<Engine>>, request_id: String) -> bool {
