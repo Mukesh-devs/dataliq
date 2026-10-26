@@ -47,3 +47,31 @@ the development container.
 Theme and density live in a Zustand store persisted to the webview's local
 storage. Backend settings (memory limit, cache) use a JSON settings file from
 step 3; UI settings move there when the settings screen arrives.
+
+## D7 — `query_arrow` (materialized) instead of `stream_arrow`
+
+The duckdb crate's Arrow iterators **panic** if fetching a chunk fails, and a
+streaming fetch can fail mid-way (for example after a cancel). We use
+`Statement::query_arrow`, which executes the whole statement before the
+iterator starts, so errors and interrupts surface as `Result`s. This is safe
+because every query the UI runs is bounded: grid pages and previews use
+`LIMIT`, and user SQL results (v0.3) are materialized into a temp table and
+paged. `run_query` also caps responses at 100,000 rows.
+
+## D8 — Parameters inside table functions
+
+User values (including file paths) are bound as parameters even inside table
+functions, e.g. `read_csv(?, delim = ?)`. DuckDB re-binds such prepared
+statements at execution time; this is covered by the engine tests.
+
+## D9 — No debug info for dependencies
+
+DuckDB's bundled C++ build produces ~6 GB of debug info per build
+configuration. `[profile.dev.package."*"] debug = false` keeps `target/` small;
+our own crate keeps full debug info.
+
+## D10 — `.zst` support
+
+DuckDB reads `.zst` CSV/JSON through the zstd file system registered by its
+Parquet extension, which we compile in. So `.csv.zst`, `.tsv.zst`,
+`.json.zst` and `.ndjson.zst` are supported in addition to `.gz`.

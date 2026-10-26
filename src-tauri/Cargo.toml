@@ -19,3 +19,22 @@ tauri-build = { version = "=2.7.2", features = [] }
 tauri = { version = "=2.12.3", features = [] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+# `json` and `parquet` are compiled in so DuckDB never needs to download extensions.
+duckdb = { version = "=1.10506.0", features = ["bundled", "json", "parquet"] }
+# Same major version as duckdb's arrow; adds the IPC writer.
+arrow = { version = "58.4.1", default-features = false, features = ["ipc"] }
+thiserror = "2.0.21"
+tracing = "0.1.44"
+dirs = "7.0.0"
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing-appender = "0.2.5"
+parking_lot = "0.12.5"
+
+[dev-dependencies]
+criterion = "0.8.2"
+tempfile = "3.27.0"
+
+[[bench]]
+name = "arrow_transfer"
+harness = false

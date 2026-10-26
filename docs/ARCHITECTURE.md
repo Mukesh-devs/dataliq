@@ -30,6 +30,20 @@ docs/                 decisions, benchmarks, architecture
 
 Modules are added as the roadmap reaches them.
 
+## Engine
+
+`engine::Engine` owns one in-memory DuckDB database. Every query runs on its
+own connection (`try_clone`) inside `spawn_blocking`, so the UI thread never
+waits on DuckDB. The memory limit (default 50% of RAM) and spill directory
+come from `settings.json` in the OS config directory.
+
+Requests carry an optional id and group. `cancel_query(id)` interrupts a
+running query; starting a request in a group (e.g. one grid view) interrupts
+older requests in the same group, so a newer scroll or filter always wins.
+
+Results travel as raw Arrow IPC stream bytes (`tauri::ipc::Response`), decoded
+in the frontend with `apache-arrow` (`src/lib/arrow.ts`). No JSON for rows.
+
 ## Data flow
 
 ```

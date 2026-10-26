@@ -28,3 +28,22 @@ tested, and anything left over.
   theme-persistence flow. Smoke check: the debug app window shows the shell with the
   bundled fonts under the strict CSP.
 - Left over: drag-and-drop and Open are wired up in step 10 (Tabs and opening).
+
+### Step 3 — DuckDB engine ✅
+
+- `engine::Engine`: in-memory DuckDB (bundled, with json + parquet compiled in, extension
+  auto-install/auto-load off), memory limit (default 50% RAM) and spill dir from
+  `settings.json` (OS config dir, written with defaults on first start), one connection per
+  query, request registry with cancel-by-id and "newer request in a group wins".
+- Commands `run_query` (returns raw Arrow IPC via `tauri::ipc::Response`, capped at 100k rows)
+  and `cancel_query`; per-command permissions in `capabilities/default.json`.
+- Frontend: `src/lib/arrow.ts` (decode + type mapping), `src/lib/ipc.ts` (typed `invoke`,
+  `BigViewError`), status bar shows the DuckDB version via a real Arrow round trip.
+- Logging with `tracing` to stderr and a daily-rolling file in the app log dir.
+- Tested: 10 engine integration tests (types/values of a known query, IPC round trip vs a
+  committed fixture, empty results keep schema, bound parameters, row cap, memory/temp/thread
+  settings, offline JSON+Parquet, plain error messages, cancel by id, group cancel) + unit
+  tests for settings/errors/params; Vitest decodes the Rust-written IPC fixture and tests the
+  engine store with mocked IPC. Benchmark: 0.58 ms per 1,000-row page (docs/BENCHMARKS.md).
+  Smoke check: app status bar shows "Ready · DuckDB v1.5.6"; settings.json and log file created.
+- Left over: none.

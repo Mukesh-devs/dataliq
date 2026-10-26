@@ -2,11 +2,20 @@ import { EmptyState } from "../components/shell/EmptyState";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
+import { useEffect } from "react";
+import { useEngine } from "../stores/engine";
 import { useTabs } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 
 export function App() {
   const { tabs, activeId, setActive } = useTabs();
+  const engineVersion = useEngine((s) => s.version);
+  const probeEngine = useEngine((s) => s.probe);
+
+  useEffect(() => {
+    void probeEngine();
+  }, [probeEngine]);
+
   // File opening is wired up in later steps (import + tabs).
   const openFile = () => {};
 
@@ -20,7 +29,14 @@ export function App() {
           <EmptyState onOpen={openFile} recent={[]} onOpenRecent={() => {}} />
         </main>
       </div>
-      <StatusBar message={tabs.length === 0 ? "Ready" : `${tabs.length} files open`} />
+      <StatusBar
+        message={[
+          tabs.length === 0 ? "Ready" : `${tabs.length} files open`,
+          engineVersion && `DuckDB ${engineVersion}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      />
     </div>
   );
 }

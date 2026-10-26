@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Minimum permissions for the main window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "allow-run-query", "allow-cancel-query"]
 }
