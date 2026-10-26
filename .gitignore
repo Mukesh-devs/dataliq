@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+src-tauri/gen/schemas/
+*.tsbuildinfo
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+e2e/__screenshots__/actual/
+
+# Generated large fixtures (see scripts/gen_fixtures.py)
+fixtures/generated/
+
+# Benchmarks
+bench-results/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
