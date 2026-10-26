@@ -42,6 +42,35 @@ export interface ColumnMeta {
 export interface DatasetInfo {
   id: string;
   rowCount: number;
+  /** Imported into the cache (false = read straight from the file). */
+  cached?: boolean;
+}
+
+export interface ImportOutcome {
+  dataset: DatasetInfo;
+  fromCache: boolean;
+  elapsedMs: number;
+}
+
+export interface ImportProgress {
+  jobId: string;
+  percent: number | null;
+  elapsedMs: number;
+}
+
+export interface CacheInfo {
+  dir: string;
+  enabled: boolean;
+  maxBytes: number;
+  usedBytes: number;
+  entries: number;
+}
+
+export interface AppSettings {
+  memoryLimitMb: number | null;
+  cacheEnabled: boolean;
+  cacheMaxGb: number;
+  smallFileMb: number;
 }
 
 export interface SourceInfo {
@@ -74,6 +103,48 @@ export async function previewFile(
 export async function fetchRows(datasetId: string, start: number, count: number): Promise<Table> {
   const bytes = await call<ArrayBuffer>("fetch_rows", { datasetId, start, count });
   return decodeIpc(bytes);
+}
+
+/** Imports a file into the cache (or reuses it). Progress arrives as events. */
+export function importFile(
+  path: string,
+  options: OpenOptions,
+  jobId: string,
+): Promise<ImportOutcome> {
+  return call<ImportOutcome>("import_file", { path, options, jobId });
+}
+
+export function cancelImport(jobId: string): Promise<boolean> {
+  return call<boolean>("cancel_import", { jobId });
+}
+
+/** Reads a file directly without importing (slower deep scrolling). */
+export function openDirect(path: string, options: OpenOptions): Promise<DatasetInfo> {
+  return call<DatasetInfo>("open_direct", { path, options });
+}
+
+export function closeDataset(datasetId: string): Promise<void> {
+  return call<void>("close_dataset", { datasetId });
+}
+
+export function cacheInfo(): Promise<CacheInfo> {
+  return call<CacheInfo>("cache_info");
+}
+
+export function clearCache(): Promise<CacheInfo> {
+  return call<CacheInfo>("clear_cache");
+}
+
+export function getSettings(): Promise<AppSettings> {
+  return call<AppSettings>("get_settings");
+}
+
+/** Subscribes to import progress events. Resolves to an unsubscribe function. */
+export async function onImportProgress(
+  handler: (progress: ImportProgress) => void,
+): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<ImportProgress>("import-progress", (e) => handler(e.payload));
 }
 
 export const FILE_EXTENSIONS = [

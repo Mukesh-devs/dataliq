@@ -1,6 +1,9 @@
-import { Columns3, Files } from "lucide-react";
+import { Columns3, Database, Files } from "lucide-react";
 import type { ReactNode } from "react";
+import { formatBytes } from "../../lib/format";
+import { useApp } from "../../stores/app";
 import type { Tab } from "../../stores/tabs";
+import { Button } from "../ui/Button";
 
 function Section({
   title,
@@ -44,6 +47,30 @@ export function Sidebar({ tabs }: { tabs: Tab[] }) {
       <Section title="Columns" icon={<Columns3 className="size-3.5" aria-hidden />}>
         <p className="px-1.5 text-fg-subtle">Open a file to see its columns</p>
       </Section>
+      <div className="flex-1" />
+      <CacheSection />
     </aside>
+  );
+}
+
+function CacheSection() {
+  const cache = useApp((s) => s.cache);
+  const clear = useApp((s) => s.clearCache);
+  if (!cache) return null;
+  return (
+    <Section title="Cache" icon={<Database className="size-3.5" aria-hidden />}>
+      <div className="flex items-center gap-2 px-1.5 text-[12px] text-fg-muted">
+        <span className="tabular flex-1" title={cache.dir}>
+          {cache.enabled
+            ? `${formatBytes(cache.usedBytes)} of ${formatBytes(cache.maxBytes)}`
+            : "Caching is off"}
+        </span>
+        {cache.enabled && cache.entries > 0 && (
+          <Button size="sm" variant="ghost" onClick={() => void clear()}>
+            Clear cache
+          </Button>
+        )}
+      </div>
+    </Section>
   );
 }

@@ -26,7 +26,8 @@ arrow = { version = "58.4.1", default-features = false, features = ["ipc"] }
 thiserror = "2.0.21"
 tracing = "0.1.44"
 dirs = "7.0.0"
-sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system", "disk"] }
+sha2 = "0.11.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing-appender = "0.2.5"
 parking_lot = "0.12.5"

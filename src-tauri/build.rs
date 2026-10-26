@@ -8,6 +8,13 @@ fn main() {
             "fetch_rows",
             "open_file",
             "preview_file",
+            "import_file",
+            "cancel_import",
+            "open_direct",
+            "close_dataset",
+            "cache_info",
+            "clear_cache",
+            "get_settings",
         ]),
     ))
     .expect("failed to run tauri-build");

@@ -10,6 +10,13 @@
     "allow-cancel-query",
     "allow-fetch-rows",
     "allow-open-file",
-    "allow-preview-file"
+    "allow-preview-file",
+    "allow-import-file",
+    "allow-cancel-import",
+    "allow-open-direct",
+    "allow-close-dataset",
+    "allow-cache-info",
+    "allow-clear-cache",
+    "allow-get-settings"
   ]
 }

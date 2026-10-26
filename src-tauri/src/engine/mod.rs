@@ -5,17 +5,18 @@ mod cancel;
 pub mod datasets;
 mod ipc;
 mod param;
+pub mod raw;
 pub mod sql;
 
 use std::path::PathBuf;
 
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use duckdb::{Config, Connection};
+use duckdb::Connection;
 use parking_lot::Mutex;
 
 pub use cancel::RequestRegistry;
-pub use datasets::{Dataset, Datasets};
+pub use datasets::{Dataset, DatasetSource, Datasets};
 pub use ipc::batches_to_ipc;
 pub use param::Param;
 
@@ -65,6 +66,8 @@ pub struct Engine {
     requests: RequestRegistry,
     /// Tables the grid can page through.
     pub datasets: Datasets,
+    /// The database handle; declared last so it is closed after `root`.
+    raw: raw::RawDb,
 }
 
 impl Engine {
@@ -72,21 +75,34 @@ impl Engine {
     pub fn open_in_memory(cfg: &EngineConfig) -> Result<Engine> {
         std::fs::create_dir_all(&cfg.temp_dir)?;
         let mib = (cfg.memory_limit_bytes / (1024 * 1024)).max(1);
-        let mut config = Config::default()
-            .max_memory(&format!("{mib}MiB"))?
-            .with("temp_directory", cfg.temp_dir.to_string_lossy())?
+        let mut settings = vec![
+            ("max_memory", format!("{mib}MiB")),
+            (
+                "temp_directory",
+                cfg.temp_dir.to_string_lossy().into_owned(),
+            ),
             // Fully offline: json/parquet are compiled in; never download extensions.
-            .enable_autoload_extension(false)?
-            .with("autoinstall_known_extensions", "false")?;
+            ("autoload_known_extensions", "false".to_string()),
+            ("autoinstall_known_extensions", "false".to_string()),
+        ];
         if let Some(t) = cfg.threads {
-            config = config.threads(i64::from(t.max(1)))?;
+            settings.push(("threads", t.max(1).to_string()));
         }
-        let conn = Connection::open_in_memory_with_flags(config)?;
+        let raw = raw::RawDb::open_in_memory(&settings)?;
+        // SAFETY: `raw` outlives every connection: it is dropped last (field
+        // order) and connections are only used while the Engine is alive.
+        let conn = unsafe { Connection::open_from_raw(raw.handle())? };
         Ok(Engine {
             root: Mutex::new(conn),
             requests: RequestRegistry::default(),
             datasets: Datasets::default(),
+            raw,
         })
+    }
+
+    /// A raw connection for a long statement whose progress can be polled.
+    pub fn raw_connection(&self) -> Result<raw::RawConnection> {
+        raw::RawConnection::connect(&self.raw)
     }
 
     /// A new connection to the shared database, for one query on one thread.

@@ -127,3 +127,24 @@ its own `scrollTo` (and scroll-to-selected-cell) adds a relative delta that the
 mapping then misreads, landing at the end of the table. `scrollToRow.ts`
 computes the real scrollTop for the wanted virtual position, and the cell is
 selected only after the jump has rendered.
+
+## D17 — Import progress through DuckDB's C API
+
+The `duckdb` crate does not expose `duckdb_query_progress` or the raw
+connection handle. The engine therefore opens the database itself through the
+C API (`engine/raw.rs`, `duckdb_open_ext` with our settings) and wraps it with
+`Connection::open_from_raw` for normal queries. Imports run on a raw
+connection with `enable_progress_bar` on; a second thread polls
+`duckdb_query_progress` (atomics inside DuckDB) every 250 ms and emits
+`import-progress` events. For CSV, DuckDB's percentage is based on bytes read
+— compressed bytes for `.gz` — which is what the plan asks for.
+
+## D18 — Caching disabled and low disk space
+
+With caching off, imports still write a DuckDB file (paging needs a table with
+contiguous rowids) but into a per-process temp folder deleted on exit. When the
+cache disk lacks room for the estimated database (0.5× the file size, or
+1.5× for compressed input, plus 1 GB — measured databases are ~0.2× and
+~0.4×), the import stops with a plain message and the UI
+offers **Read directly**: the grid then pages `read_csv(...)` with
+LIMIT/OFFSET — no disk needed, slower when jumping deep into the file.

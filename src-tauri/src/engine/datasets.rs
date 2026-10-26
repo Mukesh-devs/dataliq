@@ -8,15 +8,27 @@ use serde::Serialize;
 use super::{Engine, Param, RequestKey};
 use crate::error::{AppError, Result};
 
-/// A pageable table. `relation` is a quoted table name whose `rowid`s are
-/// contiguous from 0 (tables created with CREATE TABLE AS, never deleted from).
+/// How a dataset's rows are read.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DatasetSource {
+    /// A quoted table name whose `rowid`s are contiguous from 0 (created with
+    /// CREATE TABLE AS and never deleted from). Paged by rowid range.
+    Table(String),
+    /// A table expression read directly from the file (no import). Paged with
+    /// LIMIT/OFFSET, so deep pages are slower; used when disk space is low.
+    Query { sql: String, params: Vec<Param> },
+}
+
+/// Data the grid can page through.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dataset {
     pub id: String,
     #[serde(skip)]
-    pub relation: String,
+    pub source: DatasetSource,
     pub row_count: u64,
+    /// Imported into the cache (false = read straight from the file).
+    pub cached: bool,
 }
 
 #[derive(Default)]
@@ -40,6 +52,10 @@ impl Datasets {
     pub fn remove(&self, id: &str) -> Option<Dataset> {
         self.map.write().remove(id)
     }
+
+    pub fn ids(&self) -> Vec<String> {
+        self.map.read().keys().cloned().collect()
+    }
 }
 
 /// Largest page the grid may request at once.
@@ -59,11 +75,21 @@ impl Engine {
         let ds = self.datasets.get(id)?;
         let count = count.min(MAX_PAGE_ROWS);
         let end = start.saturating_add(count).min(ds.row_count);
-        let sql = format!(
-            "SELECT * FROM {} WHERE rowid >= ? AND rowid < ? ORDER BY rowid",
-            ds.relation
-        );
-        let params = [Param::Int(start as i64), Param::Int(end as i64)];
-        self.query_ipc(&sql, &params, count as usize, key)
+        match &ds.source {
+            DatasetSource::Table(relation) => {
+                let sql = format!(
+                    "SELECT * FROM {relation} WHERE rowid >= ? AND rowid < ? ORDER BY rowid"
+                );
+                let params = [Param::Int(start as i64), Param::Int(end as i64)];
+                self.query_ipc(&sql, &params, count as usize, key)
+            }
+            DatasetSource::Query { sql, params } => {
+                let sql = format!("SELECT * FROM {sql} LIMIT ? OFFSET ?");
+                let mut params = params.clone();
+                params.push(Param::Int(end.saturating_sub(start) as i64));
+                params.push(Param::Int(start as i64));
+                self.query_ipc(&sql, &params, count as usize, key)
+            }
+        }
     }
 }

@@ -1,8 +1,33 @@
 import type { Table } from "apache-arrow";
 import { create } from "zustand";
-import { baseName, openFile, previewFile, type OpenOptions, type SourceInfo } from "../lib/files";
+import {
+  baseName,
+  cancelImport,
+  closeDataset,
+  importFile,
+  openDirect,
+  openFile,
+  previewFile,
+  type ImportProgress,
+  type OpenOptions,
+  type SourceInfo,
+} from "../lib/files";
 
 export type TabStatus = "loading" | "ready" | "error";
+
+export interface ImportState {
+  jobId: string;
+  status: "running" | "done" | "error" | "cancelled";
+  /** 0–100, or null while it can't be estimated. */
+  percent: number | null;
+  elapsedMs: number;
+  /** Error message (status "error"). */
+  error?: string;
+  /** Error kind from the backend, e.g. "low-disk". */
+  errorKind?: string;
+  /** Reused an existing cache entry. */
+  fromCache?: boolean;
+}
 
 export interface Tab {
   id: string;
@@ -18,6 +43,8 @@ export interface Tab {
   error?: string;
   /** Time from open to first rows on screen, in ms. */
   previewMs?: number;
+  /** Background import of the full file. */
+  import?: ImportState;
 }
 
 interface TabsState {
@@ -28,35 +55,89 @@ interface TabsState {
   openPath: (path: string) => Promise<void>;
   /** Re-opens a tab's file with new import settings. */
   reopen: (id: string, options: OpenOptions) => Promise<void>;
+  cancelImport: (id: string) => Promise<void>;
+  /** Reads the file directly instead of importing (e.g. low disk space). */
+  readDirect: (id: string) => Promise<void>;
   close: (id: string) => void;
+  /** Applies an `import-progress` event (subscribed once by the App). */
+  applyProgress: (progress: ImportProgress) => void;
 }
 
 let nextId = 1;
+let nextJob = 1;
 
 export const useTabs = create<TabsState>()((set, get) => {
   const patch = (id: string, changes: Partial<Tab>) =>
     set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...changes } : t)) }));
+  const find = (id: string) => get().tabs.find((t) => t.id === id);
+
+  /** Imports the full file in the background; the preview stays usable. */
+  const startImport = async (id: string, path: string, options: OpenOptions) => {
+    const jobId = `job-${nextJob++}`;
+    patch(id, { import: { jobId, status: "running", percent: null, elapsedMs: 0 } });
+    const isCurrent = () => find(id)?.import?.jobId === jobId;
+    try {
+      const outcome = await importFile(path, options, jobId);
+      const tab = find(id);
+      if (!tab || !isCurrent()) {
+        void closeDataset(outcome.dataset.id).catch(() => {});
+        return;
+      }
+      patch(id, {
+        info: tab.info ? { ...tab.info, dataset: outcome.dataset } : tab.info,
+        import: {
+          jobId,
+          status: "done",
+          percent: 100,
+          elapsedMs: outcome.elapsedMs,
+          fromCache: outcome.fromCache,
+        },
+      });
+    } catch (err) {
+      if (!isCurrent()) return;
+      const kind = (err as { kind?: string }).kind;
+      const current = find(id)?.import;
+      patch(id, {
+        import: {
+          jobId,
+          status: kind === "cancelled" ? "cancelled" : "error",
+          percent: current?.percent ?? null,
+          elapsedMs: current?.elapsedMs ?? 0,
+          error: err instanceof Error ? err.message : String(err),
+          errorKind: kind,
+        },
+      });
+    }
+  };
 
   /** Loads info and preview in parallel; a newer load for the tab wins. */
   const load = async (id: string, path: string, options: OpenOptions) => {
     const started = performance.now();
     const requestId = `${id}:${started}`;
-    patch(id, { status: "loading", options, error: undefined });
+    patch(id, { status: "loading", options, error: undefined, import: undefined });
     try {
       const [info, preview] = await Promise.all([
         openFile(path, options),
         previewFile(path, options, requestId),
       ]);
-      const current = get().tabs.find((t) => t.id === id);
+      const current = find(id);
       if (!current || current.options !== options) return; // superseded or closed
       patch(id, { status: "ready", info, preview, previewMs: performance.now() - started });
+      if (!info.dataset) void startImport(id, path, options);
     } catch (err) {
-      const current = get().tabs.find((t) => t.id === id);
+      const current = find(id);
       if (!current || current.options !== options) return;
       const kind = (err as { kind?: string }).kind;
       if (kind === "cancelled") return;
       patch(id, { status: "error", error: err instanceof Error ? err.message : String(err) });
     }
+  };
+
+  /** Cancels a running import and closes the tab's dataset. */
+  const release = (tab: Tab) => {
+    if (tab.import?.status === "running") void cancelImport(tab.import.jobId).catch(() => {});
+    const ds = tab.info?.dataset;
+    if (ds) void closeDataset(ds.id).catch(() => {});
   };
 
   return {
@@ -78,16 +159,57 @@ export const useTabs = create<TabsState>()((set, get) => {
       await load(id, path, options);
     },
     reopen: async (id, options) => {
-      const tab = get().tabs.find((t) => t.id === id);
-      if (tab) await load(id, tab.path, options);
+      const tab = find(id);
+      if (!tab) return;
+      release(tab);
+      patch(id, { info: tab.info ? { ...tab.info, dataset: null } : tab.info });
+      await load(id, tab.path, options);
     },
-    close: (id) =>
+    cancelImport: async (id) => {
+      const job = find(id)?.import;
+      if (job?.status === "running") await cancelImport(job.jobId);
+    },
+    readDirect: async (id) => {
+      const tab = find(id);
+      if (!tab?.info) return;
+      try {
+        const dataset = await openDirect(tab.path, tab.options);
+        const t = find(id);
+        if (!t?.info) return;
+        patch(id, {
+          info: { ...t.info, dataset },
+          import: { jobId: "direct", status: "done", percent: 100, elapsedMs: 0 },
+        });
+      } catch (err) {
+        patch(id, {
+          import: {
+            jobId: "direct",
+            status: "error",
+            percent: null,
+            elapsedMs: 0,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
+    },
+    applyProgress: (p) =>
+      set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.import?.jobId === p.jobId && t.import.status === "running"
+            ? { ...t, import: { ...t.import, percent: p.percent, elapsedMs: p.elapsedMs } }
+            : t,
+        ),
+      })),
+    close: (id) => {
+      const tab = find(id);
+      if (tab) release(tab);
       set((s) => {
         const index = s.tabs.findIndex((t) => t.id === id);
         const tabs = s.tabs.filter((t) => t.id !== id);
         const activeId =
           s.activeId === id ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null) : s.activeId;
         return { tabs, activeId };
-      }),
+      });
+    },
   };
 });

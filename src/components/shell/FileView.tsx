@@ -8,11 +8,15 @@ import type { Tab } from "../../stores/tabs";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
+import { smallFileBytes, useApp } from "../../stores/app";
+import { ImportBar } from "../import/ImportBar";
 import { ImportSettings } from "../import/ImportSettings";
 
 interface FileViewProps {
   tab: Tab;
   onReopen: (options: Tab["options"]) => void;
+  onCancelImport?: () => void;
+  onReadDirect?: () => void;
 }
 
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
@@ -36,8 +40,9 @@ function useRowSource(tab: Tab): RowSource | null {
   return source;
 }
 
-export function FileView({ tab, onReopen }: FileViewProps) {
+export function FileView({ tab, onReopen, onCancelImport, onReadDirect }: FileViewProps) {
   const source = useRowSource(tab);
+  const settings = useApp((s) => s.settings);
   const grid = useRef<DataGridHandle>(null);
   const [goToOpen, setGoToOpen] = useState(false);
   const showSettings =
@@ -76,6 +81,15 @@ export function FileView({ tab, onReopen }: FileViewProps) {
           />
         )}
       </div>
+      {tab.import && tab.status === "ready" && (
+        <ImportBar
+          state={tab.import}
+          quiet={(tab.info?.sizeBytes ?? 0) < smallFileBytes(settings)}
+          onCancel={() => onCancelImport?.()}
+          onReadDirect={() => onReadDirect?.()}
+          onRetry={() => onReopen(tab.options)}
+        />
+      )}
       {tab.status === "error" ? (
         <div
           role="alert"

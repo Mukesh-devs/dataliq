@@ -17,15 +17,26 @@ pub struct Settings {
     pub temp_dir: Option<PathBuf>,
     /// DuckDB worker threads. `None` = all cores.
     pub threads: Option<u32>,
+    /// Keep imported datasets between sessions.
+    pub cache_enabled: bool,
+    /// Cache size limit in GiB (least recently used entries are removed).
+    pub cache_max_gb: u64,
+    /// Cache location. `None` = the OS cache directory.
+    pub cache_dir: Option<PathBuf>,
+    /// Files smaller than this (MiB) import without a progress bar.
+    pub small_file_mb: u64,
 }
 
-#[allow(clippy::derivable_impls)] // explicit so defaults are documented in one place
 impl Default for Settings {
     fn default() -> Self {
         Settings {
             memory_limit_mb: None,
             temp_dir: None,
             threads: None,
+            cache_enabled: true,
+            cache_max_gb: 20,
+            cache_dir: None,
+            small_file_mb: 100,
         }
     }
 }
@@ -102,6 +113,8 @@ mod tests {
             memory_limit_mb: Some(2048),
             temp_dir: Some(dir.path().join("spill")),
             threads: Some(2),
+            cache_max_gb: 5,
+            ..Settings::default()
         };
         s.save(&path).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
@@ -117,6 +130,8 @@ mod tests {
         let s = Settings::load(&path).unwrap();
         assert_eq!(s.threads, Some(4));
         assert_eq!(s.memory_limit_mb, None);
+        assert!(s.cache_enabled);
+        assert_eq!(s.cache_max_gb, 20);
     }
 
     #[test]

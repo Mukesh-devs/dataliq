@@ -33,5 +33,16 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | First rows of a 5 GB CSV | < 1 s | 0.30 s | v0.1 step 5 |
 | First rows of a 5 GB .csv.gz (109M rows, ~12.5 GB uncompressed) | < 2 s | 1.23 s (test), 1.04 s in the app | v0.1 step 5 |
 
+| Full import of a 100 MB CSV (908K rows) | — | 2.2 s | v0.1 step 7 |
+| Full import of a 100 MB .csv.gz (2.1M rows) | — | 3.8 s | v0.1 step 7 |
+| Full import of a 5 GB CSV (45.8M rows) | report (aim < 60 s) | 31.9 s (168 MB/s), cache file 0.96 GB | v0.1 step 7 |
+| Full import of a 5 GB .csv.gz (109M rows) | report | 98.5 s (55 MB/s compressed, ~127 MB/s uncompressed), cache file 2.27 GB | v0.1 step 7 |
+| Reopen a cached file | < 1 s | 1–2 ms | v0.1 step 7 |
+| Peak memory while importing 5 GB | < DuckDB limit + 300 MB (8,045 + 300 MiB) | 1.9 GB (CSV), 3.2 GB (.csv.gz) | v0.1 step 7 |
+
+Import numbers come from `cargo test -p bigview --test perf_import -- --ignored --nocapture
+--test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
+so `.csv.gz` imports are bounded by it (plus our parallel integrity check on another core).
+
 Preview numbers come from `cargo test -p bigview --test perf_preview -- --ignored --nocapture`
 (dev profile) and the app's status bar.

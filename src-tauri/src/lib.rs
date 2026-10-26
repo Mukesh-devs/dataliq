@@ -1,8 +1,10 @@
 //! BigView desktop app: Tauri entry point and module tree.
 
+pub mod cache;
 pub mod commands;
 pub mod engine;
 pub mod error;
+pub mod import;
 pub mod settings;
 pub mod sources;
 
@@ -40,6 +42,23 @@ pub fn run() {
             );
             let engine = Engine::open_in_memory(&cfg)?;
             app.manage(Arc::new(engine));
+
+            let cache_dir = match &settings.cache_dir {
+                Some(dir) => dir.clone(),
+                None => paths.app_cache_dir()?.join("datasets"),
+            };
+            let cache = cache::Cache::new(cache::CacheConfig {
+                dir: cache_dir,
+                max_bytes: settings.cache_max_gb.saturating_mul(1 << 30),
+                enabled: settings.cache_enabled,
+            })?;
+            // Uncached imports live only for this session.
+            let temp_dir = std::env::temp_dir().join(format!("bigview-{}", std::process::id()));
+            app.manage(Arc::new(commands::import::ImportState {
+                cache,
+                imports: import::Imports::default(),
+                temp_dir,
+            }));
             app.manage(settings);
             Ok(())
         })
@@ -48,8 +67,23 @@ pub fn run() {
             commands::query::cancel_query,
             commands::query::fetch_rows,
             commands::files::open_file,
-            commands::files::preview_file
+            commands::files::preview_file,
+            commands::import::import_file,
+            commands::import::cancel_import,
+            commands::import::open_direct,
+            commands::import::close_dataset,
+            commands::import::cache_info,
+            commands::import::clear_cache,
+            commands::import::get_settings
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running BigView");
+        .build(tauri::generate_context!())
+        .expect("error while building BigView")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Uncached imports are session-only.
+                if let Some(state) = app.try_state::<Arc<commands::import::ImportState>>() {
+                    let _ = std::fs::remove_dir_all(&state.temp_dir);
+                }
+            }
+        });
 }

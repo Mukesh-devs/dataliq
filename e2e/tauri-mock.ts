@@ -17,6 +17,11 @@ export interface MockOptions {
   datasets?: Record<string, number>;
   /** Builds Arrow IPC (base64) for `fetch_rows`; runs in Node. */
   fetchRows?: (start: number, count: number) => string;
+  /**
+   * Simulated background imports by path: progress events to emit (one per
+   * `stepMs`) and the final row count. Paths not listed never finish.
+   */
+  imports?: Record<string, { progress: number[]; rows: number; stepMs?: number }>;
 }
 
 /**
@@ -30,12 +35,19 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     await page.exposeFunction("__fetchRows", (start: number, count: number) => build(start, count));
   }
   await page.addInitScript(
-    ({ recordings, dialogPaths, datasets }) => {
+    ({ recordings, dialogPaths, datasets, imports }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
       w.__invokes = log;
       let nextCallback = 1;
+      const listeners: Record<string, number[]> = {};
+      const emit = (event: string, payload: unknown) => {
+        for (const id of listeners[event] ?? []) {
+          (w[`_${id}`] as (e: unknown) => void)?.({ event, id, payload });
+        }
+      };
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       w.__TAURI_INTERNALS__ = {
         metadata: {
           currentWindow: { label: "main" },
@@ -61,6 +73,40 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 ? file.info
                 : { ...(file.info as object), dataset: { id: "ds-1", rowCount: rows } };
             }
+            case "plugin:event|listen": {
+              const event = String(args.event);
+              (listeners[event] ??= []).push(Number(args.handler));
+              return Number(args.handler);
+            }
+            case "plugin:event|unlisten":
+              return null;
+            case "get_settings":
+              return { memoryLimitMb: null, cacheEnabled: true, cacheMaxGb: 20, smallFileMb: 0 };
+            case "cache_info":
+              return {
+                dir: "/cache",
+                enabled: true,
+                maxBytes: 20 * 1024 ** 3,
+                usedBytes: 0,
+                entries: 0,
+              };
+            case "cancel_import":
+            case "close_dataset":
+              return true;
+            case "import_file": {
+              const plan = imports[String(args.path)];
+              if (!plan) return new Promise(() => {}); // never finishes
+              for (const percent of plan.progress) {
+                await sleep(plan.stepMs ?? 150);
+                emit("import-progress", { jobId: args.jobId, percent, elapsedMs: 1000 });
+              }
+              await sleep(plan.stepMs ?? 150);
+              return {
+                dataset: { id: "imported-1", rowCount: plan.rows, cached: true },
+                fromCache: false,
+                elapsedMs: 4200,
+              };
+            }
             case "fetch_rows": {
               const fetchRows = w.__fetchRows as (s: number, c: number) => Promise<string>;
               return toBuffer(await fetchRows(Number(args.start), Number(args.count)));
@@ -74,7 +120,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
         },
       };
     },
-    { recordings, dialogPaths: options.dialogPaths ?? [], datasets: options.datasets ?? {} },
+    {
+      recordings,
+      dialogPaths: options.dialogPaths ?? [],
+      datasets: options.datasets ?? {},
+      imports: options.imports ?? {},
+    },
   );
 }
 

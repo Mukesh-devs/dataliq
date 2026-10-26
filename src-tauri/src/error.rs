@@ -15,6 +15,9 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error("Settings file is invalid: {0}")]
     Settings(String),
+    /// Not enough free disk space to import into the cache.
+    #[error("Not enough free disk space to import this file: about {} needed, {} free. You can read it directly from the file instead (slower), or free up space.", human(*needed), human(*available))]
+    LowDisk { needed: u64, available: u64 },
     /// Unexpected internal error (a bug). Logged with details.
     #[error("Something went wrong: {0}")]
     Internal(String),
@@ -28,6 +31,7 @@ impl AppError {
             AppError::Cancelled => "cancelled",
             AppError::Io(_) => "io",
             AppError::Settings(_) => "settings",
+            AppError::LowDisk { .. } => "low-disk",
             AppError::Internal(_) => "internal",
         }
     }
@@ -58,6 +62,15 @@ impl Serialize for AppError {
         s.serialize_field("kind", self.kind())?;
         s.serialize_field("message", &self.to_string())?;
         s.end()
+    }
+}
+
+fn human(bytes: u64) -> String {
+    let gb = bytes as f64 / (1u64 << 30) as f64;
+    if gb >= 1.0 {
+        format!("{gb:.1} GB")
+    } else {
+        format!("{:.0} MB", bytes as f64 / (1u64 << 20) as f64)
     }
 }
 

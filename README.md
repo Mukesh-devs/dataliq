@@ -18,12 +18,15 @@ and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
 - Delimiter, header, quoting and types are detected automatically; override
   them in **Import settings** (delimiter, header, quote, encoding, skip rows,
   date format, ignore bad rows).
+- The full file is imported in the background into a local cache (with
+  progress and Cancel) while you browse the preview; reopening an unchanged
+  file is instant.
 - A fast canvas data grid: type icons, right-aligned numbers, `null` shown
   distinctly from empty text, column resize, range selection and copy, and
   **Go to row** (Ctrl+G).
 - Light and dark themes that follow your OS.
 
-_Coming in v0.1:_ JSON/NDJSON, Parquet and Excel, background import with a disk cache, tabs and opening from the terminal.
+_Coming in v0.1:_ JSON/NDJSON, Parquet and Excel, tabs and opening from the terminal.
 
 ## Building from source
 

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use arrow::array::AsArray;
 use arrow::datatypes::Int64Type;
 use arrow::ipc::reader::StreamReader;
-use bigview_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
+use bigview_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, RequestKey};
 
 fn engine_with_table(rows: u64) -> (Engine, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();
@@ -25,8 +25,9 @@ fn engine_with_table(rows: u64) -> (Engine, tempfile::TempDir) {
         .unwrap();
     engine.datasets.insert(Dataset {
         id: "ds".into(),
-        relation: "\"big table\"".into(),
+        source: DatasetSource::Table("\"big table\"".into()),
         row_count: rows,
+        cached: true,
     });
     (engine, tmp)
 }

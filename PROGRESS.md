@@ -109,3 +109,32 @@ tested, and anything left over.
   Smoke (real app): 5 GB .csv.gz preview in the canvas grid, scrolling and range selection.
 - Left over: the full dataset (and thus paging in the real app) arrives with step 7's import;
   column header mini-histograms are v0.2.
+
+### Step 7 — Background import and cache ✅
+
+- `cache/`: key = SHA-256 of (absolute path, size, mtime, import options); one DuckDB file +
+  JSON meta per dataset in the OS cache dir; writes go to `.partial` and are renamed on
+  success; stale partials removed at startup; LRU cleanup to `cacheMaxGb` (default 20) never
+  touching open datasets; clear; free-space lookup.
+- `import/`: `CREATE TABLE … AS SELECT * FROM read_csv(…)` on a raw DuckDB connection
+  (`engine/raw.rs`, C API) so progress (`duckdb_query_progress`, bytes-based for CSV/.gz) can
+  be polled and the import interrupted; gzip integrity check in parallel (`sources/integrity.rs`);
+  attach read-only + register as a rowid-paged dataset; low-disk error with a "Read directly"
+  fallback (LIMIT/OFFSET paging of the file); caching-off mode uses a session temp dir.
+- Commands: `import_file` (emits `import-progress`), `cancel_import`, `open_direct`,
+  `close_dataset`, `cache_info`, `clear_cache`, `get_settings`. Settings gain `cacheEnabled`,
+  `cacheMaxGb`, `cacheDir`, `smallFileMb`.
+- UI: import starts after the preview; progress bar with percent, elapsed time and Cancel
+  (hidden for files < 100 MB); grid switches to the full dataset in place; failure/cancel
+  bars with "Try again"/"Import again"/"Read directly"; status bar shows rows and
+  "imported in …"/"from cache"; sidebar cache size with "Clear cache".
+- Tested: cache unit tests (keys, commit/partials, LRU, free space); 10 import integration
+  tests (reopen from cache < 1 s in a new session, edit → re-import, cancel leaves an empty
+  cache dir and a later import works, progress events, truncated .gz → plain error and nothing
+  cached, .gz = plain rows, caching off, LRU under limit, direct mode paging, low-disk message);
+  gzip integrity unit test; Vitest (store import lifecycle, progress, cancel, low disk, reopen,
+  close; ImportBar states); Playwright (progress → switch to full data; cancel keeps preview).
+  Perf: 5 GB CSV import 31.9 s, 5 GB .csv.gz 98.5 s, reopen 1–2 ms, peak RSS 1.9/3.2 GB.
+  Smoke (real app): progress bar during a 100 MB .csv.gz import, scroll position kept when the
+  grid switched to 2,132,553 rows, "from cache" on reopen in a new app session.
+- Left over: none for this step. (Filters/selection preservation applies once filters exist in v0.2.)

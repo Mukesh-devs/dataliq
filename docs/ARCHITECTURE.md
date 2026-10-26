@@ -54,6 +54,19 @@ reader SQL; `preview_file` returns the first 1,000 rows as Arrow. The UI runs
 both in parallel. Reader errors are rewritten into plain messages with a fix
 (`sources/friendly.rs`).
 
+## Import and cache
+
+After the preview is on screen, the UI starts `import_file` in the background
+(`import/mod.rs`). The file is copied into a DuckDB database
+(`CREATE TABLE data AS SELECT * FROM read_csv(…)`) written to
+`<cache>/<key>.duckdb.partial` and renamed only on success; the key hashes the
+absolute path, size, modified time and import options (`cache/mod.rs`). A
+finished database is attached read-only and registered as a dataset that the
+grid pages by rowid. Reopening an unchanged file just attaches the cached
+database. Gzip input is verified in parallel (`sources/integrity.rs`). The
+cache is cleaned least-recently-used to its size limit; open datasets are never
+removed.
+
 ## Data flow
 
 ```

@@ -3,6 +3,7 @@
 pub mod csv;
 pub mod detect;
 mod friendly;
+pub mod integrity;
 
 use std::path::{Path, PathBuf};
 
