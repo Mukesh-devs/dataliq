@@ -138,3 +138,9 @@ fn import_5gb_csv_gz() {
 fn import_5gb_ndjson_gz() {
     measure("logs_5gb.ndjson.gz");
 }
+
+#[test]
+#[ignore = "needs generated fixtures"]
+fn import_1m_row_xlsx() {
+    measure("sales_1m.xlsx");
+}

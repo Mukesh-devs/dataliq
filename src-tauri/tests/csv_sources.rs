@@ -33,7 +33,14 @@ fn open(
     path: &Path,
     csv: CsvOptions,
 ) -> Result<(SourceInfo, RecordBatch), AppError> {
-    let source = Source::new(path, OpenOptions { csv })?.resolve_dialect(engine)?;
+    let source = Source::new(
+        path,
+        OpenOptions {
+            csv,
+            ..OpenOptions::default()
+        },
+    )?
+    .resolve_dialect(engine)?;
     let info = source.inspect(engine)?;
     let bytes = source.preview_ipc(engine, 1000, &RequestKey::default())?;
     let reader = StreamReader::try_new(Cursor::new(bytes), None).unwrap();

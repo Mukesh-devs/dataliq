@@ -60,7 +60,7 @@ function CacheSection() {
   return (
     <Section title="Cache" icon={<Database className="size-3.5" aria-hidden />}>
       <div className="flex items-center gap-2 px-1.5 text-[12px] text-fg-muted">
-        <span className="tabular flex-1" title={cache.dir}>
+        <span className="tabular flex-1 truncate whitespace-nowrap" title={cache.dir}>
           {cache.enabled
             ? `${formatBytes(cache.usedBytes)} of ${formatBytes(cache.maxBytes)}`
             : "Caching is off"}

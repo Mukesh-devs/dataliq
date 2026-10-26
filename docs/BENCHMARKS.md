@@ -41,6 +41,8 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Full import of a 5 GB .ndjson.gz | report | 94.6 s, cache file 1.83 GB, peak RSS 3.0 GB | v0.1 step 8 |
 | Open a 50M-row Parquet (inspect + row count + preview) | < 1 s | 0.046 s | v0.1 step 8 |
 | Random 500-row page of a 50M-row Parquet (in place) | < 100 ms | 22.9 ms | v0.1 step 8 |
+| First rows of a 1M-row .xlsx (41 MB) | — | 0.054 s (streams only the first rows) | v0.1 step 9 |
+| Full import of a 1M-row .xlsx | — | 14.9 s, peak RSS 419 MB | v0.1 step 9 |
 | Reopen a cached file | < 1 s | 1–2 ms | v0.1 step 7 |
 | Peak memory while importing 5 GB | < DuckDB limit + 300 MB (8,045 + 300 MiB) | 1.9 GB (CSV), 3.2 GB (.csv.gz) | v0.1 step 7 |
 

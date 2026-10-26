@@ -16,6 +16,7 @@ const FILES: &[(&str, &str)] = &[
     ("csv/nulls.csv", "/data/nulls.csv"),
     ("json/nested.json", "/data/nested.json"),
     ("parquet/types.parquet", "/data/types.parquet"),
+    ("excel/multi_sheet.xlsx", "/data/multi_sheet.xlsx"),
 ];
 
 fn root() -> PathBuf {
@@ -57,6 +58,7 @@ fn record() -> serde_json::Value {
             .unwrap();
         let mut info = serde_json::to_value(source.inspect(&engine).unwrap()).unwrap();
         let real_str = real.to_string_lossy().replace('\'', "''");
+        let real_display = real.display().to_string();
         info["path"] = (*fake).into();
         // Mirror `open_file`: Parquet is queried in place, so it has a dataset
         // at once (with a stable id; real ids hash the file's mtime).
@@ -72,6 +74,7 @@ fn record() -> serde_json::Value {
             .as_str()
             .unwrap()
             .replace(&real_str, fake)
+            .replace(&real_display, fake)
             .into();
         let preview = source
             .preview_ipc(&engine, 1000, &RequestKey::default())

@@ -162,3 +162,16 @@ that already have a `file_row_number` column fall back to LIMIT/OFFSET.
 Arrow buffers under NULL slots carry whatever memory DuckDB left there, so
 IPC bytes for the same result differ between runs. Tests that guard recorded
 or committed IPC data compare decoded record batches, never raw bytes.
+
+## D21 — Excel: calamine + Appender, rules for headers and blank rows
+
+Excel files are read with calamine (no DuckDB extension needed, works
+offline). For `.xlsx` the preview streams cells and stops after the first
+rows (54 ms for a 1M-row sheet); the full import reads the sheet, infers one
+type per column from all values (integral numbers → BIGINT, other numbers →
+DOUBLE, dates → DATE/TIMESTAMP, mixed → VARCHAR) and appends rows with
+DuckDB's Appender into the cached database. Formula cells use their cached
+values. Fully empty rows are skipped. The header row is the first non-empty
+all-text row, skipping title rows that have fewer cells than the rows below;
+users can pick another row or "No header row". The legacy `.xls` fixture is
+written by `scripts/make_xls.py` (xlwt), since no Rust crate writes BIFF8.

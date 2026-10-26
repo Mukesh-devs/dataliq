@@ -166,6 +166,25 @@ impl Engine {
         batches_to_ipc(&result.schema, &result.batches)
     }
 
+    /// Runs a query on a caller-owned connection (e.g. one holding temp
+    /// tables) and encodes the result as Arrow IPC.
+    pub fn query_ipc_on(conn: &Connection, sql: &str, max_rows: usize) -> Result<Vec<u8>> {
+        let mut stmt = conn.prepare(sql)?;
+        let arrow = stmt.query_arrow([])?;
+        let schema = arrow.get_schema();
+        let mut batches = Vec::new();
+        let mut rows = 0;
+        for batch in arrow {
+            if rows >= max_rows {
+                break;
+            }
+            let take = batch.num_rows().min(max_rows - rows);
+            rows += take;
+            batches.push(batch.slice(0, take));
+        }
+        batches_to_ipc(&schema, &batches)
+    }
+
     /// Runs statements that return no rows (DDL, SET, …).
     pub fn execute_batch(&self, sql: &str) -> Result<()> {
         Ok(self.connection()?.execute_batch(sql)?)

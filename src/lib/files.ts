@@ -15,8 +15,23 @@ export interface CsvOptions {
   timestampFormat?: string;
 }
 
+/** Excel choices. Unset = detect (first sheet with data, header row). */
+export interface ExcelOptions {
+  sheet?: string;
+  /** 1-based header row; 0 = no header row. */
+  headerRow?: number;
+}
+
+export interface ExcelInfo {
+  sheets: string[];
+  sheet: string;
+  /** Header row in use (1-based); 0 = none. */
+  headerRow: number;
+}
+
 export interface OpenOptions {
   csv?: CsvOptions;
+  excel?: ExcelOptions;
 }
 
 export interface SniffedCsv {
@@ -80,6 +95,7 @@ export interface SourceInfo {
   format: FileFormat;
   compression: Compression;
   sniffed: SniffedCsv | null;
+  excel: ExcelInfo | null;
   columns: ColumnMeta[];
   readerSql: string;
   dataset: DatasetInfo | null;

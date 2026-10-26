@@ -155,3 +155,21 @@ tested, and anything left over.
   Parquet "queried in place", Go to row 30,000,000 lands on the row.
 - Fixed along the way: recording guard compares decoded Arrow (D20).
 - Left over: none.
+
+### Step 9 — Excel ✅
+
+- `sources/excel.rs` (calamine 0.36): sheet list, default = first sheet with data, header row
+  detection (skips title rows) or user choice (row N / none), unique non-empty column names,
+  type inference per column, cached formula values, empty rows skipped; xlsx preview streams
+  only the first rows; rows written with DuckDB's Appender (temp table for the preview, the
+  cached database for the import, with progress and cancel).
+- UI: Sheet picker and Header row choice in the file header; changing either re-opens and
+  re-imports (each sheet/header choice is its own cache entry).
+- Fixture: `fixtures/excel/legacy.xls` via `scripts/make_xls.py`.
+- Tested: 5 integration tests (xlsx types/dates/formulas/empty row/blanks, title row skipped,
+  header override and "no header", legacy .xls, missing/empty sheet errors, import + per-sheet
+  cache entries) + unit tests (dates, header detection, names, inference); Vitest for the
+  controls; Playwright opens the recorded xlsx and switches sheets. Perf: 1M-row xlsx preview
+  0.054 s, import 14.9 s (peak 419 MB). Smoke (real app): multi_sheet.xlsx with picker,
+  "4 rows · imported in 14 ms".
+- Left over: none.

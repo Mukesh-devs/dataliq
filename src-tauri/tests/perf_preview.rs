@@ -115,3 +115,11 @@ fn parquet_50m_open_and_page() {
         "page took {per_page:?}"
     );
 }
+
+/// No budget in the plan for Excel; recorded in docs/BENCHMARKS.md. The
+/// preview streams only the first rows, so it stays fast for big sheets.
+#[test]
+#[ignore = "needs generated fixtures"]
+fn preview_1m_row_xlsx() {
+    check("sales_1m.xlsx", Duration::from_secs(2));
+}

@@ -271,6 +271,7 @@ mod tests {
                 delimiter: Some(";".into()),
                 ..CsvOptions::default()
             },
+            ..OpenOptions::default()
         };
         assert_ne!(k, cache_key(&stamp(10, 1), &other), "options");
     }

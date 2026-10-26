@@ -23,6 +23,7 @@ export const sampleInfo = {
     dateFormat: null,
     timestampFormat: null,
   },
+  excel: null,
   columns: [
     { name: "id", type: "BIGINT" },
     { name: "name", type: "VARCHAR" },

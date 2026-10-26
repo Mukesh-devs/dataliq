@@ -21,6 +21,7 @@ output is reproducible byte-for-byte, so edit the generator rather than the file
 | `json/array.json`, `json/records.ndjson`, `json/nested.json` | JSON array, newline-delimited JSON, nested objects and arrays |
 | `parquet/types.parquet` | many DuckDB types (ints, floats, decimal, text, date, timestamp, time, blob, list, struct, map, uuid) with nulls |
 | `excel/multi_sheet.xlsx` | two sheets, dates, formulas with cached values, an empty row, a title row above the header |
+| `excel/legacy.xls` | Excel 97-2003 (BIFF8): numbers, text with umlauts, dates, booleans, an empty sheet — written by `scripts/make_xls.py` |
 | `ipc/known_query.arrows` | Arrow IPC bytes written by the Rust engine tests and decoded by the frontend tests |
 
 ## Large generated fixtures

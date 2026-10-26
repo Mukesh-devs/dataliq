@@ -2,6 +2,7 @@
 
 pub mod csv;
 pub mod detect;
+pub mod excel;
 mod friendly;
 pub mod integrity;
 
@@ -11,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 pub use csv::CsvOptions;
 pub use detect::{Compression, Detected, FileFormat};
+pub use excel::{ExcelInfo, ExcelOptions};
 pub use friendly::friendly_error;
 
 use crate::engine::{Engine, Param, RequestKey};
@@ -21,6 +23,7 @@ use crate::error::{AppError, Result};
 #[serde(default, rename_all = "camelCase")]
 pub struct OpenOptions {
     pub csv: CsvOptions,
+    pub excel: ExcelOptions,
 }
 
 /// CSV settings as detected by DuckDB's sniffer, shown in the Import settings popover.
@@ -56,6 +59,8 @@ pub struct SourceInfo {
     pub compression: Compression,
     /// Detected CSV settings (CSV/TSV only).
     pub sniffed: Option<SniffedCsv>,
+    /// Sheets and header row (Excel only).
+    pub excel: Option<ExcelInfo>,
     pub columns: Vec<ColumnMeta>,
     /// The table expression used to read the file, for "Copy as SQL".
     pub reader_sql: String,
@@ -132,9 +137,9 @@ impl Source {
                 "read_parquet(?)".to_string(),
                 vec![Param::Text(self.path_str())],
             )),
-            other => Err(AppError::Query(format!(
-                "Opening {other:?} files is not supported yet."
-            ))),
+            FileFormat::Xlsx | FileFormat::Xls => Err(AppError::Query(
+                "Excel files can't be read in place. Free up some disk space so the sheet can be imported.".into(),
+            )),
         }
     }
 
@@ -312,10 +317,47 @@ impl Source {
             .map_err(|e| friendly_error(&e.to_string()))
     }
 
+    pub fn is_excel(&self) -> bool {
+        matches!(self.detected.format, FileFormat::Xlsx | FileFormat::Xls)
+    }
+
+    /// Reads an Excel sheet (all of it, or the first `max_rows` data rows).
+    pub fn load_excel(&self, max_rows: Option<usize>) -> Result<excel::Sheet> {
+        excel::load(
+            &self.path,
+            &self.options.excel,
+            self.detected.format == FileFormat::Xlsx,
+            max_rows,
+        )
+    }
+
     /// Detects, sniffs and describes the file.
     pub fn inspect(&self, engine: &Engine) -> Result<SourceInfo> {
-        let sniffed = self.sniff(engine)?;
-        let columns = self.columns(engine)?;
+        let (sniffed, columns, excel, reader_sql) = if self.is_excel() {
+            let sheet = self.load_excel(Some(1000))?;
+            let columns = sheet
+                .names
+                .iter()
+                .zip(&sheet.types)
+                .map(|(n, t)| ColumnMeta {
+                    name: n.clone(),
+                    r#type: t.sql().to_string(),
+                })
+                .collect();
+            let sql = format!(
+                "-- Excel sheet \"{}\" of {} (imported into a table)",
+                sheet.info.sheet,
+                self.path.display()
+            );
+            (None, columns, Some(sheet.info), sql)
+        } else {
+            (
+                self.sniff(engine)?,
+                self.columns(engine)?,
+                None,
+                self.reader_display_sql()?,
+            )
+        };
         Ok(SourceInfo {
             file_name: self
                 .path
@@ -326,8 +368,9 @@ impl Source {
             format: self.detected.format,
             compression: self.detected.compression,
             sniffed,
+            excel,
             columns,
-            reader_sql: self.reader_display_sql()?,
+            reader_sql,
             dataset: None,
             path: self.path.clone(),
         })
@@ -335,6 +378,18 @@ impl Source {
 
     /// First `limit` rows read straight from the file, as Arrow IPC bytes.
     pub fn preview_ipc(&self, engine: &Engine, limit: usize, key: &RequestKey) -> Result<Vec<u8>> {
+        if self.is_excel() {
+            // Temp table on one connection, queried on that same connection.
+            let sheet = self.load_excel(Some(limit))?;
+            if sheet.names.is_empty() {
+                // An empty sheet: no columns, no rows.
+                return crate::engine::batches_to_ipc(&arrow::datatypes::Schema::empty(), &[]);
+            }
+            let conn = engine.connection()?;
+            let never = std::sync::atomic::AtomicBool::new(false);
+            excel::write_table(&conn, None, "bv_preview", &sheet, &never, &|_| {})?;
+            return Engine::query_ipc_on(&conn, "SELECT * FROM temp.bv_preview", limit);
+        }
         let (reader, params) = self.reader()?;
         let sql = format!("SELECT * FROM {reader} LIMIT {limit}");
         engine

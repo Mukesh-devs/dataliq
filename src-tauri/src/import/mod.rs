@@ -15,7 +15,7 @@ use crate::engine::raw::{Progress, RawConnection};
 use crate::engine::sql::quote_ident;
 use crate::engine::{Dataset, DatasetSource, Engine};
 use crate::error::{AppError, Result};
-use crate::sources::{Compression, Source, friendly_error, integrity};
+use crate::sources::{Compression, Source, excel, friendly_error, integrity};
 
 /// Progress report sent to the UI while an import runs.
 #[derive(Debug, Clone, Serialize)]
@@ -194,17 +194,24 @@ pub fn import(
     let corrupt = AtomicBool::new(false);
     let done = AtomicBool::new(false);
 
+    let is_excel = source.is_excel();
+    let report = |percent: Option<f64>| {
+        on_progress(ImportProgress {
+            job_id: job_id.to_string(),
+            percent,
+            elapsed_ms: started.elapsed().as_millis() as u64,
+        })
+    };
     let result: Result<u64> = std::thread::scope(|scope| {
-        // Progress reporter.
+        // Progress reporter for DuckDB readers (Excel reports per batch of rows).
         scope.spawn(|| {
+            if is_excel {
+                return;
+            }
             while !done.load(Ordering::Relaxed) {
                 std::thread::sleep(Duration::from_millis(250));
                 let Progress { percent, .. } = conn.progress();
-                on_progress(ImportProgress {
-                    job_id: job_id.to_string(),
-                    percent,
-                    elapsed_ms: started.elapsed().as_millis() as u64,
-                });
+                report(percent);
             }
         });
         // Gzip integrity check, on another core, alongside DuckDB.
@@ -219,6 +226,19 @@ pub fn import(
         });
 
         let run = || -> Result<u64> {
+            if is_excel {
+                let sheet = source.load_excel(None)?;
+                let conn = engine.connection()?;
+                let staging_name = format!("import_{key}");
+                return excel::write_table(
+                    &conn,
+                    Some(&staging_name),
+                    "data",
+                    &sheet,
+                    &cancelled,
+                    &|p| report(Some(p)),
+                );
+            }
             conn.execute("SET enable_progress_bar = true", &[])?;
             conn.execute("SET enable_progress_bar_print = false", &[])?;
             let (reader, params) = source.reader()?;

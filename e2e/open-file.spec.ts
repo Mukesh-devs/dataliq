@@ -67,3 +67,22 @@ test("nested JSON values expand into pretty-printed JSON", async ({ page }) => {
   await page.mouse.dblclick(box.x + 200, box.y + 32 + 14);
   await expect(page.locator("#portal textarea")).toHaveValue(/"city": "Berlin"/);
 });
+
+test("Excel files show a sheet picker and header row choice", async ({ page }) => {
+  await mockTauri(page, { dialogPaths: ["/data/multi_sheet.xlsx"] });
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  await expect(page.getByLabel("Sheet")).toHaveValue("Orders");
+  await expect(page.getByLabel("Header row")).toHaveValue("1");
+  await expect(gridCell(page, "Alice")).toBeAttached();
+  await page.getByLabel("Sheet").selectOption("Notes");
+  const lastOpen = await page.evaluate(() =>
+    (window as unknown as { __invokes: { cmd: string; args: { options: unknown } }[] }).__invokes
+      .filter((i) => i.cmd === "open_file")
+      .at(-1),
+  );
+  expect(lastOpen?.args.options).toEqual({ excel: { sheet: "Notes" } });
+});

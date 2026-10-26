@@ -9,6 +9,7 @@ import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
+import { ExcelSettings } from "../import/ExcelSettings";
 import { ImportBar } from "../import/ImportBar";
 import { ImportSettings } from "../import/ImportSettings";
 
@@ -73,6 +74,12 @@ export function FileView({ tab, onReopen, onCancelImport, onReadDirect }: FileVi
           </span>
         )}
         <div className="flex-1" />
+        {tab.info?.excel && (
+          <ExcelSettings
+            info={tab.info.excel}
+            onChange={(excel) => onReopen({ ...tab.options, excel })}
+          />
+        )}
         {showSettings && (
           <ImportSettings
             options={tab.options.csv ?? {}}
