@@ -45,6 +45,10 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Full import of a 1M-row .xlsx | — | 14.9 s, peak RSS 419 MB | v0.1 step 9 |
 | Reopen a cached file | < 1 s | 1–2 ms | v0.1 step 7 |
 | Peak memory while importing 5 GB | < DuckDB limit + 300 MB (8,045 + 300 MiB) | 1.9 GB (CSV), 3.2 GB (.csv.gz) | v0.1 step 7 |
+| App cold start to usable window (release) | < 1 s | window mapped 0.13 s, UI ready 0.87 s | v0.1.0 |
+| Idle memory, whole app incl. webview (release) | < 200 MB | 241 MiB PSS, of which 77 MiB private — see below | v0.1.0 |
+| Installer size (Linux) | < 40 MB | .deb 19.4 MB, .rpm 19.4 MB, .AppImage 92.5 MB — see below | v0.1.0 |
+| Grid scroll, 50M rows (Chromium, mocked backend) | ~60 fps, no blank page > 100 ms | 60 fps; page wait p95 42 ms / max 51 ms (fast scroll), p95 56 / max 77 ms (fling) | v0.1.0 |
 
 Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
@@ -52,3 +56,83 @@ so `.csv.gz` imports are bounded by it (plus our parallel integrity check on ano
 
 Preview numbers come from `cargo test -p bigview --test it perf_preview -- --ignored --nocapture`
 (dev profile) and the app's status bar.
+
+## v0.1.0 — linux-dev
+
+**Startup** (release build, Xvfb with software rendering, 6 runs): the window
+is mapped 0.12–0.16 s after launch; the UI is ready (React mounted, first IPC
+call, logged as `frontend ready`) after 0.86–0.89 s. With `bigview comma.csv`
+the file's rows are on screen after ~1.0 s.
+
+**Idle memory** (release, no file open, 12 s after launch, PSS summed over the
+`bigview`, `WebKitWebProcess` and `WebKitNetworkProcess` processes):
+
+| Process | PSS | of which private (anonymous) |
+| --- | --- | --- |
+| bigview (Rust + DuckDB + GTK) | 104 MiB | 33 MiB |
+| WebKitWebProcess (UI) | 115 MiB | 36 MiB |
+| WebKitNetworkProcess | 22 MiB | 8 MiB |
+| **Total** | **241 MiB** | **77 MiB** |
+
+The budget is missed on PSS but met on private memory. Most of the rest is
+shared library code mapped from disk: WebKitGTK and JavaScriptCore (~85 MiB
+across the three processes), the bigview binary itself (29 MiB, mostly
+DuckDB) and `libLLVM` (36 MiB), which is only loaded because Xvfb has no GPU
+and WebKit falls back to llvmpipe software GL. On a desktop with a GPU driver
+that part goes away. These pages are clean and shared with other WebKitGTK
+apps. Opening a small file adds ~2 MiB. Tracked for the v1.0 performance
+pass on all three OSes (Windows WebView2 and macOS WKWebView report memory
+differently). See docs/DECISIONS.md, D25.
+
+**Installer size**: the `.deb` and `.rpm` (19.4 MB) depend on the system's
+WebKitGTK. The `.AppImage` (92.5 MB) bundles WebKitGTK and GStreamer so it
+runs on any distribution; it cannot meet a 40 MB budget and is documented
+instead (D24). The release binary is 50 MB uncompressed, most of it DuckDB.
+Windows and macOS installers are built by CI (`tauri build --debug`) and
+will be measured from release builds in the v1.0 release workflow.
+
+**Grid scroll** (`pnpm e2e:perf`): headless Chromium, 1280×800, the backend
+mocked with pages that answer after 7 ms (the measured 50M-row page time).
+Steady wheel scrolling never waits for a page (prefetch); fast scrolling
+(~60 rows per wheel event) crosses a page every few events. Page wait is the
+time from the page request to rows ready, so it is an upper bound on how
+long a region stays blank.
+
+| Mode | fps | worst frame | page loads | page wait p95 / max |
+| --- | --- | --- | --- | --- |
+| steady scroll (100 px per event) | 60.0 | 17 ms | 0 | — |
+| fast scroll (2,000 px per event) | 60.0 | 17 ms | 25 | 42 / 51 ms |
+| fling (400,000 px per event) | 59.5 | 33 ms | 252 | 56 / 77 ms |
+
+The real webviews (WebKitGTK, WebView2, WKWebView) are checked by hand in
+each step's smoke test; frame timing there is part of the v1.0 pass.
+
+**Small benchmark suite** (`pnpm bench`, best of 5 runs, dev profile, the
+regression guard's flows):
+
+| Flow | linux-dev |
+| --- | --- |
+| first_rows_100mb_csv | 214 ms |
+| first_rows_100mb_csv_gz | 1,125 ms |
+| first_rows_100mb_ndjson_gz | 336 ms |
+| first_rows_100k_xlsx | 50 ms |
+| import_100mb_csv | 1,280 ms |
+| import_100mb_csv_gz | 2,681 ms |
+| import_100mb_ndjson_gz | 2,387 ms |
+| import_100k_xlsx | 1,440 ms |
+| reopen_cached_100mb_csv | 1.3 ms |
+| page_1m_parquet (random 500-row page) | 9.7 ms |
+
+Run-to-run noise on this shared container is up to ~30% for the import
+flows between batches (a few % within a batch), so the guard keeps the
+fastest of 5 runs and compares against a baseline recorded on the same CI
+runner type (`bench/baseline/<os>.json`), not against these numbers.
+
+Found while benchmarking: every import waited for its progress thread's
+250 ms poll to end, so imports finished up to 250 ms late. Fixed (the thread
+is woken when the import ends).
+
+### Not yet measured per OS
+
+Windows and macOS numbers (all budgets) are not measured yet: CI only builds
+and tests there. They are part of the v1.0 performance pass.

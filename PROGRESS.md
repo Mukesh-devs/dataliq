@@ -195,3 +195,19 @@ tested, and anything left over.
   D-Bus): `bigview comma.csv` opened at startup; `bigview semicolon.csv records.ndjson` from a
   second launch exited in 0.06 s and both files opened as tabs in the running app with rows.
 - Left over: file associations are v1.0 (settings/installer).
+
+### v0.1.0 release ✅
+
+- Version test list: all Rust unit + integration tests, Vitest, Playwright UI flows, Tauri debug
+  build; on-demand perf checks (`perf_preview`, `perf_import`, `paging`, `bench_small`,
+  `pnpm e2e:perf`) on the generated fixtures.
+- Added the small benchmark suite and regression guard (`pnpm bench`, `bench.yml`, D26) and a
+  grid scroll check (`pnpm e2e:perf`); a `frontend ready` startup log for cold-start timing.
+- Fixed: imports waited up to 250 ms for the progress thread to finish polling.
+- Measured (docs/BENCHMARKS.md): cold start 0.87 s to UI ready; idle memory 241 MiB PSS / 77 MiB
+  private (budget missed on PSS, D25); .deb/.rpm 19.4 MB, AppImage 92.5 MB (D24); grid 60 fps
+  with page waits under 80 ms.
+- Done criteria: all formats open; previews meet the budget (5 GB CSV 0.30 s, .csv.gz 1.04–1.23
+  s, .ndjson.gz 0.35 s); 50M rows scroll; installers build on all 3 OSes in CI.
+- Left over: per-OS budgets on Windows/macOS and the AppImage/idle-memory items go to the v1.0
+  performance pass; the Bench workflow's first run records the CI baseline.

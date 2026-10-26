@@ -204,12 +204,16 @@ pub fn import(
     };
     let result: Result<u64> = std::thread::scope(|scope| {
         // Progress reporter for DuckDB readers (Excel reports per batch of rows).
-        scope.spawn(|| {
+        // Parked rather than sleeping, so it exits as soon as the import ends.
+        let reporter = scope.spawn(|| {
             if is_excel {
                 return;
             }
-            while !done.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(250));
+            loop {
+                std::thread::park_timeout(Duration::from_millis(250));
+                if done.load(Ordering::SeqCst) {
+                    break;
+                }
                 let Progress { percent, .. } = conn.progress();
                 report(percent);
             }
@@ -270,6 +274,7 @@ pub fn import(
         };
         let r = run();
         done.store(true, Ordering::SeqCst);
+        reporter.thread().unpark();
         r
     });
     imports.jobs.lock().remove(job_id);

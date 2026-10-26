@@ -3,7 +3,8 @@
 //!   BENCH_OUT=bench.json cargo test -p bigview --test it bench_small -- --ignored --nocapture
 //!
 //! Each flow runs a few times and keeps the fastest run, which is the most
-//! stable number on a shared CI runner.
+//! stable number on a shared CI runner. `BENCH_RUNS=n` changes the number of
+//! runs; `BENCH_VERBOSE=1` prints every run.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -15,7 +16,7 @@ use bigview_lib::import::{self, ImportTarget, Imports};
 use bigview_lib::settings::Settings;
 use bigview_lib::sources::{OpenOptions, Source};
 
-const RUNS: usize = 3;
+const RUNS: usize = 5;
 
 fn generated(name: &str) -> PathBuf {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -42,7 +43,15 @@ fn cache(dir: PathBuf) -> Cache {
 
 /// Fastest of `RUNS` runs; `f` returns the time of the measured part.
 fn best(mut f: impl FnMut() -> Duration) -> Duration {
-    (0..RUNS).map(|_| f()).min().unwrap()
+    let runs: usize = std::env::var("BENCH_RUNS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(RUNS);
+    let all: Vec<Duration> = (0..runs).map(|_| f()).collect();
+    if std::env::var_os("BENCH_VERBOSE").is_some() {
+        eprintln!("runs: {all:?}");
+    }
+    all.into_iter().min().unwrap()
 }
 
 /// Inspect + 1,000-row preview, as the UI does on open.

@@ -189,3 +189,30 @@ Ctrl+W, Ctrl+Tab), in the tab bar, and in the command palette (v0.2).
 Every Rust integration-test binary links DuckDB statically (~100 MB each).
 All integration tests live in `src-tauri/tests/it/` as modules of one binary,
 which cut `target/` growth and link time considerably.
+
+## D24 — AppImage size is outside the installer budget
+
+The 40 MB installer budget is met by the `.deb` and `.rpm` (19.4 MB), which
+use the distribution's WebKitGTK. An AppImage must bundle WebKitGTK and
+GStreamer to run everywhere, which makes it ~92 MB; there is no way to get
+it near 40 MB without dropping the format. We keep it (it is the only
+package for distributions without .deb/.rpm) and record its size separately.
+
+## D25 — Idle memory is measured as PSS and reported with private memory
+
+"Idle memory (whole app incl. webview)" is measured as the PSS of all app
+processes, which counts shared library pages proportionally. On Linux under
+Xvfb this is 241 MiB, over the 200 MB budget, but only 77 MiB of it is
+private memory; the rest is WebKitGTK/JavaScriptCore code, the DuckDB code
+in our binary, and llvmpipe (software GL, absent with a GPU). We report both
+numbers and revisit on real desktops with GPUs on all three OSes in v1.0
+rather than chase library pages now.
+
+## D26 — Benchmark baselines come from the CI runner
+
+The regression guard compares against `bench/baseline/<os>.json`, recorded
+by the Bench workflow itself, because timings from a developer machine don't
+transfer to a CI runner. Without a baseline the workflow only reports (and
+uploads the results to commit as the baseline). The guard keeps the fastest
+of 5 runs and ignores slowdowns under 5 ms, because shared runners are noisy.
+It runs on version tags and on demand, not on every push.
