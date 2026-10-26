@@ -3,9 +3,9 @@
 
 use duckdb::ToSql;
 use duckdb::types::{ToSqlOutput, Value};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Param {
     Null,

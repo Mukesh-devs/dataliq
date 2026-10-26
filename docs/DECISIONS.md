@@ -217,3 +217,21 @@ uploads the results to commit as the baseline). The guard keeps the fastest
 of 5 runs and ignores slowdowns under 5 ms, because shared runners are noisy.
 It runs on version tags, on demand, and on pushes that change the benchmark
 itself (to record a baseline), not on every push.
+
+## D27 — View SQL: bound values, local "today", NULL-friendly negation
+
+Views (`src-tauri/src/view/`) are built from a serializable `ViewSpec`.
+Column names are looked up in the dataset's schema (unknown names are a plain
+error) and quoted; every value, including regex patterns and search text, is
+a bound parameter. Text tests (`contains`, `starts_with`, `ends_with`,
+`regexp_matches`) run on a column's text form, so they work on any type;
+comparisons use the column's own type, so dates are given as ISO text.
+
+DuckDB's `current_date` lives in the ICU extension, which we don't bundle
+(and extensions are never downloaded), so "last N days" binds both ends of
+the range from the user's local date, computed in Rust. That is also what
+the user means by "today", and it makes the SQL testable with a fixed date.
+
+A negated filter is `NOT coalesce(test, FALSE)`, so "doesn't contain x"
+keeps NULL cells instead of silently dropping them, as SQL's three-valued
+logic would. Sorts are always `NULLS LAST`, in both directions.

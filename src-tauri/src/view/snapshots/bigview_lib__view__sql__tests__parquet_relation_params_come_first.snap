@@ -1,0 +1,7 @@
+---
+source: src-tauri/src/view/sql.rs
+expression: "render(&build(&spec, &rel, &schema()).unwrap())"
+---
+SELECT * FROM read_parquet(?) WHERE "id" >= ?
+SELECT count(*) FROM read_parquet(?) WHERE "id" >= ?
+params: ["/d/x.parquet",5]

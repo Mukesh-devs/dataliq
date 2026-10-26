@@ -211,3 +211,22 @@ tested, and anything left over.
   s, .ndjson.gz 0.35 s); 50M rows scroll; installers build on all 3 OSes in CI.
 - Left over: per-OS budgets on Windows/macOS and the AppImage/idle-memory items go to the v1.0
   performance pass; the Bench workflow's first run records the CI baseline.
+
+## v0.2 — Explore
+
+### Step 1 — ViewSpec and SQL builder ✅
+
+- `ViewSpec` (filters, multi-column sort, global search, visible columns in order) shared with the
+  UI as JSON; `view::build` turns it into a `SELECT` and a `count(*)` over any dataset (imported
+  table, direct read, or Parquet in place) with every value bound and every identifier checked
+  and quoted (D27).
+- Filter ops: contains / starts with / ends with (case-insensitive by default), regex, empty,
+  null / not null, equals, >, >=, <, <=, range (open ends), last N days, value list (with NULL),
+  and `not` on any of them. Search covers text columns.
+- Tested: insta snapshots of the generated SQL for every op, combined views, Parquet params, and
+  column names with spaces, quotes, apostrophes, SQL keywords, unicode, emoji and `;--`; values
+  never reach SQL text; plain errors for unknown columns; UI JSON round trip. Integration tests
+  run every op in DuckDB on a table with awkward column names (and on Parquet in place) and check
+  the exact rows, sort order (NULLS LAST) and that `count` agrees with `select`.
+- Smoke: no UI yet (filters arrive in step 2); the app still starts and opens files as before.
+- Left over: none.

@@ -8,6 +8,7 @@ pub mod error;
 pub mod import;
 pub mod settings;
 pub mod sources;
+pub mod view;
 
 mod logging;
 #[cfg(target_os = "macos")]

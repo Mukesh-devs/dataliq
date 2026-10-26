@@ -24,6 +24,8 @@ duckdb = { version = "=1.10506.0", features = ["bundled", "json", "parquet"] }
 # Same major version as duckdb's arrow; adds the IPC writer.
 arrow = { version = "58.4.1", default-features = false, features = ["ipc"] }
 thiserror = "2.0.21"
+# Local "today" for relative date filters (already in the tree via arrow).
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 tracing = "0.1.44"
 dirs = "7.0.0"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system", "disk"] }
@@ -38,6 +40,7 @@ calamine = { version = "=0.36.1", default-features = false }
 
 [dev-dependencies]
 criterion = "0.8.2"
+insta = "1.49.0"
 tempfile = "3.27.0"
 
 [[bench]]
