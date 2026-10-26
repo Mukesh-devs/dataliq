@@ -50,3 +50,20 @@ test("errors are shown in plain words", async ({ page }) => {
     .click();
   await expect(page.getByRole("alert")).toContainText("File not found: /data/missing.csv");
 });
+
+test("nested JSON values expand into pretty-printed JSON", async ({ page }) => {
+  await mockTauri(page, { dialogPaths: ["/data/nested.json"] });
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  // The accessible mirror carries the pretty-printed value.
+  await expect(
+    page.locator('td[role="gridcell"]').filter({ hasText: '"city": "Berlin"' }),
+  ).toBeAttached();
+  // Row 1 of the "user" column: row markers, then id (90 px), then user.
+  const box = (await page.getByTestId("data-grid").boundingBox())!;
+  await page.mouse.dblclick(box.x + 200, box.y + 32 + 14);
+  await expect(page.locator("#portal textarea")).toHaveValue(/"city": "Berlin"/);
+});

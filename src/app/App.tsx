@@ -19,7 +19,8 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
   else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
     if (tab.import?.fromCache) parts.push("from cache");
-    else if (tab.info.dataset.cached === false) parts.push("read directly");
+    else if (tab.info.dataset.cached === false)
+      parts.push(tab.info.format === "parquet" ? "queried in place" : "read directly");
     else parts.push(`imported in ${formatDuration(tab.import?.elapsedMs ?? 0)}`);
   } else if (tab.preview) {
     parts.push(`${formatCount(tab.preview.numRows)} preview rows`);

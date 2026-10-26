@@ -67,3 +67,51 @@ fn preview_5gb_csv() {
 fn preview_5gb_csv_gz() {
     check("sales_5gb.csv.gz", Duration::from_secs(2));
 }
+
+#[test]
+#[ignore = "needs generated fixtures"]
+fn preview_5gb_ndjson_gz() {
+    check("logs_5gb.ndjson.gz", Duration::from_secs(2));
+}
+
+#[test]
+#[ignore = "needs generated fixtures"]
+fn parquet_50m_open_and_page() {
+    use bigview_lib::import;
+    let Some(path) = generated("sales_50m.parquet") else {
+        eprintln!("sales_50m.parquet: not generated, skipping");
+        return;
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = EngineConfig::from_settings(&Settings::default());
+    cfg.temp_dir = tmp.path().to_path_buf();
+    let engine = Engine::open_in_memory(&cfg).unwrap();
+    let start = Instant::now();
+    let source = Source::new(&path, OpenOptions::default()).unwrap();
+    source.inspect(&engine).unwrap();
+    let ds = import::open_in_place(&engine, &source).unwrap();
+    source
+        .preview_ipc(&engine, 1000, &RequestKey::default())
+        .unwrap();
+    let open = start.elapsed();
+    assert_eq!(ds.row_count, 50_000_000);
+    let t = Instant::now();
+    let n = 50;
+    for i in 0..n {
+        let row = (i * 997_331) % (ds.row_count - 500);
+        engine
+            .fetch_rows(&ds.id, row, 500, &RequestKey::default())
+            .unwrap();
+    }
+    let per_page = t.elapsed() / n as u32;
+    println!(
+        "sales_50m.parquet: open (inspect + row count + preview) {:.3} s, {:.1} ms per random 500-row page",
+        open.as_secs_f64(),
+        per_page.as_secs_f64() * 1000.0
+    );
+    assert!(open < Duration::from_secs(1), "open took {open:?}");
+    assert!(
+        per_page < Duration::from_millis(100),
+        "page took {per_page:?}"
+    );
+}

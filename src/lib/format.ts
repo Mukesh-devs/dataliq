@@ -1,4 +1,4 @@
-import type { ColumnKind } from "./arrow";
+import type { ColumnKind, ValueFormat } from "./arrow";
 
 const pad = (n: number, w = 2) => String(n).padStart(w, "0");
 
@@ -21,7 +21,8 @@ export function toJsonText(value: unknown): string {
       ? (value as { toJSON: () => unknown }).toJSON()
       : value;
   return JSON.stringify(plain, (_k, v: unknown) => {
-    if (typeof v === "bigint") return v.toString();
+    // JSON has no BigInt: keep it a number when that is exact, else a string.
+    if (typeof v === "bigint") return Number.isSafeInteger(Number(v)) ? Number(v) : v.toString();
     if (ArrayBuffer.isView(v) && !(v instanceof DataView)) return Array.from(v as Int32Array);
     if (v && typeof v === "object" && "toJSON" in v)
       return (v as { toJSON: () => unknown }).toJSON();
@@ -29,13 +30,44 @@ export function toJsonText(value: unknown): string {
   });
 }
 
+/** Inserts the decimal point into an unscaled integer string: ("-1234", 2) -> "-12.34". */
+export function scaleDecimal(unscaled: string, scale: number): string {
+  if (scale <= 0) return unscaled;
+  const negative = unscaled.startsWith("-");
+  const digits = (negative ? unscaled.slice(1) : unscaled).padStart(scale + 1, "0");
+  const text = `${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
+  return negative ? `-${text}` : text;
+}
+
+/** Time of day from ticks since midnight: "12:34:56" or "12:34:56.789". */
+export function formatTime(ticks: number | bigint, ticksPerSecond: number): string {
+  const perSecond = BigInt(ticksPerSecond);
+  const t = BigInt(ticks);
+  const secs = Number(t / perSecond);
+  const frac = t % perSecond;
+  const base = `${pad(Math.floor(secs / 3600))}:${pad(Math.floor(secs / 60) % 60)}:${pad(secs % 60)}`;
+  if (frac === 0n) return base;
+  const width = String(ticksPerSecond).length - 1;
+  return `${base}.${frac.toString().padStart(width, "0").replace(/0+$/, "")}`;
+}
+
 /**
  * Formats one cell for display. Returns `null` for SQL NULL so callers can
  * render it distinctly; an empty string stays an empty string.
  */
-export function formatValue(value: unknown, kind: ColumnKind): string | null {
+export function formatValue(value: unknown, format: ColumnKind | ValueFormat): string | null {
   if (value === null || value === undefined) return null;
+  const { kind, scale, timeTicksPerSecond } =
+    typeof format === "string" ? ({ kind: format } as ValueFormat) : format;
+  if (scale !== undefined && typeof value === "object") {
+    // Arrow decimals are big-number objects whose String() is the unscaled integer.
+    return scaleDecimal(String(value), scale);
+  }
   switch (kind) {
+    case "time":
+      return typeof value === "number" || typeof value === "bigint"
+        ? formatTime(value, timeTicksPerSecond ?? 1e6)
+        : String(value);
     case "date":
       return typeof value === "number" ? isoDate(value) : String(value);
     case "timestamp":

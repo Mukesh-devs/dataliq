@@ -317,3 +317,43 @@ pub fn open_direct(engine: &Engine, source: &Source) -> Result<Dataset> {
     engine.datasets.insert(ds.clone());
     Ok(ds)
 }
+
+/// Opens a Parquet file as a dataset without importing. The row count comes
+/// from the file metadata, so this is instant even for 50M rows.
+pub fn open_in_place(engine: &Engine, source: &Source) -> Result<Dataset> {
+    let stamp = SourceStamp::of(&source.path)?;
+    let key = format!("pq-{}", cache::cache_key(&stamp, &source.options));
+    if let Ok(ds) = engine.datasets.get(&key) {
+        return Ok(ds);
+    }
+    let path = source.path.to_string_lossy().into_owned();
+    let conn = engine.connection()?;
+    let rows: i64 = conn
+        .query_row("SELECT count(*) FROM read_parquet(?)", [&path], |r| {
+            r.get(0)
+        })
+        .map_err(|e| friendly_error(&e.to_string()))?;
+    // `file_row_number` paging needs the name to be free.
+    let clash: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM (DESCRIBE SELECT * FROM read_parquet(?)) \
+             WHERE column_name = 'file_row_number'",
+            [&path],
+            |r| r.get(0),
+        )
+        .map_err(|e| friendly_error(&e.to_string()))?;
+    let dataset_source = if clash == 0 {
+        DatasetSource::Parquet { path }
+    } else {
+        let (sql, params) = source.reader()?;
+        DatasetSource::Query { sql, params }
+    };
+    let ds = Dataset {
+        id: key,
+        source: dataset_source,
+        row_count: rows as u64,
+        cached: false,
+    };
+    engine.datasets.insert(ds.clone());
+    Ok(ds)
+}

@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cellValue, columnKind, decodeIpc, describeColumns } from "./arrow";
+import { formatValue } from "./format";
 
 describe("columnKind", () => {
   it("maps Arrow types to display kinds", () => {
@@ -62,5 +63,45 @@ describe("decodeIpc", () => {
       "2024-01-31T00:00:00.000Z",
     );
     expect(cellValue(table, 2, 4)).toBeNull();
+  });
+});
+
+// Previews recorded from the real backend (src-tauri/tests/ui_recordings.rs).
+describe("every recorded column type decodes and formats", () => {
+  const recordings = JSON.parse(
+    readFileSync(resolve(process.cwd(), "e2e/recordings/backend.json"), "utf8"),
+  ) as { files: Record<string, { preview: string }> };
+
+  it.each(Object.keys(recordings.files))("%s", (path) => {
+    const table = decodeIpc(Buffer.from(recordings.files[path]!.preview, "base64"));
+    const columns = describeColumns(table);
+    for (let r = 0; r < table.numRows; r++) {
+      columns.forEach((c, i) => {
+        const text = formatValue(cellValue(table, r, i), c);
+        if (text !== null) expect(text).not.toMatch(/\[object |undefined/);
+      });
+    }
+  });
+
+  it("Parquet types render as people expect", () => {
+    const table = decodeIpc(
+      Buffer.from(recordings.files["/data/types.parquet"]!.preview, "base64"),
+    );
+    const columns = describeColumns(table);
+    const row0 = Object.fromEntries(
+      columns.map((c, i) => [c.name, formatValue(cellValue(table, 0, i), c)]),
+    );
+    expect(row0).toMatchObject({
+      c_decimal: "12.34",
+      c_time: "12:34:56",
+      c_date: "2024-01-31",
+      c_timestamp: "2024-01-31 12:34:56",
+      c_blob: "\\xaabb",
+      c_list: "[1,2,3]",
+      c_struct: '{"a":1,"b":"x"}',
+      c_map: '{"k":1}',
+      c_uuid: "7d1c2a4b-9f3e-4c5d-8a6b-1e2f3a4b5c6d",
+      c_bigint: "10000000000",
+    });
   });
 });

@@ -138,3 +138,20 @@ tested, and anything left over.
   Smoke (real app): progress bar during a 100 MB .csv.gz import, scroll position kept when the
   grid switched to 2,132,553 rows, "from cache" on reopen in a new app session.
 - Left over: none for this step. (Filters/selection preservation applies once filters exist in v0.2.)
+
+### Step 8 — JSON, NDJSON and Parquet ✅
+
+- JSON/NDJSON via `read_json(?, format = 'auto' | 'newline_delimited', compression = ?)`
+  (also `.gz`/`.zst`); imported like CSV. Nested STRUCT/LIST/MAP values show as compact JSON
+  and open pretty-printed in the cell viewer (double-click/Enter).
+- Parquet queried in place: `open_file` returns a dataset at once (row count from metadata),
+  paged by `file_row_number` (`DatasetSource::Parquet`), no import or cache.
+- Frontend formatting fixed for DECIMAL (scale) and TIME (unit); BigInts inside JSON stay numbers.
+- Tested: 6 integration tests (JSON array, NDJSON, nested, .gz equals plain, JSON import keeps
+  nested types, Parquet with 18 types, Parquet in-place paging); Vitest decodes and formats every
+  recorded column type (incl. Parquet types) and checks the expected text; Playwright opens nested
+  JSON and expands a value. Perf: 5 GB .ndjson.gz first rows 0.35 s, import 94.6 s (106M rows =
+  manifest); 50M-row Parquet open 46 ms, 22.9 ms per random page. Smoke (real app): 50M-row
+  Parquet "queried in place", Go to row 30,000,000 lands on the row.
+- Fixed along the way: recording guard compares decoded Arrow (D20).
+- Left over: none.

@@ -17,6 +17,9 @@ pub enum DatasetSource {
     /// A table expression read directly from the file (no import). Paged with
     /// LIMIT/OFFSET, so deep pages are slower; used when disk space is low.
     Query { sql: String, params: Vec<Param> },
+    /// A Parquet file queried in place, paged with its `file_row_number`
+    /// (DuckDB skips row groups, so any page costs about the same).
+    Parquet { path: String },
 }
 
 /// Data the grid can page through.
@@ -82,6 +85,18 @@ impl Engine {
                 );
                 let params = [Param::Int(start as i64), Param::Int(end as i64)];
                 self.query_ipc(&sql, &params, count as usize, key)
+            }
+            DatasetSource::Parquet { path } => {
+                let sql = "SELECT * EXCLUDE (file_row_number) \
+                           FROM read_parquet(?, file_row_number = true) \
+                           WHERE file_row_number >= ? AND file_row_number < ? \
+                           ORDER BY file_row_number";
+                let params = [
+                    Param::Text(path.clone()),
+                    Param::Int(start as i64),
+                    Param::Int(end as i64),
+                ];
+                self.query_ipc(sql, &params, count as usize, key)
             }
             DatasetSource::Query { sql, params } => {
                 let sql = format!("SELECT * FROM {sql} LIMIT ? OFFSET ?");

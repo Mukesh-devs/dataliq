@@ -28,7 +28,16 @@ pub enum Compression {
 }
 
 impl Compression {
-    /// Value for DuckDB's `compression` reader option.
+    /// Value for `read_json`'s `compression` option (a FileCompressionType).
+    pub fn duckdb_file_compression(self) -> &'static str {
+        match self {
+            Compression::None => "uncompressed",
+            Compression::Gzip => "gzip",
+            Compression::Zstd => "zstd",
+        }
+    }
+
+    /// Value for `read_csv`'s `compression` option.
     pub fn duckdb_name(self) -> &'static str {
         match self {
             Compression::None => "none",

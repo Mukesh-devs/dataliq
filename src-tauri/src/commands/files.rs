@@ -26,9 +26,12 @@ pub async fn open_file(
 ) -> Result<SourceInfo> {
     let engine = Arc::clone(&engine);
     blocking(move || {
-        Source::new(&path, options.unwrap_or_default())?
-            .resolve_dialect(&engine)?
-            .inspect(&engine)
+        let source = Source::new(&path, options.unwrap_or_default())?.resolve_dialect(&engine)?;
+        let mut info = source.inspect(&engine)?;
+        if source.is_queried_in_place() {
+            info.dataset = Some(crate::import::open_in_place(&engine, &source)?);
+        }
+        Ok(info)
     })
     .await
 }

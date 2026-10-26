@@ -13,8 +13,10 @@ and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
 
 ## Features
 
-- Open CSV and TSV files, also compressed (`.gz`, `.zst`), with the first
-  1,000 rows on screen in about a second, even for 5 GB `.csv.gz` files.
+- Open CSV, TSV, JSON and NDJSON files, also compressed (`.gz`, `.zst`), with
+  the first 1,000 rows on screen in about a second, even for 5 GB `.gz` files.
+  Nested JSON values expand into pretty-printed JSON.
+- Parquet is queried in place: a 50M-row file opens in under 0.1 s.
 - Delimiter, header, quoting and types are detected automatically; override
   them in **Import settings** (delimiter, header, quote, encoding, skip rows,
   date format, ignore bad rows).
@@ -26,7 +28,7 @@ and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
   **Go to row** (Ctrl+G).
 - Light and dark themes that follow your OS.
 
-_Coming in v0.1:_ JSON/NDJSON, Parquet and Excel, tabs and opening from the terminal.
+_Coming in v0.1:_ Excel, tabs and opening from the terminal.
 
 ## Building from source
 

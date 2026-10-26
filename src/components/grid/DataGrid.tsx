@@ -104,8 +104,8 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
 
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
-      const kind = source.columns[col]?.kind ?? "other";
-      return toGridCell(source.getValue(row, col), kind, cellStyle);
+      const column = source.columns[col] ?? { kind: "other" as const };
+      return toGridCell(source.getValue(row, col), column, cellStyle);
     },
     [source, cellStyle],
   );

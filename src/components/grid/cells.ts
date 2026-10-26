@@ -1,5 +1,5 @@
 import { GridCellKind, type GridCell } from "@glideapps/glide-data-grid";
-import type { ColumnKind } from "../../lib/arrow";
+import type { ColumnKind, ValueFormat } from "../../lib/arrow";
 import { formatValue } from "../../lib/format";
 import { NOT_LOADED, type CellResult } from "./rowSource";
 
@@ -16,9 +16,14 @@ export interface CellStyle {
 const loading: GridCell = { kind: GridCellKind.Loading, allowOverlay: false };
 
 /** Converts one value to a read-only Glide cell, by column kind. */
-export function toGridCell(value: CellResult, kind: ColumnKind, style: CellStyle): GridCell {
+export function toGridCell(
+  value: CellResult,
+  format: ColumnKind | ValueFormat,
+  style: CellStyle,
+): GridCell {
   if (value === NOT_LOADED) return loading;
-  const text = formatValue(value, kind);
+  const kind = typeof format === "string" ? format : format.kind;
+  const text = formatValue(value, format);
   if (text === null) {
     return {
       kind: GridCellKind.Text,
@@ -51,6 +56,16 @@ export function toGridCell(value: CellResult, kind: ColumnKind, style: CellStyle
         readonly: true,
         copyData: text,
       };
+    case "json":
+      return {
+        kind: GridCellKind.Text,
+        data: prettyJson(value) ?? text,
+        displayData: text.length > MAX_DISPLAY ? `${text.slice(0, MAX_DISPLAY)}…` : text,
+        copyData: text,
+        // Click to expand: the overlay shows the value pretty-printed.
+        allowOverlay: true,
+        readonly: true,
+      };
     default:
       if (text === "") {
         return {
@@ -72,6 +87,14 @@ export function toGridCell(value: CellResult, kind: ColumnKind, style: CellStyle
         allowOverlay: true,
         readonly: true,
       };
+  }
+}
+
+function prettyJson(value: unknown): string | null {
+  try {
+    return JSON.stringify(JSON.parse(formatValue(value, "json") ?? "null"), null, 2);
+  } catch {
+    return null;
   }
 }
 

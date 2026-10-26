@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatCount, formatDuration, formatValue, toJsonText } from "./format";
+import {
+  formatBytes,
+  formatCount,
+  formatDuration,
+  formatTime,
+  formatValue,
+  scaleDecimal,
+  toJsonText,
+} from "./format";
 
 describe("formatValue", () => {
   it("keeps NULL distinct from empty text", () => {
@@ -25,7 +33,27 @@ describe("formatValue", () => {
 
   it("renders nested values as JSON", () => {
     expect(toJsonText({ a: 1n, b: [1, 2], c: new Int32Array([3]) })).toBe(
-      '{"a":"1","b":[1,2],"c":[3]}',
+      '{"a":1,"b":[1,2],"c":[3]}',
+    );
+    // Too big for a JS number: kept exact as a string.
+    expect(toJsonText([9007199254740993n])).toBe('["9007199254740993"]');
+  });
+});
+
+describe("decimals and times", () => {
+  it("places the decimal point by scale", () => {
+    expect(scaleDecimal("1234", 2)).toBe("12.34");
+    expect(scaleDecimal("-1", 2)).toBe("-0.01");
+    expect(scaleDecimal("5", 0)).toBe("5");
+    expect(formatValue({ toString: () => "-1234" }, { kind: "number", scale: 2 })).toBe("-12.34");
+  });
+
+  it("formats times of day from ticks", () => {
+    expect(formatTime(45_296_000_000n, 1e6)).toBe("12:34:56");
+    expect(formatTime(45_296_789_000n, 1e6)).toBe("12:34:56.789");
+    expect(formatTime(0, 1)).toBe("00:00:00");
+    expect(formatValue(45_296_000_000n, { kind: "time", timeTicksPerSecond: 1e6 })).toBe(
+      "12:34:56",
     );
   });
 });

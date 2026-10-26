@@ -148,3 +148,17 @@ cache disk lacks room for the estimated database (0.5× the file size, or
 ~0.4×), the import stops with a plain message and the UI
 offers **Read directly**: the grid then pages `read_csv(...)` with
 LIMIT/OFFSET — no disk needed, slower when jumping deep into the file.
+
+## D19 — Parquet paging by `file_row_number`
+
+Parquet is queried in place. Pages use
+`read_parquet(?, file_row_number = true) WHERE file_row_number BETWEEN …`,
+which DuckDB pushes down to row groups: ~23–28 ms per page anywhere in a
+50M-row file, versus 36 → 86 ms for LIMIT/OFFSET as the offset grows. Files
+that already have a `file_row_number` column fall back to LIMIT/OFFSET.
+
+## D20 — Arrow IPC recordings are compared decoded
+
+Arrow buffers under NULL slots carry whatever memory DuckDB left there, so
+IPC bytes for the same result differ between runs. Tests that guard recorded
+or committed IPC data compare decoded record batches, never raw bytes.

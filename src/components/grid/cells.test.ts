@@ -55,6 +55,23 @@ describe("toGridCell", () => {
   });
 });
 
+describe("nested values", () => {
+  it("shows JSON compactly and expands it pretty-printed in the overlay", () => {
+    const cell = toGridCell({ a: 1, b: [1, 2] }, "json", style);
+    expect(cell).toMatchObject({
+      displayData: '{"a":1,"b":[1,2]}',
+      copyData: '{"a":1,"b":[1,2]}',
+      allowOverlay: true,
+    });
+    expect((cell as { data: string }).data).toBe('{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}');
+  });
+
+  it("formats decimals with their scale", () => {
+    const cell = toGridCell({ toString: () => "1234" }, { kind: "number", scale: 2 }, style);
+    expect(cell).toMatchObject({ displayData: "12.34", contentAlign: "right" });
+  });
+});
+
 describe("initialWidth", () => {
   it("fits the name, within limits", () => {
     expect(initialWidth("id", "integer")).toBe(90);

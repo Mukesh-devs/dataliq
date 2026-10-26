@@ -19,7 +19,14 @@ export interface ColumnInfo {
   /** Arrow type as text, e.g. "Int64" or "Timestamp<MICROSECOND>". */
   type: string;
   nullable: boolean;
+  /** Digits after the decimal point (DECIMAL columns). */
+  scale?: number;
+  /** Ticks per second for TIME columns (1, 1e3, 1e6 or 1e9). */
+  timeTicksPerSecond?: number;
 }
+
+/** What the formatter needs to know about a column. */
+export type ValueFormat = Pick<ColumnInfo, "kind" | "scale" | "timeTicksPerSecond">;
 
 /** Decodes Arrow IPC stream bytes (as returned by the backend) into a Table. */
 export function decodeIpc(bytes: ArrayBuffer | Uint8Array): Table {
@@ -66,13 +73,19 @@ export function columnKind(type: DataType): ColumnKind {
   }
 }
 
+const TICKS_PER_SECOND = [1, 1e3, 1e6, 1e9]; // by TimeUnit: s, ms, µs, ns
+
 export function describeField(field: Field): ColumnInfo {
-  return {
+  const type = field.type as DataType & { scale?: number; unit?: number };
+  const info: ColumnInfo = {
     name: field.name,
     kind: columnKind(field.type),
     type: String(field.type),
     nullable: field.nullable,
   };
+  if (type.typeId === Type.Decimal) info.scale = type.scale ?? 0;
+  if (type.typeId === Type.Time) info.timeTicksPerSecond = TICKS_PER_SECOND[type.unit ?? 0];
+  return info;
 }
 
 export function describeColumns(table: Table): ColumnInfo[] {

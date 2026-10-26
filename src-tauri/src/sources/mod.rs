@@ -111,10 +111,37 @@ impl Source {
                 compression,
                 &self.options.csv,
             )),
+            FileFormat::Json | FileFormat::Ndjson => {
+                // `auto` accepts both a JSON array and newline-delimited JSON,
+                // so a mislabeled .json still opens.
+                let layout = if format == FileFormat::Ndjson {
+                    "newline_delimited"
+                } else {
+                    "auto"
+                };
+                Ok((
+                    "read_json(?, format = ?, compression = ?)".to_string(),
+                    vec![
+                        Param::Text(self.path_str()),
+                        Param::Text(layout.into()),
+                        Param::Text(compression.duckdb_file_compression().into()),
+                    ],
+                ))
+            }
+            FileFormat::Parquet => Ok((
+                "read_parquet(?)".to_string(),
+                vec![Param::Text(self.path_str())],
+            )),
             other => Err(AppError::Query(format!(
                 "Opening {other:?} files is not supported yet."
             ))),
         }
+    }
+
+    /// Parquet is already columnar and fast: it is queried in place instead
+    /// of being imported, with the row count read from the file metadata.
+    pub fn is_queried_in_place(&self) -> bool {
+        self.detected.format == FileFormat::Parquet
     }
 
     /// Reader SQL with literal values, for display ("Copy as SQL") only.
