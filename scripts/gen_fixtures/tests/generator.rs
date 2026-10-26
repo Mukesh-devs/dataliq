@@ -195,6 +195,15 @@ fn committed_fixtures_are_up_to_date() {
                 .unwrap()
             };
             assert_eq!(q(&entry), q(&old), "{} differs", rel.display());
+        } else if rel.extension().is_some_and(|e| e == "xlsx") {
+            // Zip metadata (host OS, attributes) differs per platform; the
+            // workbook parts must match exactly.
+            assert_eq!(
+                zip_entries(&entry),
+                zip_entries(&old),
+                "{} is stale: run `pnpm fixtures committed`",
+                rel.display()
+            );
         } else {
             assert!(
                 std::fs::read(&entry).unwrap() == std::fs::read(&old).unwrap_or_default(),
@@ -205,6 +214,20 @@ fn committed_fixtures_are_up_to_date() {
         checked += 1;
     }
     assert!(checked >= 20, "only {checked} fixtures checked");
+}
+
+fn zip_entries(path: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(path).unwrap()).unwrap();
+    let mut out: Vec<(String, Vec<u8>)> = (0..archive.len())
+        .map(|i| {
+            let mut f = archive.by_index(i).unwrap();
+            let mut bytes = Vec::new();
+            f.read_to_end(&mut bytes).unwrap();
+            (f.name().to_string(), bytes)
+        })
+        .collect();
+    out.sort();
+    out
 }
 
 fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {

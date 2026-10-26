@@ -20,3 +20,5 @@ serde_json = "1.0.154"
 
 [dev-dependencies]
 tempfile = "3.27.0"
+# Same version rust_xlsxwriter uses; compares .xlsx files by entry contents.
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
