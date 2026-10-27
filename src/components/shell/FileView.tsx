@@ -2,6 +2,7 @@ import {
   ChartColumn,
   CircleAlert,
   Download,
+  GitCompareArrows,
   LoaderCircle,
   SquareTerminal,
   Table,
@@ -32,6 +33,17 @@ import {
   saveRecipeScript,
 } from "../../lib/recipe";
 import { baseName } from "../../lib/files";
+import {
+  CHANGED,
+  STATUS,
+  compareFiles,
+  compareSql,
+  isChangedCell,
+  type RowStatus,
+} from "../../lib/compare";
+import { CompareBar } from "../compare/CompareBar";
+import { CompareDialog, type CompareSide } from "../compare/CompareDialog";
+import type { CellTint } from "../grid/gridTheme";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
@@ -154,6 +166,26 @@ export function FileView({
   const view = useMemo(() => tab.view ?? {}, [tab.view]);
   const filters = useMemo(() => view.filters ?? [], [view]);
   const filtered = useMemo(() => new Set(filters.map((f) => f.column)), [filters]);
+  // A comparison: the status its rows are filtered to, and its cell fills.
+  const shownStatus = filters.find((f) => f.column === STATUS && f.op === "equals" && !f.not) as
+    { value: RowStatus } | undefined;
+  const isCompare = !!tab.compare;
+  const cellTint = useMemo(() => {
+    if (!isCompare || !source) return undefined;
+    const st = source.columns.findIndex((c) => c.name === STATUS);
+    const ch = source.columns.findIndex((c) => c.name === CHANGED);
+    if (st < 0) return undefined;
+    return (row: number, column: string): CellTint | undefined => {
+      const status = source.getValue(row, st);
+      if (status === "added" || status === "removed") return status;
+      if (status !== "changed") return undefined;
+      if (column === STATUS) return "changed";
+      const changed = ch < 0 ? null : source.getValue(row, ch);
+      return isChangedCell(typeof changed === "string" ? changed : null, column)
+        ? "changed"
+        : undefined;
+    };
+  }, [isCompare, source]);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
   const [renaming, setRenaming] = useState<{ column: string; anchor: Anchor } | null>(null);
@@ -286,6 +318,52 @@ export function FileView({
     [setRecipeOpen, tab.id],
   );
   const [recipeWarning, setRecipeWarning] = useState<string>();
+
+  // Comparing this file with another open one.
+  const openCompare = useTabs((s) => s.openCompare);
+  const [comparing, setComparing] = useState<{ anchor: Anchor; others: CompareSide[] } | null>(
+    null,
+  );
+  const compareButton = useRef<HTMLButtonElement>(null);
+  const canCompare = tab.status === "ready" && !!baseOf(tab).dataset && !tab.compare;
+  const sideOf = (t: Tab): CompareSide => ({
+    tabId: t.id,
+    title: t.title,
+    columns: baseOf(t).columns,
+  });
+  const startCompare = () => {
+    const r = compareButton.current?.getBoundingClientRect();
+    const others = useTabs
+      .getState()
+      .tabs.filter((t) => t.id !== tab.id && t.status === "ready" && baseOf(t).dataset)
+      .map(sideOf);
+    setComparing({ anchor: r ? rectAnchor(r) : gridAnchor(), others });
+  };
+  const runCompare = async (beforeId: string, afterId: string, keys: string[]) => {
+    const all = useTabs.getState().tabs;
+    const [before, after] = [all.find((t) => t.id === beforeId), all.find((t) => t.id === afterId)];
+    const [b, a] = [before && baseOf(before), after && baseOf(after)];
+    if (!before || !after || !b?.dataset || !a?.dataset) throw new Error("The file was closed.");
+    const out = await compareFiles(
+      b.dataset.id,
+      a.dataset.id,
+      keys,
+      undefined,
+      `compare:${tab.id}`,
+    );
+    const preview = await fetchRows(out.dataset.id, 0, 200);
+    const sql =
+      b.readerSql && a.readerSql
+        ? await compareSql(b.dataset.id, a.dataset.id, keys, b.readerSql, a.readerSql).catch(
+            () => undefined,
+          )
+        : undefined;
+    openCompare({
+      compare: { ...out, left: before.title, right: after.title, keys },
+      preview,
+      sql,
+    });
+  };
   const fileId = tab.info?.dataset?.id;
   const fileReader = tab.info?.readerSql;
   const fileColumns = tab.info?.columns;
@@ -564,6 +642,15 @@ export function FileView({
         keywords: "cancel",
         run: () => cancelView(tab.id),
       });
+    if (canCompare)
+      // eslint-disable-next-line react-hooks/refs -- measures the button when picked
+      add({
+        id: "compare",
+        title: "Compare with another file…",
+        group: "File",
+        keywords: "diff differences versions changes",
+        run: startCompare,
+      });
     if (canClean) {
       add({
         id: "clean",
@@ -751,6 +838,7 @@ export function FileView({
     recipeActions,
     hasSteps,
     fileId,
+    canCompare,
   ]);
   useRegisterCommands("file", commands);
 
@@ -798,7 +886,9 @@ export function FileView({
         </span>
         {tab.info && (
           <span className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase">
-            {tab.info.format === "sql" ? (
+            {tab.compare ? (
+              "Comparison"
+            ) : tab.info.format === "sql" ? (
               "SQL result"
             ) : (
               <>
@@ -854,6 +944,17 @@ export function FileView({
             )}
           </Button>
         )}
+        {canCompare && (
+          <Button
+            ref={compareButton}
+            size="sm"
+            variant="ghost"
+            onClick={startCompare}
+            title="Compare with another open file: added, removed and changed rows"
+          >
+            <GitCompareArrows className="size-3.5" aria-hidden /> Compare
+          </Button>
+        )}
         {tab.status === "ready" && baseId && sqlTable && (
           <Button
             size="sm"
@@ -890,6 +991,27 @@ export function FileView({
           onCancel={() => onCancelImport?.()}
           onReadDirect={() => onReadDirect?.()}
           onRetry={() => onReopen(tab.options)}
+        />
+      )}
+      {tab.compare && (
+        <CompareBar
+          compare={tab.compare}
+          shown={shownStatus?.value}
+          onShow={(status) =>
+            setFilters([
+              ...filters.filter((f) => f.column !== STATUS),
+              ...(status ? [{ column: STATUS, op: "equals" as const, value: status }] : []),
+            ])
+          }
+        />
+      )}
+      {comparing && (
+        <CompareDialog
+          anchor={comparing.anchor}
+          current={sideOf(tab)}
+          others={comparing.others}
+          onOpenChange={(o) => !o && setComparing(null)}
+          onCompare={runCompare}
         />
       )}
       {tab.status === "ready" && onViewChange && columns.length > 0 && (
@@ -1014,6 +1136,7 @@ export function FileView({
               sort={sort}
               highlight={tab.viewState?.dataset ? view.search : undefined}
               histograms={chartsWanted ? charts : undefined}
+              cellTint={cellTint}
               onCellMenu={(column, row, p) =>
                 setCellMenu({
                   column,

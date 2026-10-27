@@ -18,6 +18,7 @@ import {
 import { cancelQuery } from "../lib/ipc";
 import { describeColumns } from "../lib/arrow";
 import type { ChartSpec } from "../lib/chart";
+import type { CompareInfo } from "../lib/compare";
 import type { ColumnLayout } from "../lib/layout";
 import {
   appliedSteps,
@@ -125,6 +126,8 @@ export interface Tab {
   recipeState?: RecipeState;
   /** The recipe panel is open. */
   recipeOpen?: boolean;
+  /** A comparison of two files: its counts (the tab's rows are the differences). */
+  compare?: CompareInfo;
 }
 
 /** What a tab's views, charts and SQL table read: the cleaned rows or the file. */
@@ -215,6 +218,11 @@ interface TabsState {
    * a file). The tab owns the dataset from then on. Returns the tab id.
    */
   openResult: (result: { dataset: DatasetInfo; preview: Table; sql: string }) => string;
+  /**
+   * Opens a comparison's differing rows in a new tab (filters, export, …
+   * as for a file). The tab owns the dataset from then on. Returns the tab id.
+   */
+  openCompare: (c: { compare: CompareInfo; preview: Table; sql?: string }) => string;
   /** Renames the tab's SQL table; undefined goes back to the file's name. */
   setSqlName: (id: string, name: string | undefined) => void;
   setMode: (id: string, mode: "grid" | "chart") => void;
@@ -640,6 +648,31 @@ export const useTabs = create<TabsState>()((set, get) => {
       };
       set((s) => ({
         tabs: [...s.tabs, { id, title, path: "", options: {}, status: "ready", info, preview }],
+        activeId: id,
+      }));
+      return id;
+    },
+    openCompare: ({ compare, preview, sql }) => {
+      const id = `tab-${nextId++}`;
+      const title = `${compare.left} ↔ ${compare.right}`;
+      const info: SourceInfo = {
+        path: "",
+        fileName: title,
+        sizeBytes: 0,
+        format: "sql",
+        compression: "none",
+        sniffed: null,
+        excel: null,
+        columns: compare.columns,
+        // "Copy view as SQL" reads both files (none when unknown).
+        readerSql: sql ? `(\n${sql.replace(/;\s*$/, "")}\n)` : "",
+        dataset: compare.dataset,
+      };
+      set((s) => ({
+        tabs: [
+          ...s.tabs,
+          { id, title, path: "", options: {}, status: "ready", info, preview, compare },
+        ],
         activeId: id,
       }));
       return id;

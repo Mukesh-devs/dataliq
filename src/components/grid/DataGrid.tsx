@@ -37,7 +37,15 @@ import { sortMark, type Bin, type SortKey } from "../../lib/view";
 import { toRanges } from "../../lib/exporting";
 import { useAppliedTheme } from "../../stores/appliedTheme";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
-import { chartColor, gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
+import {
+  chartColor,
+  gridTheme,
+  matchColor,
+  nullColor,
+  rowHeight,
+  tintColors,
+  type CellTint,
+} from "./gridTheme";
 import { CHART_HEIGHT, paintHistogram } from "./headerChart";
 import { paintMatches } from "./highlight";
 import type { RowSource } from "./rowSource";
@@ -122,6 +130,8 @@ interface DataGridProps {
    * (even empty, while loading) makes the headers taller to fit them.
    */
   histograms?: ReadonlyMap<string, Bin[]>;
+  /** A fill for some cells (a comparison's changed cells, added and removed rows). */
+  cellTint?: (row: number, column: string) => CellTint | undefined;
 }
 
 /** Width of Glide's header menu button (`menuButtonSize` in its source). */
@@ -153,6 +163,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     highlight,
     histograms,
     onCellMenu,
+    cellTint,
   },
   ref,
 ) {
@@ -222,13 +233,21 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     [source, shown, layout, onHeaderMenu, filteredColumns, theme, sort],
   );
 
+  const tints = useMemo(() => {
+    void themeVersion;
+    return tintColors();
+  }, [themeVersion]);
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
       const src = shown[col] ?? -1;
-      const column = source.columns[src] ?? { kind: "other" as const };
-      return toGridCell(source.getValue(row, src), column, cellStyle);
+      const column = source.columns[src] ?? { kind: "other" as const, name: "" };
+      const cell = toGridCell(source.getValue(row, src), column, cellStyle);
+      const tint = cellTint?.(row, column.name);
+      return tint
+        ? { ...cell, themeOverride: { ...cell.themeOverride, bgCell: tints[tint] } }
+        : cell;
     },
-    [source, shown, cellStyle],
+    [source, shown, cellStyle, cellTint, tints],
   );
 
   // A new source (e.g. preview -> imported data) must load what is on screen

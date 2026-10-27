@@ -668,3 +668,25 @@ tested, and anything left over.
   1,000 rows; Ctrl+O people-q2.csv (500 rows, no `joined`) → Load recipe… → "Loaded 1 step from
   smoke-recipe.json", names in Title Case, and the panel says the file has no column “joined”.
 - Left over: none.
+
+### Step 3 — Compare two files ✅
+
+- Compare (toolbar, palette) with any other open tab: before/after (swappable), key columns
+  (one like `id` suggested), Compare → a new tab of the differing rows: `status`, keys,
+  `changed`, each compared column with its new value and a `(before)` column where it changed.
+- A bar with the counts (each filters the rows), the same rows, changes per column, and notes
+  for repeated keys (matched in order of appearance), columns of different types (compared as
+  text) and columns only one side has. Changed cells are amber, added rows green, removed rows
+  red (tokens, light and dark). The diff exports, filters, sorts and charts like a file (D41).
+- Tested: fixtures `fixtures/compare/orders_v1.csv` → `orders_v2.csv` with documented
+  differences (duplicate keys, a number column that becomes text): exact counts, columns and
+  every row; keys checked on both sides; people.csv against an edited copy (every 50th row
+  removed, every 7th amount changed, two added) against the differences worked out in Rust; the
+  standalone SQL over both readers gives the same rows in plain DuckDB; Vitest for key
+  suggestions, notes, changed cells, the dialog and the bar; Playwright for the whole flow,
+  including the cell fills read from the canvas.
+- Smoke (real app): `bigview orders_v1.csv orders_v2.csv` → Compare from v1 (v2 and `id`
+  preselected) → "7 → 8 rows: 2 added · 1 removed · 4 changed · 2 the same", "Changed: qty 1 ·
+  price 1 · note 2", both notes, the cells filled as expected in dark theme, 38 ms; "2 added"
+  shows those 2 rows; Export → CSV through the save dialog gives exactly the documented rows.
+- Left over: none.

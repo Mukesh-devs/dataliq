@@ -8,6 +8,7 @@
 
 mod bench_small;
 mod charts;
+mod compare;
 mod copy_sql;
 mod csv_sources;
 mod engine_query;

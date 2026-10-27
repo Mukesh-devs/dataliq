@@ -1,0 +1,9 @@
+id,name,qty,price,note
+1,Apple,3,1.50,
+2,Banana,12,0.30,ripe
+3,Cherry,n/a,0.10,
+5,Elder,1,9.99,
+5,Elder,2,9.99,updated
+5,Elder,3,9.99,
+6,Fig,4,3.20,new note
+7,Grape,10,4.00,

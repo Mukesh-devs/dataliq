@@ -480,3 +480,26 @@ The exported `.sql` script is the same query the app runs (D39) over the
 file's reader, with a two-line header and each step's description as a
 `--` comment above it; disabled steps are left out. Files are written whole
 (a `.partial` file renamed), and only as `.json` or `.sql`.
+
+## D41 — Comparing files: one full outer join, a tab of differences
+
+Two open tabs are compared by key columns the user picks (a column named
+like `id`, `key`, `code` or `…_id` is suggested). Each side's rows get
+their file order and the occurrence of their key, and the join is on the
+keys plus that occurrence, so a repeated key never multiplies rows: the
+first `id = 5` before is matched with the first after, the second with the
+second, and a third only after is added; repeated keys are counted and
+mentioned. Columns both files have are compared with `IS DISTINCT FROM`
+(NULL = NULL), as text when their types differ (said in the bar); columns
+only one side has are listed and not compared. Comparing a cleaned tab
+compares its cleaned rows. The result opens as a new tab whose rows are
+only the differences, in the first file's order then the added rows:
+`status`, the keys, `changed` (the changed columns' names), then each
+compared column with its new value and, for columns that changed
+somewhere, a `… (before)` column right after it. One aggregate query gives
+the counts (added, removed, changed, the same, changes per column); the
+rows are a dataset written in the background like a view, so filters,
+sort, search, charts, export and "Copy view as SQL" (one query over both
+files' readers) work as on any file. The bar's counts filter the rows by
+status; changed cells (and their old values) are filled with a soft amber,
+added rows green, removed rows red, as tokens with dark steps.

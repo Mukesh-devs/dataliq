@@ -74,7 +74,8 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     parts.push(`cleaned in ${formatDuration(r.elapsedMs)}`);
   } else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
-    if (tab.info.format === "sql") parts.push("SQL result");
+    if (tab.compare) parts.push(`compared in ${formatDuration(tab.compare.elapsedMs)}`);
+    else if (tab.info.format === "sql") parts.push("SQL result");
     else if (tab.import?.fromCache) parts.push("from cache");
     else if (tab.info.dataset.cached === false)
       parts.push(tab.info.format === "parquet" ? "queried in place" : "read directly");

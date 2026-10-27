@@ -44,6 +44,13 @@
   --null: #a1a1aa;
   /* Search matches highlighted in grid cells. */
   --match: rgb(250 204 21 / 0.45);
+  /* Comparisons: changed cells, added and removed rows (fills and marks). */
+  --diff-changed: rgb(245 158 11 / 0.2);
+  --diff-added: rgb(22 163 74 / 0.14);
+  --diff-removed: rgb(220 38 38 / 0.12);
+  --diff-changed-mark: #d97706;
+  --diff-added-mark: #16a34a;
+  --diff-removed-mark: #dc2626;
   /* Bars of the small histograms in grid headers. */
   --chart-bar: rgb(79 70 229 / 0.4);
   /* Chart series, in fixed order (validated for colour-blind separation). */
@@ -81,6 +88,12 @@
   --success: #4ade80;
   --null: #5f5f68;
   --match: rgb(250 204 21 / 0.3);
+  --diff-changed: rgb(251 191 36 / 0.18);
+  --diff-added: rgb(74 222 128 / 0.13);
+  --diff-removed: rgb(248 113 113 / 0.15);
+  --diff-changed-mark: #fbbf24;
+  --diff-added-mark: #4ade80;
+  --diff-removed-mark: #f87171;
   --chart-bar: rgb(129 140 248 / 0.45);
   --series-1: #3987e5;
   --series-2: #d95926;

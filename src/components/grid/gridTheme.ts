@@ -70,3 +70,15 @@ export function rowHeight(root: HTMLElement = document.documentElement): number 
   const px = parseFloat(getComputedStyle(root).getPropertyValue("--row-height"));
   return Number.isFinite(px) && px > 0 ? px : 28;
 }
+
+/** A comparison's cell fills: changed cells, added and removed rows. */
+export type CellTint = "changed" | "added" | "removed";
+
+export function tintColors(root: HTMLElement = document.documentElement): Record<CellTint, string> {
+  const s = getComputedStyle(root);
+  return {
+    changed: cssVar(s, "--diff-changed", "rgba(245,158,11,0.2)"),
+    added: cssVar(s, "--diff-added", "rgba(22,163,74,0.14)"),
+    removed: cssVar(s, "--diff-removed", "rgba(220,38,38,0.12)"),
+  };
+}

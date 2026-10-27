@@ -4,6 +4,7 @@ pub mod cache;
 pub mod chart;
 pub mod cli;
 pub mod commands;
+pub mod compare;
 pub mod engine;
 pub mod error;
 pub mod export;
@@ -134,7 +135,9 @@ pub fn run() {
             commands::recipe::recipe_script,
             commands::recipe::save_recipe,
             commands::recipe::load_recipe,
-            commands::recipe::save_recipe_script
+            commands::recipe::save_recipe_script,
+            commands::compare::compare_files,
+            commands::compare::compare_sql
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

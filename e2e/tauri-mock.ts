@@ -49,6 +49,11 @@ export interface MockOptions {
    * runs in Node. The dataset is `recipe-N`, paged through `fetchRows`.
    */
   recipes?: (steps: { op: string; enabled?: boolean }[]) => unknown;
+  /**
+   * Result of `compare_files` without its dataset (counts, columns, …); the
+   * dataset is `diff-N`, paged through `fetchRows`.
+   */
+  comparison?: Record<string, unknown> & { rowCount: number };
 }
 
 /**
@@ -106,7 +111,16 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     await page.exposeFunction("__recipes", (steps: { op: string }[]) => recipes(steps));
   }
   await page.addInitScript(
-    ({ recordings, dialogPaths, datasets, imports, startupFiles, savePaths, exportMs }) => {
+    ({
+      recordings,
+      dialogPaths,
+      datasets,
+      imports,
+      startupFiles,
+      savePaths,
+      exportMs,
+      comparison,
+    }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
@@ -115,6 +129,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       let nextView = 1;
       let nextResult = 1;
       let nextRecipe = 1;
+      let nextDiff = 1;
       // The SQL panel's history and saved queries (kept for the page's life).
       const history: { sql: string; ranAt: number }[] = [];
       const saved: { name: string; sql: string; savedAt: number }[] = [];
@@ -229,6 +244,15 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               return null;
             case "recipe_script":
               return `WITH base AS (SELECT * FROM ${String(args.reader)}),\nstep_1 AS (SELECT * FROM base)\nSELECT * FROM step_1;`;
+            case "compare_files": {
+              if (!comparison)
+                throw { kind: "internal", message: "unmocked command compare_files" };
+              const { rowCount, ...rest } = comparison;
+              const id = `diff-${nextDiff++}`;
+              return { dataset: { id, rowCount, cached: true }, elapsedMs: 12, ...rest };
+            }
+            case "compare_sql":
+              return `SELECT 'changed' AS status FROM ${String(args.leftReader)}, ${String(args.rightReader)};`;
             case "chart_sql":
               return `SELECT city, count(*) AS "Count" FROM ${String(args.reader)} GROUP BY 1`;
             case "save_chart_image":
@@ -368,6 +392,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       startupFiles: options.startupFiles ?? [],
       savePaths: options.savePaths ?? [],
       exportMs: options.exportMs ?? 0,
+      comparison: options.comparison,
     },
   );
 }

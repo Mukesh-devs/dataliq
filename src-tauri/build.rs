@@ -40,6 +40,8 @@ fn main() {
             "save_recipe",
             "load_recipe",
             "save_recipe_script",
+            "compare_files",
+            "compare_sql",
         ]),
     ))
     .expect("failed to run tauri-build");
