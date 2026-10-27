@@ -23,6 +23,16 @@ import {
 } from "react";
 import { useResolvedTheme } from "../../app/useResolvedTheme";
 import type { ColumnKind } from "../../lib/arrow";
+import {
+  fitWidth,
+  label,
+  move,
+  pinnedCount,
+  reconcile,
+  setWidth,
+  visible as visibleColumns,
+  type ColumnLayout,
+} from "../../lib/layout";
 import { sortMark, type SortKey } from "../../lib/view";
 import { useSettings } from "../../stores/settings";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
@@ -46,20 +56,26 @@ const ICONS: Partial<Record<ColumnKind, GridColumnIcon>> = {
 export interface DataGridHandle {
   /** Scrolls so `row` (0-based) is visible and selects its first cell. */
   scrollToRow(row: number): void;
+  /** Sets a column's width to fit its header and the rows on screen. */
+  autoFit(column: string): void;
 }
 
 interface DataGridProps {
   source: RowSource;
   /** Called with the first visible row and the number of visible rows. */
   onVisibleRowsChange?: (first: number, count: number) => void;
-  /** Header menu (or right-click) on column `col`; `bounds` is in client coordinates. */
-  onHeaderMenu?: (col: number, bounds: Rectangle) => void;
+  /** Column order, hidden/pinned columns, names and widths (all columns by default). */
+  layout?: ColumnLayout;
+  /** Resizing, auto-fit or dragging a header to a new place changes the layout. */
+  onLayoutChange?: (layout: ColumnLayout) => void;
+  /** Header menu (or right-click) on a column; `bounds` is in client coordinates. */
+  onHeaderMenu?: (column: string, bounds: Rectangle) => void;
   /** Columns with an active filter, marked in the header. */
   filteredColumns?: ReadonlySet<string>;
   /** Current sort, shown as arrows in the headers. */
   sort?: SortKey[];
   /** Header clicked (outside its menu button); `add` = Shift held. */
-  onHeaderClick?: (col: number, add: boolean) => void;
+  onHeaderClick?: (column: string, add: boolean) => void;
   /** Search text to highlight in text cells. */
   highlight?: string;
 }
@@ -79,7 +95,17 @@ const emptySelection: GridSelection = {
  * arrive asynchronously and only the affected cells are redrawn.
  */
 export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataGrid(
-  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns, sort, onHeaderClick, highlight },
+  {
+    source,
+    layout: layoutIn,
+    onLayoutChange,
+    onVisibleRowsChange,
+    onHeaderMenu,
+    filteredColumns,
+    sort,
+    onHeaderClick,
+    highlight,
+  },
   ref,
 ) {
   const editor = useRef<DataEditorRef>(null);
@@ -88,7 +114,6 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
   const resolvedTheme = useResolvedTheme();
   const density = useSettings((s) => s.density);
   const [fontsReady, setFontsReady] = useState(false);
-  const [widths, setWidths] = useState<Record<string, number>>({});
   const [selection, setSelection] = useState<GridSelection>(emptySelection);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -109,27 +134,53 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     return { theme: gridTheme(), cellStyle: style, height: rowHeight() };
   }, [resolvedTheme, density, fontsReady]);
 
+  // The layout for this source's columns, and the source index of each
+  // shown column (display order).
+  const layout = useMemo(
+    () =>
+      reconcile(
+        layoutIn,
+        source.columns.map((c) => c.name),
+      ),
+    [layoutIn, source],
+  );
+  const shown = useMemo(() => {
+    const index = new Map(source.columns.map((c, i) => [c.name, i]));
+    return visibleColumns(layout)
+      .map((name) => index.get(name))
+      .filter((i): i is number => i !== undefined);
+  }, [layout, source]);
+  const nameAt = useCallback(
+    (col: number) => source.columns[shown[col] ?? -1]?.name,
+    [source, shown],
+  );
+
   const columns: GridColumn[] = useMemo(
     () =>
-      source.columns.map((c) => ({
-        id: c.name,
-        title: sort?.length ? `${c.name} ${sortMark(sort, c.name)}`.trim() : c.name,
-        icon: ICONS[c.kind] ?? GridColumnIcon.HeaderString,
-        width: widths[c.name] ?? initialWidth(c.name, c.kind),
-        hasMenu: onHeaderMenu !== undefined,
-        ...(filteredColumns?.has(c.name) && {
-          themeOverride: { textHeader: theme.accentColor, bgIconHeader: theme.accentColor },
-        }),
-      })),
-    [source, widths, onHeaderMenu, filteredColumns, theme, sort],
+      shown.map((i) => {
+        const c = source.columns[i]!;
+        const title = label(layout, c.name);
+        return {
+          id: c.name,
+          title: sort?.length ? `${title} ${sortMark(sort, c.name)}`.trim() : title,
+          icon: ICONS[c.kind] ?? GridColumnIcon.HeaderString,
+          width: layout.widths[c.name] ?? initialWidth(title, c.kind),
+          hasMenu: onHeaderMenu !== undefined,
+          ...(filteredColumns?.has(c.name) && {
+            themeOverride: { textHeader: theme.accentColor, bgIconHeader: theme.accentColor },
+          }),
+        };
+      }),
+    [source, shown, layout, onHeaderMenu, filteredColumns, theme, sort],
   );
 
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
-      const column = source.columns[col] ?? { kind: "other" as const };
-      return toGridCell(source.getValue(row, col), column, cellStyle);
+      const src = shown[col] ?? -1;
+      const column = source.columns[src] ?? { kind: "other" as const };
+      return toGridCell(source.getValue(row, src), column, cellStyle);
     },
-    [source, cellStyle],
+    [source, shown, cellStyle],
   );
 
   // A new source (e.g. preview -> imported data) must load what is on screen
@@ -150,13 +201,13 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       if (from >= to) return;
       const cells: { cell: Item }[] = [];
       for (let r = from; r < to; r++) {
-        for (let c = v.x; c < Math.min(v.x + v.width + 1, source.columns.length); c++) {
+        for (let c = v.x; c < Math.min(v.x + v.width + 1, shown.length); c++) {
           cells.push({ cell: [c, r] });
         }
       }
       editor.current?.updateCells(cells);
     });
-  }, [source]);
+  }, [source, shown]);
 
   const onVisibleRegionChanged = useCallback(
     (range: Rectangle) => {
@@ -180,7 +231,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       if (
         cell.kind === GridCellKind.Text &&
         cell.copyData !== "" &&
-        source.columns[args.col]?.kind === "text"
+        source.columns[shown[args.col] ?? -1]?.kind === "text"
       ) {
         paintMatches(ctx, cell.displayData, highlight, rect, {
           font: `${t.baseFontStyle} ${t.fontFamily}`,
@@ -190,7 +241,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       }
       drawContent();
     };
-  }, [highlight, matchFill, source]);
+  }, [highlight, matchFill, source, shown]);
 
   const getCellsForSelection = useCallback(
     (rect: Rectangle) => async () => {
@@ -229,8 +280,40 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           ),
         );
       },
+      autoFit(column: string) {
+        const src = source.columns.findIndex((c) => c.name === column);
+        const col = source.columns[src];
+        if (!col || !onLayoutChange) return;
+        // Measure the header and the rows on screen (those are loaded).
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ctx) return;
+        const font = theme.fontFamily ?? "monospace";
+        const measureWith = (f: string) => (s: string) => {
+          ctx.font = f;
+          return ctx.measureText(s).width;
+        };
+        const v = visible.current;
+        const values: string[] = [];
+        for (let r = v.y; r < Math.min(source.rowCount, v.y + Math.max(v.height, 50)); r++) {
+          const cell = toGridCell(source.getValue(r, src), col, cellStyle);
+          if (cell.kind === GridCellKind.Text || cell.kind === GridCellKind.Number)
+            values.push(cell.displayData);
+        }
+        const title = `${label(layout, column)} ${sortMark(sort ?? [], column)}`.trim();
+        const width = fitWidth(
+          title,
+          values,
+          {
+            header: measureWith(`${theme.headerFontStyle ?? "600 12px"} ${font}`),
+            cell: measureWith(`${theme.baseFontStyle ?? "12px"} ${font}`),
+          },
+          // Type icon + gap, and the menu button.
+          { padding: theme.cellHorizontalPadding ?? 8, headerExtra: 26 + MENU_BUTTON_WIDTH },
+        );
+        onLayoutChange(setWidth(layout, column, width));
+      },
     }),
-    [source, height],
+    [source, height, layout, onLayoutChange, theme, cellStyle, sort],
   );
 
   const digits = String(source.rowCount).length;
@@ -256,7 +339,10 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         getCellsForSelection={getCellsForSelection}
         gridSelection={selection}
         onGridSelectionChange={setSelection}
-        onHeaderMenuClick={onHeaderMenu}
+        onHeaderMenuClick={(col, bounds) => {
+          const name = nameAt(col);
+          if (name !== undefined) onHeaderMenu?.(name, bounds);
+        }}
         onHeaderClicked={(col, e) => {
           if (!onHeaderClick) return;
           // The menu button has its own handler.
@@ -264,15 +350,21 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           e.preventDefault(); // sort instead of selecting the column
           // Glide selected the column on mouse down; a sort click shouldn't.
           setSelection(emptySelection);
-          onHeaderClick(col, e.shiftKey);
+          const name = nameAt(col);
+          if (name !== undefined) onHeaderClick(name, e.shiftKey);
         }}
         onHeaderContextMenu={(col, e) => {
           if (!onHeaderMenu) return;
           e.preventDefault();
-          onHeaderMenu(col, e.bounds); // client coordinates, like the menu click
+          const name = nameAt(col);
+          // Client coordinates, like the menu click.
+          if (name !== undefined) onHeaderMenu(name, e.bounds);
         }}
         onColumnResize={(column, newSize) =>
-          setWidths((w) => ({ ...w, [column.id ?? column.title]: newSize }))
+          onLayoutChange?.(setWidth(layout, column.id ?? column.title, newSize))
+        }
+        onColumnMoved={
+          onLayoutChange ? (from, to) => onLayoutChange(move(layout, from, to)) : undefined
         }
         drawCell={drawCell}
         rowMarkers="number"
@@ -282,7 +374,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         smoothScrollX
         smoothScrollY
         theme={theme}
-        freezeColumns={0}
+        freezeColumns={pinnedCount(layout)}
         keybindings={{ search: false, selectAll: true, copy: true }}
       />
     </div>

@@ -14,6 +14,7 @@ import {
   type SourceInfo,
 } from "../lib/files";
 import { cancelQuery } from "../lib/ipc";
+import type { ColumnLayout } from "../lib/layout";
 import { isIdentity, openView, type ViewReady, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
 
@@ -70,6 +71,8 @@ export interface Tab {
   /** What the user asked to see (filters, …). */
   view?: ViewSpec;
   viewState?: ViewState;
+  /** Column order, hidden and pinned columns, names and widths. */
+  layout?: ColumnLayout;
 }
 
 interface TabsState {
@@ -94,6 +97,7 @@ interface TabsState {
   setView: (id: string, view: ViewSpec) => Promise<void>;
   /** Applies a `view-ready` event (subscribed once by the App). */
   applyViewReady: (ready: ViewReady) => void;
+  setLayout: (id: string, layout: ColumnLayout) => void;
 }
 
 let nextId = 1;
@@ -273,6 +277,7 @@ export const useTabs = create<TabsState>()((set, get) => {
         info: tab.info ? { ...tab.info, dataset: null } : tab.info,
         view: undefined,
         viewState: undefined,
+        layout: undefined,
       });
       await load(id, tab.path, options);
     },
@@ -320,6 +325,7 @@ export const useTabs = create<TabsState>()((set, get) => {
             : t,
         ),
       })),
+    setLayout: (id, layout) => patch(id, { layout }),
     setView: async (id, view) => {
       if (!find(id)) return;
       patch(id, { view: isIdentity(view) ? undefined : view });

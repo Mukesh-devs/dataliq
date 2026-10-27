@@ -11,6 +11,16 @@ import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSour
 import { smallFileBytes, useApp } from "../../stores/app";
 import { columnValues, toggleSort, type Filter, type SortKey, type ViewSpec } from "../../lib/view";
 import { ColumnMenu } from "../filters/ColumnMenu";
+import { RenameColumn } from "../filters/RenameColumn";
+import {
+  label,
+  reconcile,
+  rename,
+  setHidden,
+  setPinned,
+  visible,
+  type ColumnLayout,
+} from "../../lib/layout";
 import { FilterBar } from "../filters/FilterBar";
 import { SearchBox } from "../filters/SearchBox";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
@@ -24,6 +34,7 @@ interface FileViewProps {
   onCancelImport?: () => void;
   onReadDirect?: () => void;
   onViewChange?: (view: ViewSpec) => void;
+  onLayoutChange?: (layout: ColumnLayout) => void;
 }
 
 /** The filter editor being shown: a new filter on `column`, or filter `index`. */
@@ -65,6 +76,7 @@ export function FileView({
   onCancelImport,
   onReadDirect,
   onViewChange,
+  onLayoutChange,
 }: FileViewProps) {
   const source = useRowSource(tab);
   const columns = useMemo(() => (tab.preview ? describeColumns(tab.preview) : []), [tab.preview]);
@@ -73,6 +85,15 @@ export function FileView({
   const filtered = useMemo(() => new Set(filters.map((f) => f.column)), [filters]);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
+  const [renaming, setRenaming] = useState<{ column: string; anchor: Anchor } | null>(null);
+  const layout = useMemo(
+    () =>
+      reconcile(
+        tab.layout,
+        columns.map((c) => c.name),
+      ),
+    [tab.layout, columns],
+  );
   const sort = useMemo(() => view.sort ?? [], [view]);
   const setSort = (next: SortKey[]) => onViewChange?.({ ...view, sort: next });
   const baseId = tab.info?.dataset?.id;
@@ -87,8 +108,8 @@ export function FileView({
     [baseId, editColumn, view, tab.id],
   );
   const onHeaderMenu = useCallback(
-    (col: number, bounds: { x: number; y: number; width: number; height: number }) => {
-      const column = columns[col];
+    (name: string, bounds: { x: number; y: number; width: number; height: number }) => {
+      const column = columns.find((c) => c.name === name);
       if (column) setMenu({ column, anchor: rectAnchor(bounds) });
     },
     [columns],
@@ -100,11 +121,9 @@ export function FileView({
   };
   const viewSort = view.sort;
   const onHeaderClick = useCallback(
-    (col: number, add: boolean) => {
-      const column = columns[col];
-      if (column) onViewChange?.({ ...view, sort: toggleSort(viewSort ?? [], column.name, add) });
-    },
-    [columns, onViewChange, view, viewSort],
+    (name: string, add: boolean) =>
+      onViewChange?.({ ...view, sort: toggleSort(viewSort ?? [], name, add) }),
+    [onViewChange, view, viewSort],
   );
   const settings = useApp((s) => s.settings);
   const grid = useRef<DataGridHandle>(null);
@@ -205,6 +224,25 @@ export function FileView({
           onOpenChange={(o) => !o && setMenu(null)}
           onSort={setSort}
           onFilter={() => filterColumn(menu.column, menu.anchor)}
+          {...(onLayoutChange && {
+            pinned: layout.pinned.includes(menu.column.name),
+            onPin: (p: boolean) => onLayoutChange(setPinned(layout, menu.column.name, p)),
+            onHide:
+              visible(layout).length > 1
+                ? () => onLayoutChange(setHidden(layout, menu.column.name, true))
+                : undefined,
+            onRename: () => setRenaming({ column: menu.column.name, anchor: menu.anchor }),
+            onAutoFit: () => grid.current?.autoFit(menu.column.name),
+          })}
+        />
+      )}
+      {renaming && onLayoutChange && (
+        <RenameColumn
+          column={renaming.column}
+          current={label(layout, renaming.column)}
+          anchor={renaming.anchor}
+          onOpenChange={(o) => !o && setRenaming(null)}
+          onRename={(name) => onLayoutChange(rename(layout, renaming.column, name))}
         />
       )}
       {editing && (
@@ -246,6 +284,8 @@ export function FileView({
           <DataGrid
             ref={grid}
             source={source}
+            layout={layout}
+            onLayoutChange={onLayoutChange}
             onHeaderMenu={onViewChange ? onHeaderMenu : undefined}
             onHeaderClick={onViewChange ? onHeaderClick : undefined}
             filteredColumns={filtered}

@@ -49,3 +49,42 @@ describe("ColumnMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Filter…" })).toHaveFocus();
   });
 });
+
+describe("ColumnMenu column management", () => {
+  it("pins, hides, renames and auto-fits", async () => {
+    const extra = {
+      onPin: vi.fn(),
+      onHide: vi.fn(),
+      onRename: vi.fn(),
+      onAutoFit: vi.fn(),
+    };
+    const props = { onOpenChange: vi.fn(), onSort: vi.fn(), onFilter: vi.fn() };
+    const { rerender } = render(
+      <ColumnMenu column="amount" anchor={anchor} sort={[]} pinned={false} {...props} {...extra} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("menuitem", { name: "Pin to the left" }));
+    expect(extra.onPin).toHaveBeenCalledWith(true);
+    await user.click(screen.getByRole("menuitem", { name: "Hide column" }));
+    expect(extra.onHide).toHaveBeenCalled();
+    await user.click(screen.getByRole("menuitem", { name: "Rename…" }));
+    expect(extra.onRename).toHaveBeenCalled();
+    await user.click(screen.getByRole("menuitem", { name: "Auto-fit width" }));
+    expect(extra.onAutoFit).toHaveBeenCalled();
+    // A pinned column offers Unpin; the last shown column can't be hidden.
+    rerender(
+      <ColumnMenu
+        column="amount"
+        anchor={anchor}
+        sort={[]}
+        pinned
+        {...props}
+        {...extra}
+        onHide={undefined}
+      />,
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Unpin column" }));
+    expect(extra.onPin).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole("menuitem", { name: "Hide column" })).not.toBeInTheDocument();
+  });
+});

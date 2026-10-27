@@ -1,5 +1,16 @@
 import * as Popover from "@radix-ui/react-popover";
-import { ArrowDown, ArrowUp, ListFilter, Plus, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  EyeOff,
+  ListFilter,
+  MoveHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  Plus,
+  X,
+} from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import type { SortKey } from "../../lib/view";
 import type { Anchor } from "./FilterEditor";
@@ -12,6 +23,13 @@ interface ColumnMenuProps {
   /** New sort for the view. */
   onSort: (sort: SortKey[]) => void;
   onFilter: () => void;
+  /** Column management; items are shown only when their handler is given. */
+  pinned?: boolean;
+  onPin?: (pinned: boolean) => void;
+  /** Absent when this is the only column shown. */
+  onHide?: () => void;
+  onRename?: () => void;
+  onAutoFit?: () => void;
 }
 
 /** The column header menu (▼ or right-click): sort and filter. */
@@ -22,6 +40,11 @@ export function ColumnMenu({
   onOpenChange,
   onSort,
   onFilter,
+  pinned,
+  onPin,
+  onHide,
+  onRename,
+  onAutoFit,
 }: ColumnMenuProps) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor]);
   const current = sort.find((k) => k.column === column);
@@ -67,6 +90,29 @@ export function ColumnMenu({
           <Item icon={<ListFilter />} onSelect={choose(onFilter)}>
             Filter…
           </Item>
+          {(onPin || onHide || onRename || onAutoFit) && (
+            <div className="my-1 h-px bg-border" role="separator" />
+          )}
+          {onPin && (
+            <Item icon={pinned ? <PinOff /> : <Pin />} onSelect={choose(() => onPin(!pinned))}>
+              {pinned ? "Unpin column" : "Pin to the left"}
+            </Item>
+          )}
+          {onHide && (
+            <Item icon={<EyeOff />} onSelect={choose(onHide)}>
+              Hide column
+            </Item>
+          )}
+          {onRename && (
+            <Item icon={<Pencil />} onSelect={choose(onRename)}>
+              Rename…
+            </Item>
+          )}
+          {onAutoFit && (
+            <Item icon={<MoveHorizontal />} onSelect={choose(onAutoFit)}>
+              Auto-fit width
+            </Item>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

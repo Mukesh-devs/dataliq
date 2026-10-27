@@ -86,6 +86,7 @@ export function App() {
     useTabs();
   const applyProgress = useTabs((s) => s.applyProgress);
   const setView = useTabs((s) => s.setView);
+  const setLayout = useTabs((s) => s.setLayout);
   const applyViewReady = useTabs((s) => s.applyViewReady);
   const engineVersion = useEngine((s) => s.version);
   const probeEngine = useEngine((s) => s.probe);
@@ -170,7 +171,11 @@ export function App() {
         onOpen={() => void openFile()}
       />
       <div className="flex min-h-0 flex-1">
-        <Sidebar tabs={tabs} />
+        <Sidebar
+          tabs={tabs}
+          active={active}
+          onLayoutChange={active ? (l) => setLayout(active.id, l) : undefined}
+        />
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
           {active ? (
             <FileView
@@ -180,6 +185,7 @@ export function App() {
               onCancelImport={() => void cancelImport(active.id)}
               onReadDirect={() => void readDirect(active.id)}
               onViewChange={(v) => void setView(active.id, v)}
+              onLayoutChange={(l) => setLayout(active.id, l)}
             />
           ) : (
             <EmptyState
