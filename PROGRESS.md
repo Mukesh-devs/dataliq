@@ -511,3 +511,25 @@ tested, and anything left over.
   bold header in view order, five columns, real dates, NULL as empty. SQL panel
   `SELECT count(*) AS adults …` → Export → JSON → `[{"adults":797}]`.
 - Left over: none.
+
+### Step 6 — Copy view as SQL / Open view in SQL panel ✅
+
+- "Copy view as SQL" (v0.2, D31) stays as it was: standalone SQL over the file that runs in
+  plain DuckDB.
+- New: "Open in SQL" in the file toolbar and "Open view in SQL panel" in the palette put the view
+  (filters, search, sort, shown columns under their display names) in the SQL panel as formatted
+  SQL over the tab's SQL table (`FROM "people"`), so running it reads the imported data, not the
+  file again (D37). It replaces the editor's text as one undoable change and opens the panel if
+  it was closed; it doesn't run by itself.
+- Fixed on the way: the SQL editor is created before its handle is given out, so text can go in
+  the moment the panel opens (it was silently dropped before).
+- Tested: Rust — for five views (filters of every kind, search, sorts with ties, chosen columns)
+  the SQL over the registered table, run as the panel runs it (`sql_result`, paged), gives
+  exactly the view's rows; Vitest — loading text with the panel open and closed (once, when the
+  editor mounts); Playwright — sort, Open in SQL with the panel closed, formatted query over
+  `"comma"`, the spec sent, undo restoring the old text, the palette command; "view as sql" in
+  the palette still finds Copy view as SQL first.
+- Smoke (real app, people.csv): sorted by amount ↓ and searched "Paris" (167 of 1,000 rows);
+  Open in SQL → formatted query; Ctrl+Enter → "167 rows in 22 ms", same rows in the same order
+  as the grid; Ctrl+Z brought back the earlier query.
+- Left over: none.
