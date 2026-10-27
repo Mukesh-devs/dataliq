@@ -293,3 +293,20 @@ tested, and anything left over.
 - Smoke (real app, people.csv): Ctrl+F, "smith" → "300 of 1,000 rows · filtered in 12 ms" (300
   matches the file), "smith"/"Smith" highlighted in the name column only.
 - Left over: none.
+
+### Step 5 — Column management ✅
+
+- Per-tab column layout (`src/lib/layout.ts`): display order, hidden and pinned columns, display
+  names, widths. Display only: filters, sorting and SQL keep the real names; the grid maps shown
+  columns to the data without re-querying. Reset when import settings change the columns.
+- Header menu: Pin to the left / Unpin, Hide column (never the last one), Rename… (popover with
+  Reset), Auto-fit width (header + rows on screen, 50–500 px). Drag a header to move it; dropping
+  into the pinned block pins it (Glide `freezeColumns`). Sidebar "Columns": every column in
+  display order with a show/hide checkbox, pin marker, "N of M shown" and Show all.
+- Tested: Vitest for the layout model (hidden columns keep their place, pin order, drag in/out of
+  the pinned block, reconcile with new columns, width limits, fit width), the menu items, rename
+  popover and sidebar list; Playwright for hide from the menu / show from the sidebar / Show
+  all, pin, rename, dragging a header and auto-fit.
+- Smoke (real app, people.csv): pinned "amount" from its menu → first column, pin marker in the
+  sidebar; Auto-fit on "name" narrowed it to fit "O'Neil Nakamura".
+- Left over: none.
