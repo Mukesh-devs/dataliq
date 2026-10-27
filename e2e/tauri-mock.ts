@@ -21,6 +21,10 @@ export interface MockOptions {
   views?: (spec: unknown) => number;
   /** Value list for `column_values`; runs in Node. */
   values?: (column: string, search: string | null) => { value: string | null; count: number }[];
+  /** Result of `column_profile`; runs in Node. */
+  profile?: (column: string, spec: unknown) => unknown;
+  /** Result of `column_histograms` (none by default); runs in Node. */
+  histograms?: (columns: string[], spec: unknown) => unknown[];
   /**
    * Simulated background imports by path: progress events to emit (one per
    * `stepMs`) and the final row count. Paths not listed never finish.
@@ -50,6 +54,18 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     const values = options.values;
     await page.exposeFunction("__values", (column: string, search: string | null) =>
       values(column, search),
+    );
+  }
+  if (options.profile) {
+    const profile = options.profile;
+    await page.exposeFunction("__profile", (column: string, spec: unknown) =>
+      profile(column, spec),
+    );
+  }
+  if (options.histograms) {
+    const histograms = options.histograms;
+    await page.exposeFunction("__histograms", (columns: string[], spec: unknown) =>
+      histograms(columns, spec),
     );
   }
   await page.addInitScript(
@@ -160,6 +176,16 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const values = w.__values as (c: string, s: string | null) => Promise<unknown[]>;
               const list = await values(String(args.column), (args.search as string) ?? null);
               return { values: list, truncated: false };
+            }
+            case "column_profile": {
+              const profile = w.__profile as (c: string, s: unknown) => Promise<unknown>;
+              if (!profile) throw { kind: "internal", message: "unmocked command column_profile" };
+              return profile(String(args.column), args.spec);
+            }
+            case "column_histograms": {
+              const histograms = w.__histograms as
+                ((c: string[], s: unknown) => Promise<unknown[]>) | undefined;
+              return histograms ? histograms(args.columns as string[], args.spec) : [];
             }
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };

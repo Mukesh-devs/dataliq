@@ -2,6 +2,7 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   ArrowDown,
   ArrowUp,
+  ChartColumn,
   EyeOff,
   ListFilter,
   MoveHorizontal,
@@ -30,6 +31,8 @@ interface ColumnMenuProps {
   onHide?: () => void;
   onRename?: () => void;
   onAutoFit?: () => void;
+  /** Opens the column's statistics. */
+  onProfile?: () => void;
 }
 
 /** The column header menu (▼ or right-click): sort and filter. */
@@ -45,6 +48,7 @@ export function ColumnMenu({
   onHide,
   onRename,
   onAutoFit,
+  onProfile,
 }: ColumnMenuProps) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor]);
   const current = sort.find((k) => k.column === column);
@@ -90,6 +94,11 @@ export function ColumnMenu({
           <Item icon={<ListFilter />} onSelect={choose(onFilter)}>
             Filter…
           </Item>
+          {onProfile && (
+            <Item icon={<ChartColumn />} onSelect={choose(onProfile)}>
+              Column profile
+            </Item>
+          )}
           {(onPin || onHide || onRename || onAutoFit) && (
             <div className="my-1 h-px bg-border" role="separator" />
           )}

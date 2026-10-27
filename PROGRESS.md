@@ -310,3 +310,28 @@ tested, and anything left over.
 - Smoke (real app, people.csv): pinned "amount" from its menu → first column, pin marker in the
   sidebar; Auto-fit on "name" narrowed it to fit "O'Neil Nakamura".
 - Left over: none.
+
+### Step 6 — Column profile ✅
+
+- `column_profile` (Rust, `src-tauri/src/view/profile.rs`): over the view's filters and search
+  (not its sort), one aggregate query (rows, nulls, distinct — exact up to 10M rows, HyperLogLog
+  above, shown with "≈" — min, max, mean, std dev), a histogram (20 equal bars, or one bar per
+  value for small integer ranges; dates and timestamps binned by epoch seconds) and the 10 most
+  common values. Cancellable per tab (`profile:<tab>` group). D30 explains why not `SUMMARIZE`.
+- Side panel from the header menu ("Column profile"): stats, distribution with edges formatted by
+  type, most common values with share bars; follows filter and search changes, keeps the last
+  result on screen while the next loads.
+- Header mini-histograms for every number, date and boolean column (`column_histograms`: one scan
+  for all ranges, then one per column), drawn under the titles through Glide's `drawHeader`;
+  headers grow to 46 px. Toggle in the status bar (persisted).
+- 50M rows: profiles 0.4–2.8 s per column (budget < 3 s, met), header histograms 4.0 s for 7
+  columns in the background. Grouping top values by the typed value instead of its text took a
+  near-unique timestamp from 7.5 s to 2.8 s.
+- Tested: Rust against statistics computed independently from people.csv (counts, nulls, exact
+  distinct, min/max/mean/std dev, histogram bars with the same edges, top values with ties, with
+  filters, booleans, dates, all-null and empty views, edge cases of the header query); Vitest
+  for value formatting, the panel and the header bar geometry; Playwright for the header charts
+  (screenshots with and without), the toggle, and a profile that follows a new filter.
+- Smoke (real app, people.csv): bars under id, amount, joined and active; "Column profile" on
+  amount → 1,000 rows, 20 nulls (2.0%), 974 distinct, −98.46 … 998.5, mean 454.8815, 19 ms.
+- Left over: none.

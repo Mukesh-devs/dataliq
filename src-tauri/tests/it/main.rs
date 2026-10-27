@@ -17,6 +17,7 @@ mod paging;
 mod perf_import;
 mod perf_preview;
 mod perf_sort;
+mod profile;
 mod sort;
 mod ui_recordings;
 mod view_sql;

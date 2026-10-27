@@ -8,6 +8,9 @@ export type Density = "comfortable" | "compact";
 interface SettingsState {
   theme: ThemePreference;
   density: Density;
+  /** Small histograms under the column titles. */
+  headerCharts: boolean;
+  setHeaderCharts: (on: boolean) => void;
   setTheme: (theme: ThemePreference) => void;
   setDensity: (density: Density) => void;
   /** Cycles system -> light -> dark -> system. */
@@ -26,11 +29,16 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       theme: "system",
       density: "comfortable",
+      headerCharts: true,
+      setHeaderCharts: (headerCharts) => set({ headerCharts }),
       setTheme: (theme) => set({ theme }),
       setDensity: (density) => set({ density }),
       cycleTheme: () => set((s) => ({ theme: nextTheme[s.theme] })),
     }),
-    { name: "bigview.settings", partialize: (s) => ({ theme: s.theme, density: s.density }) },
+    {
+      name: "bigview.settings",
+      partialize: (s) => ({ theme: s.theme, density: s.density, headerCharts: s.headerCharts }),
+    },
   ),
 );
 

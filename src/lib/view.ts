@@ -207,3 +207,62 @@ export function sortMark(sort: SortKey[], column: string): string {
   const arrow = sort[i]!.descending ? "↓" : "↑";
   return sort.length > 1 ? `${arrow}${i + 1}` : arrow;
 }
+
+/** What kind of statistics a column gets; mirrors `ProfileKind` in Rust. */
+export type ProfileKind = "number" | "temporal" | "text" | "boolean" | "other";
+
+/** One histogram bar: values in [lo, hi) (seconds since 1970 for dates). */
+export interface Bin {
+  lo: number;
+  hi: number;
+  count: number;
+}
+
+export interface ColumnProfile {
+  column: string;
+  type: string;
+  kind: ProfileKind;
+  rows: number;
+  nulls: number;
+  distinct: number | null;
+  /** `distinct` is an estimate (very large views). */
+  distinctApprox: boolean;
+  min: string | null;
+  max: string | null;
+  mean: number | null;
+  stddev: number | null;
+  histogram: Bin[] | null;
+  top: ValueCount[];
+  topTruncated: boolean;
+  elapsedMs: number;
+}
+
+/** Header chart data; boolean columns have three bars: true, false, null. */
+export interface ColumnHistogram {
+  column: string;
+  kind: ProfileKind;
+  bins: Bin[];
+}
+
+/** The view's filters and search only: sorting doesn't change statistics. */
+export function statsSpec(spec: ViewSpec): ViewSpec {
+  return { filters: spec.filters, search: spec.search };
+}
+
+export function columnProfile(
+  datasetId: string,
+  spec: ViewSpec,
+  column: string,
+  group?: string,
+): Promise<ColumnProfile> {
+  return call("column_profile", { datasetId, spec: statsSpec(spec), column, group });
+}
+
+export function columnHistograms(
+  datasetId: string,
+  spec: ViewSpec,
+  columns: string[],
+  group?: string,
+): Promise<ColumnHistogram[]> {
+  return call("column_histograms", { datasetId, spec: statsSpec(spec), columns, group });
+}

@@ -314,3 +314,123 @@ fn perf_views_50m() {
         bigview_lib::import::close_dataset(&engine, &v.dataset.id).unwrap();
     }
 }
+
+/// Column profiles on 50M cached rows (budget: one column < 3 s).
+#[test]
+#[ignore = "needs generated fixtures; about a minute"]
+fn perf_profile_50m() {
+    let Some((engine, _tmp)) = setup() else {
+        eprintln!("sales_50m.parquet not generated, skipping");
+        return;
+    };
+    engine.datasets.insert(Dataset {
+        id: "ds".into(),
+        source: DatasetSource::Table("cache.data".into()),
+        row_count: 50_000_000,
+        cached: true,
+    });
+    let key = RequestKey::default();
+    for column in [
+        "quantity",
+        "unit_price",
+        "order_ts",
+        "customer",
+        "country",
+        "returned",
+    ] {
+        let t = Instant::now();
+        let p = engine
+            .column_profile("ds", &ViewSpec::default(), column, &key)
+            .unwrap();
+        println!(
+            "profile {column} ({}): {:.2} s (distinct {:?}{})",
+            p.r#type,
+            t.elapsed().as_secs_f64(),
+            p.distinct,
+            if p.distinct_approx { " ≈" } else { "" }
+        );
+    }
+    let cols: Vec<String> = [
+        "order_id",
+        "order_date",
+        "order_ts",
+        "quantity",
+        "unit_price",
+        "discount",
+        "returned",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    let t = Instant::now();
+    engine
+        .column_histograms("ds", &ViewSpec::default(), &cols, &key)
+        .unwrap();
+    println!(
+        "header histograms for {} columns: {:.2} s",
+        cols.len(),
+        t.elapsed().as_secs_f64()
+    );
+}
+
+/// Times the pieces of a column profile separately (diagnostics).
+#[test]
+#[ignore = "needs generated fixtures"]
+fn perf_profile_parts() {
+    let Some((engine, _tmp)) = setup() else {
+        return;
+    };
+    let q = |label: &str, sql: &str| {
+        let t = Instant::now();
+        let conn = engine.connection().unwrap();
+        let mut stmt = conn.prepare(sql).unwrap();
+        let n = stmt.query_map([], |_| Ok(())).unwrap().count();
+        println!("{label}: {:.2} s ({n} rows)", t.elapsed().as_secs_f64());
+    };
+    let from = "FROM (SELECT * FROM cache.data)";
+    q("warm-up count", "SELECT count(*) FROM cache.data");
+    q(
+        "quantity stats",
+        &format!(
+            "SELECT count(*), count(quantity), CAST(min(quantity) AS VARCHAR), CAST(max(quantity) AS VARCHAR), avg(CAST(quantity AS DOUBLE)), stddev_samp(CAST(quantity AS DOUBLE)), approx_count_distinct(quantity), min(CAST(quantity AS DOUBLE)), max(CAST(quantity AS DOUBLE)) {from}"
+        ),
+    );
+    q(
+        "quantity stats, no stddev",
+        &format!(
+            "SELECT count(*), count(quantity), min(quantity), max(quantity), avg(quantity) {from}"
+        ),
+    );
+    q(
+        "quantity approx_count_distinct",
+        &format!("SELECT approx_count_distinct(quantity) {from}"),
+    );
+    q(
+        "quantity stddev",
+        &format!("SELECT stddev_samp(CAST(quantity AS DOUBLE)) {from}"),
+    );
+    q(
+        "quantity histogram",
+        &format!(
+            "SELECT b, count(*) FROM (SELECT least(greatest(CAST(floor((x - 1) / 1) AS BIGINT), 0), 20) AS b FROM (SELECT CAST(quantity AS DOUBLE) AS x {from}) WHERE x IS NOT NULL) GROUP BY b"
+        ),
+    );
+    q(
+        "quantity top (varchar)",
+        &format!(
+            "SELECT CAST(quantity AS VARCHAR) v, count(*) n {from} GROUP BY 1 ORDER BY n DESC LIMIT 11"
+        ),
+    );
+    q(
+        "quantity top (typed)",
+        &format!("SELECT quantity, count(*) n {from} GROUP BY 1 ORDER BY n DESC LIMIT 11"),
+    );
+    q(
+        "order_ts top (typed)",
+        &format!("SELECT order_ts, count(*) n {from} GROUP BY 1 ORDER BY n DESC LIMIT 11"),
+    );
+    q(
+        "order_ts approx distinct",
+        &format!("SELECT approx_count_distinct(order_ts) {from}"),
+    );
+}

@@ -5,6 +5,7 @@ import {
   GridCellKind,
   GridColumnIcon,
   type DrawCellCallback,
+  type DrawHeaderCallback,
   type DataEditorRef,
   type GridCell,
   type GridColumn,
@@ -33,10 +34,11 @@ import {
   visible as visibleColumns,
   type ColumnLayout,
 } from "../../lib/layout";
-import { sortMark, type SortKey } from "../../lib/view";
+import { sortMark, type Bin, type SortKey } from "../../lib/view";
 import { useSettings } from "../../stores/settings";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
-import { gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
+import { chartColor, gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
+import { CHART_HEIGHT, paintHistogram } from "./headerChart";
 import { paintMatches } from "./highlight";
 import type { RowSource } from "./rowSource";
 import { scrollToRow } from "./scrollToRow";
@@ -78,12 +80,19 @@ interface DataGridProps {
   onHeaderClick?: (column: string, add: boolean) => void;
   /** Search text to highlight in text cells. */
   highlight?: string;
+  /**
+   * Small histograms drawn under the header titles, by column name. Given
+   * (even empty, while loading) makes the headers taller to fit them.
+   */
+  histograms?: ReadonlyMap<string, Bin[]>;
 }
 
 /** Width of Glide's header menu button (`menuButtonSize` in its source). */
 const MENU_BUTTON_WIDTH = 30;
 
 const HEADER_HEIGHT = 32;
+/** Header height with room for a histogram under the title. */
+const CHART_HEADER_HEIGHT = HEADER_HEIGHT + CHART_HEIGHT + 4;
 
 const emptySelection: GridSelection = {
   columns: CompactSelection.empty(),
@@ -105,6 +114,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     sort,
     onHeaderClick,
     highlight,
+    histograms,
   },
   ref,
 ) {
@@ -243,6 +253,44 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     };
   }, [highlight, matchFill, source, shown]);
 
+  // Header histograms: the title moves up and the bars fill the bottom.
+  const headerHeight = histograms ? CHART_HEADER_HEIGHT : HEADER_HEIGHT;
+  const barColor = useMemo(() => {
+    void resolvedTheme;
+    return chartColor();
+  }, [resolvedTheme]);
+  const drawHeader = useMemo<DrawHeaderCallback | undefined>(() => {
+    if (!histograms) return undefined;
+    return ({ ctx, column, rect, menuBounds }, drawContent) => {
+      ctx.save();
+      ctx.translate(0, -(CHART_HEIGHT + 4) / 2);
+      drawContent();
+      ctx.restore();
+      const bins = histograms.get(column.id ?? column.title);
+      if (!bins) return;
+      const left = rect.x + 8;
+      // Stop short of the menu button.
+      const right = (column.hasMenu ? menuBounds.x : rect.x + rect.width) - 4;
+      paintHistogram(
+        ctx,
+        bins,
+        {
+          x: left,
+          y: rect.y + rect.height - CHART_HEIGHT - 4,
+          width: right - left,
+          height: CHART_HEIGHT,
+        },
+        barColor,
+      );
+    };
+  }, [histograms, barColor]);
+
+  // Glide doesn't redraw headers for a new drawHeader; damage them (row -1).
+  useEffect(() => {
+    if (histograms === undefined) return;
+    editor.current?.updateCells(shown.map((_, c) => ({ cell: [c, -1] as Item })));
+  }, [histograms, shown]);
+
   const getCellsForSelection = useCallback(
     (rect: Rectangle) => async () => {
       await source.load(rect.y, rect.y + rect.height);
@@ -263,7 +311,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       scrollToRow(row: number) {
         const target = Math.max(0, Math.min(source.rowCount - 1, Math.floor(row)));
         const scroller = container.current?.querySelector<HTMLElement>(".dvn-scroller");
-        if (scroller) scrollToRow(scroller, target, height, HEADER_HEIGHT, source.rowCount);
+        if (scroller) scrollToRow(scroller, target, height, headerHeight, source.rowCount);
         // Select only once the jump has rendered: Glide scrolls to a newly
         // selected cell with a relative scroll that is wrong for huge tables,
         // but does nothing when the cell is already in view.
@@ -313,7 +361,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         onLayoutChange(setWidth(layout, column, width));
       },
     }),
-    [source, height, layout, onLayoutChange, theme, cellStyle, sort],
+    [source, height, headerHeight, layout, onLayoutChange, theme, cellStyle, sort],
   );
 
   const digits = String(source.rowCount).length;
@@ -367,10 +415,11 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           onLayoutChange ? (from, to) => onLayoutChange(move(layout, from, to)) : undefined
         }
         drawCell={drawCell}
+        drawHeader={drawHeader}
         rowMarkers="number"
         rowMarkerWidth={Math.max(40, digits * 8 + 20)}
         rowHeight={height}
-        headerHeight={HEADER_HEIGHT}
+        headerHeight={headerHeight}
         smoothScrollX
         smoothScrollY
         theme={theme}

@@ -268,3 +268,21 @@ imported tables (rowid tiebreak).
 
 Sorting only the row ids (15.6 s) and joining back for each page was
 rejected: pages took over a second each.
+
+## D30 — Column profiles from one aggregate query per column, not SUMMARIZE
+
+The plan suggests DuckDB's `SUMMARIZE`. It profiles every column of a
+relation at once, computing approximate quantiles and `approx_unique` for
+all of them, so profiling one column of a 9-column, 50M-row view pays for
+all nine. Instead a profile runs three queries over the view (filters and
+search, no sort): one aggregate (count, non-null count, min, max, mean,
+sample std dev, distinct — exact up to 10M rows, HyperLogLog above, marked
+"≈"), a fixed-width histogram, and the 10 most common values, grouped by the
+typed value and cast to text only for the rows kept. Each column takes
+0.4–2.8 s on 50M rows (budget < 3 s).
+
+Header mini-histograms use the same histogram query for every number, date
+and boolean column, after a single scan for all their ranges. They are
+exact (not sampled) and load behind the grid; the headers grow from 32 to
+46 px to fit them, and the status bar has a toggle to turn them off
+(persisted).

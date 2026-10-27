@@ -56,6 +56,11 @@ export function matchColor(root: HTMLElement = document.documentElement): string
   return cssVar(getComputedStyle(root), "--match", "rgba(250,204,21,0.45)");
 }
 
+/** Bars of the histograms in the headers. */
+export function chartColor(root: HTMLElement = document.documentElement): string {
+  return cssVar(getComputedStyle(root), "--chart-bar", "rgba(79,70,229,0.4)");
+}
+
 export function nullColor(root: HTMLElement = document.documentElement): string {
   return getComputedStyle(root).getPropertyValue("--null").trim() || "#a1a1aa";
 }

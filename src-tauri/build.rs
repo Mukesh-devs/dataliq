@@ -18,6 +18,8 @@ fn main() {
             "take_startup_files",
             "open_view",
             "column_values",
+            "column_profile",
+            "column_histograms",
         ]),
     ))
     .expect("failed to run tauri-build");

@@ -9,7 +9,20 @@ import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
-import { columnValues, toggleSort, type Filter, type SortKey, type ViewSpec } from "../../lib/view";
+import { useSettings } from "../../stores/settings";
+import {
+  columnHistograms,
+  columnProfile,
+  columnValues,
+  statsSpec,
+  toggleSort,
+  type Bin,
+  type ColumnProfile,
+  type Filter,
+  type SortKey,
+  type ViewSpec,
+} from "../../lib/view";
+import { ProfilePanel } from "../profile/ProfilePanel";
 import { ColumnMenu } from "../filters/ColumnMenu";
 import { RenameColumn } from "../filters/RenameColumn";
 import {
@@ -47,6 +60,9 @@ interface Editing {
 const rectAnchor = (r: { x: number; y: number; width: number; height: number }): Anchor => ({
   getBoundingClientRect: () => new DOMRect(r.x, r.y, r.width, r.height),
 });
+
+const CHART_KINDS = new Set(["integer", "number", "date", "timestamp", "boolean"]);
+const NO_CHARTS: ReadonlyMap<string, Bin[]> = new Map();
 
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
 
@@ -86,6 +102,14 @@ export function FileView({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
   const [renaming, setRenaming] = useState<{ column: string; anchor: Anchor } | null>(null);
+  const [profiled, setProfiled] = useState<string | null>(null);
+  // The last profile result and what it was computed for (column + view).
+  const [profile, setProfile] = useState<{
+    key: string;
+    column: string;
+    data?: ColumnProfile;
+    error?: string;
+  } | null>(null);
   const layout = useMemo(
     () =>
       reconcile(
@@ -107,6 +131,45 @@ export function FileView({
         : undefined,
     [baseId, editColumn, view, tab.id],
   );
+  // The open profile follows the view's filters and search (not its sort).
+  const statsKey = JSON.stringify(statsSpec(view));
+  const profileKey = `${profiled}\u0000${baseId}\u0000${statsKey}`;
+  useEffect(() => {
+    if (!profiled || !baseId) return;
+    let alive = true;
+    const key = `${profiled}\u0000${baseId}\u0000${statsKey}`;
+    columnProfile(baseId, JSON.parse(statsKey) as ViewSpec, profiled, `profile:${tab.id}`)
+      .then((data) => alive && setProfile({ key, column: profiled, data }))
+      .catch((e: unknown) => {
+        if (!alive || (e as { kind?: string }).kind === "cancelled") return;
+        setProfile({ key, column: profiled, error: e instanceof Error ? e.message : String(e) });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [profiled, baseId, statsKey, tab.id]);
+
+  // Header histograms for every number, date and boolean column, following
+  // the view's filters and search. The previous ones stay up while new ones load.
+  const headerCharts = useSettings((s) => s.headerCharts);
+  const chartColumns = useMemo(
+    () => columns.filter((c) => CHART_KINDS.has(c.kind)).map((c) => c.name),
+    [columns],
+  );
+  const chartsWanted = headerCharts && baseId !== undefined && chartColumns.length > 0;
+  const [charts, setCharts] = useState<ReadonlyMap<string, Bin[]>>(NO_CHARTS);
+  useEffect(() => {
+    if (!chartsWanted || !baseId) return;
+    let alive = true;
+    columnHistograms(baseId, JSON.parse(statsKey) as ViewSpec, chartColumns, `charts:${tab.id}`)
+      .then((list) => alive && setCharts(new Map(list.map((h) => [h.column, h.bins]))))
+      // Headers simply go without charts (cancelled, or the view failed).
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [chartsWanted, baseId, statsKey, chartColumns, tab.id]);
+
   const onHeaderMenu = useCallback(
     (name: string, bounds: { x: number; y: number; width: number; height: number }) => {
       const column = columns.find((c) => c.name === name);
@@ -234,6 +297,7 @@ export function FileView({
             onRename: () => setRenaming({ column: menu.column.name, anchor: menu.anchor }),
             onAutoFit: () => grid.current?.autoFit(menu.column.name),
           })}
+          onProfile={baseId ? () => setProfiled(menu.column.name) : undefined}
         />
       )}
       {renaming && onLayoutChange && (
@@ -280,7 +344,7 @@ export function FileView({
           </div>
         </div>
       ) : source ? (
-        <>
+        <div className="flex min-h-0 flex-1">
           <DataGrid
             ref={grid}
             source={source}
@@ -291,6 +355,7 @@ export function FileView({
             filteredColumns={filtered}
             sort={sort}
             highlight={tab.viewState?.dataset ? view.search : undefined}
+            histograms={chartsWanted ? charts : undefined}
           />
           <GoToRow
             open={goToOpen}
@@ -298,7 +363,20 @@ export function FileView({
             rowCount={source.rowCount}
             onGo={(row) => grid.current?.scrollToRow(row - 1)}
           />
-        </>
+          {profiled && (
+            <ProfilePanel
+              title={label(layout, profiled)}
+              // The previous result stays on screen while the new one loads.
+              profile={profile?.column === profiled ? profile.data : undefined}
+              loading={profile?.key !== profileKey}
+              error={profile?.key === profileKey ? profile.error : undefined}
+              onClose={() => {
+                setProfiled(null);
+                setProfile(null);
+              }}
+            />
+          )}
+        </div>
       ) : (
         <div className="flex flex-1 items-center justify-center gap-2 text-fg-muted">
           <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading {tab.title}…

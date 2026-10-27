@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::engine::{Engine, RequestKey};
 use crate::error::{AppError, Result};
-use crate::view::{OpenedView, ValueList, ViewSpec};
+use crate::view::{ColumnHistogram, ColumnProfile, OpenedView, ValueList, ViewSpec};
 
 /// Sent as `view-ready` when a view has been written out in full (all its
 /// pages are fast; a sorted view's middle rows are available).
@@ -90,4 +90,48 @@ pub async fn column_values(
     })
     .await
     .map_err(|e| AppError::Internal(format!("values task failed: {e}")))?
+}
+
+/// Statistics, histogram and top values of one column over a view.
+#[tauri::command]
+pub async fn column_profile(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    spec: ViewSpec,
+    column: String,
+    request_id: Option<String>,
+    group: Option<String>,
+) -> Result<ColumnProfile> {
+    let engine = Arc::clone(&engine);
+    let key = RequestKey {
+        id: request_id,
+        group,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        engine.column_profile(&dataset_id, &spec, &column, &key)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("profile task failed: {e}")))?
+}
+
+/// Small histograms for the grid headers (numbers, dates, booleans).
+#[tauri::command]
+pub async fn column_histograms(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    spec: ViewSpec,
+    columns: Vec<String>,
+    request_id: Option<String>,
+    group: Option<String>,
+) -> Result<Vec<ColumnHistogram>> {
+    let engine = Arc::clone(&engine);
+    let key = RequestKey {
+        id: request_id,
+        group,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        engine.column_histograms(&dataset_id, &spec, &columns, &key)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("histogram task failed: {e}")))?
 }

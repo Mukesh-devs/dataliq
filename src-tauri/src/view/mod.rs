@@ -5,11 +5,15 @@
 //! against the dataset's schema, and every user value is a bound parameter.
 
 mod open;
+mod profile;
 mod sql;
 
 use serde::{Deserialize, Serialize};
 
 pub use open::{MAX_VALUES, OpenedView, ValueCount, ValueList, materialize_request_id};
+pub use profile::{
+    BINS, Bin, ColumnHistogram, ColumnProfile, EXACT_DISTINCT_ROWS, ProfileKind, TOP_VALUES,
+};
 pub use sql::{BuiltView, Relation, build, build_at};
 
 use crate::engine::Param;

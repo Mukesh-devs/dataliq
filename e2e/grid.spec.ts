@@ -82,7 +82,8 @@ test("copy a selected range as tab-separated text", async ({ page, context }) =>
   const grid = page.getByTestId("data-grid");
   // Click by position: the row-marker column, then "id" (90 px) and "name".
   const box = (await grid.boundingBox())!;
-  const rowY = (r: number) => 32 + 28 * r + 14; // header + rows
+  // Header (46 px: room for the column histograms) + rows.
+  const rowY = (r: number) => 46 + 28 * r + 14;
   await page.mouse.click(box.x + 120, box.y + rowY(0));
   await page.keyboard.down("Shift");
   await page.mouse.click(box.x + 260, box.y + rowY(2));

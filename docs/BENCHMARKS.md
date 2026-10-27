@@ -163,3 +163,25 @@ Strategies measured before choosing (`perf_sort_strategies`): a sort of only
 the row ids is faster (15.6 s) but fetching a page by id list then takes
 1.1 s; writing full sorted rows to an in-memory table instead of the on-disk
 scratch database saves little (26–55 s) and holds memory.
+
+### Column profiles (v0.2 step 6)
+
+`cargo test -p bigview --test it perf_profile_50m -- --ignored --nocapture`, same 50M rows,
+warm cache. One profile is the stats query (count, nulls, min, max, mean, std dev, distinct —
+HyperLogLog above 10M rows), the histogram and the 10 most common values.
+
+| Column | Distinct | Profile |
+| --- | --- | --- |
+| `quantity` INTEGER | 21 | 1.21 s |
+| `unit_price` DECIMAL(10,2) | ≈ 219K | 2.21 s |
+| `order_ts` TIMESTAMP | ≈ 39.5M | 2.78 s |
+| `customer` VARCHAR | ≈ 84K | 2.19 s |
+| `country` VARCHAR | 9 | 0.44 s |
+| `returned` BOOLEAN | 2 | 0.47 s |
+| Header histograms, 7 columns (background) | — | 4.0 s |
+
+Budget: **stats < 3 s per column on 50M rows — met**. Grouping the most common values by the
+typed column and casting only the kept rows to text took `order_ts` from 7.5 s to 2.8 s (a
+near-unique column builds a 39M-entry hash table either way, but of 8-byte keys instead of
+strings). The header histograms read every column's range in one scan, then one scan per number
+or date column; they load behind the grid and are cancelled by the next view change.

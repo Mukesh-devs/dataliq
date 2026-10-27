@@ -44,6 +44,8 @@
   --null: #a1a1aa;
   /* Search matches highlighted in grid cells. */
   --match: rgb(250 204 21 / 0.45);
+  /* Bars of the small histograms in grid headers. */
+  --chart-bar: rgb(79 70 229 / 0.4);
 }
 
 :root[data-theme="dark"] {
@@ -68,6 +70,7 @@
   --success: #4ade80;
   --null: #5f5f68;
   --match: rgb(250 204 21 / 0.3);
+  --chart-bar: rgb(129 140 248 / 0.45);
 }
 
 @media (prefers-reduced-motion: reduce) {
