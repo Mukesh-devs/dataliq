@@ -147,7 +147,14 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const viewRows = w.__viewRows as (spec: unknown) => Promise<number>;
               const rowCount = await viewRows(args.spec);
               const id = `view-${nextView++}`;
-              return { dataset: { id, rowCount, cached: true }, totalRows: 1000, elapsedMs: 15 };
+              // Sorted views finish in the background (the test emits view-ready).
+              const sorted = ((args.spec as { sort?: unknown[] }).sort?.length ?? 0) > 0;
+              return {
+                dataset: { id, rowCount, cached: true },
+                totalRows: 1000,
+                elapsedMs: 15,
+                materializing: sorted,
+              };
             }
             case "column_values": {
               const values = w.__values as (c: string, s: string | null) => Promise<unknown[]>;

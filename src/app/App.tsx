@@ -14,6 +14,7 @@ import {
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
+import { onViewReady } from "../lib/view";
 import { useApp } from "../stores/app";
 import { useEngine } from "../stores/engine";
 import { useRecent } from "../stores/recent";
@@ -44,7 +45,9 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     parts.push(`${rows} of ${formatCount(v.totalRows ?? tab.info.dataset.rowCount)} rows`);
     const verb = viewVerb(tab);
     if (v.status === "running") parts.push(`${verb.ing}…`);
-    else parts.push(`${verb.ed} in ${formatDuration(v.elapsedMs ?? 0)}`);
+    else if (v.sorting)
+      parts.push(`first rows in ${formatDuration(v.elapsedMs ?? 0)}, sorting the rest…`);
+    else parts.push(`${verb.ed} in ${formatDuration(v.fullMs ?? v.elapsedMs ?? 0)}`);
   } else if (tab.viewState?.status === "running") {
     const ing = viewVerb(tab).ing;
     parts.push(`${ing[0]!.toUpperCase()}${ing.slice(1)}…`);
@@ -83,6 +86,7 @@ export function App() {
     useTabs();
   const applyProgress = useTabs((s) => s.applyProgress);
   const setView = useTabs((s) => s.setView);
+  const applyViewReady = useTabs((s) => s.applyViewReady);
   const engineVersion = useEngine((s) => s.version);
   const probeEngine = useEngine((s) => s.probe);
   const loadApp = useApp((s) => s.load);
@@ -125,6 +129,7 @@ export function App() {
   useShortcuts(shortcuts);
 
   useSubscription(useMemo(() => () => onImportProgress(applyProgress), [applyProgress]));
+  useSubscription(useMemo(() => () => onViewReady(applyViewReady), [applyViewReady]));
   // A second `bigview <files>` launch forwards its files here.
   useSubscription(useMemo(() => () => onOpenFiles((p) => void openPaths(p)), [openPaths]));
   useSubscription(

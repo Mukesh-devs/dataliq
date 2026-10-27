@@ -14,7 +14,7 @@ import {
   type SourceInfo,
 } from "../lib/files";
 import { cancelQuery } from "../lib/ipc";
-import { isIdentity, openView, type ViewSpec } from "../lib/view";
+import { isIdentity, openView, type ViewReady, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
 
 export type TabStatus = "loading" | "ready" | "error";
@@ -42,7 +42,12 @@ export interface ViewState {
   dataset?: DatasetInfo;
   /** Rows in the whole file. */
   totalRows?: number;
+  /** Time until the view's rows were on screen. */
   elapsedMs?: number;
+  /** A sorted view's first and last rows are ready; the rest is still sorting. */
+  sorting?: boolean;
+  /** Time until the whole view was written (sorted views). */
+  fullMs?: number;
   error?: string;
 }
 
@@ -87,6 +92,8 @@ interface TabsState {
   applyProgress: (progress: ImportProgress) => void;
   /** Changes a tab's view (filters, …); the grid follows when it is computed. */
   setView: (id: string, view: ViewSpec) => Promise<void>;
+  /** Applies a `view-ready` event (subscribed once by the App). */
+  applyViewReady: (ready: ViewReady) => void;
 }
 
 let nextId = 1;
@@ -176,6 +183,8 @@ export const useTabs = create<TabsState>()((set, get) => {
           dataset: out.dataset,
           totalRows: out.totalRows,
           elapsedMs: out.elapsedMs,
+          // Only a sort makes the user wait for the background part.
+          sorting: !!out.materializing && (spec.sort?.length ?? 0) > 0,
         },
       });
     } catch (err) {
@@ -300,6 +309,14 @@ export const useTabs = create<TabsState>()((set, get) => {
         tabs: s.tabs.map((t) =>
           t.import?.jobId === p.jobId && t.import.status === "running"
             ? { ...t, import: { ...t.import, percent: p.percent, elapsedMs: p.elapsedMs } }
+            : t,
+        ),
+      })),
+    applyViewReady: (ready) =>
+      set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.viewState?.dataset?.id === ready.datasetId
+            ? { ...t, viewState: { ...t.viewState, sorting: false, fullMs: ready.elapsedMs } }
             : t,
         ),
       })),

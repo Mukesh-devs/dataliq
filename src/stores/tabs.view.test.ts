@@ -185,3 +185,46 @@ describe("tabs store: cancelling views", () => {
     expect(tab().viewState).toBeUndefined();
   });
 });
+
+describe("tabs store: background sorts", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("marks a big sort as still sorting until view-ready", async () => {
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => ({
+        dataset: { id: "view-3", rowCount: 1000 },
+        totalRows: 1000,
+        elapsedMs: 900,
+        materializing: true,
+      }),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    await useTabs.getState().setView(id, { sort: [{ column: "id" }] });
+    expect(tab().viewState).toMatchObject({ status: "done", sorting: true, elapsedMs: 900 });
+    // Another view's event changes nothing.
+    useTabs.getState().applyViewReady({ datasetId: "view-99", elapsedMs: 1 });
+    expect(tab().viewState?.sorting).toBe(true);
+    useTabs.getState().applyViewReady({ datasetId: "view-3", elapsedMs: 31_000 });
+    expect(tab().viewState).toMatchObject({ sorting: false, fullMs: 31_000 });
+  });
+
+  it("filter-only views are never shown as sorting", async () => {
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => ({
+        dataset: { id: "view-4", rowCount: 10 },
+        totalRows: 1000,
+        elapsedMs: 5,
+        materializing: true,
+      }),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    await useTabs.getState().setView(tab().id, { filters: [nameFilter] });
+    expect(tab().viewState?.sorting).toBe(false);
+  });
+});

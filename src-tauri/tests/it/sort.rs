@@ -213,7 +213,11 @@ fn closing_a_view_drops_its_table() {
     );
     assert_eq!(scratch_tables(&fx.engine).len(), 2);
     import::close_dataset(&fx.engine, &a.dataset.id).unwrap();
-    assert_eq!(scratch_tables(&fx.engine), [format!("v_{}", b.dataset.id)]);
+    // Views that fit in their first rows are just that table.
+    assert_eq!(
+        scratch_tables(&fx.engine),
+        [format!("v_{}_head", b.dataset.id)]
+    );
     import::close_dataset(&fx.engine, &b.dataset.id).unwrap();
     assert!(scratch_tables(&fx.engine).is_empty());
     // Materializing a closed view is a plain error, and leaves nothing behind.
@@ -270,7 +274,10 @@ fn a_newer_sort_cancels_an_older_one_in_the_same_group() {
         old.map(|v| v.dataset)
     );
     // Only the newer view's table is left.
-    assert_eq!(scratch_tables(&engine), [format!("v_{}", fast.dataset.id)]);
+    assert_eq!(
+        scratch_tables(&engine),
+        [format!("v_{}_head", fast.dataset.id)]
+    );
 }
 
 #[test]
@@ -307,4 +314,196 @@ fn sorting_a_parquet_file_queried_in_place() {
         |_| true,
     );
     assert_eq!(all_ids(&fx.engine, &v.dataset.id, 1000), want);
+}
+
+/// More rows than fit in a sorted view's head: the first and last rows are
+/// served before the full sort is written; middle pages wait for it.
+#[test]
+fn big_sorts_show_first_and_last_rows_before_the_full_sort() {
+    use bigview_lib::engine::datasets::MAX_HEAD;
+    let fx = fx();
+    let n: u64 = 3 * MAX_HEAD;
+    fx.engine
+        .execute_batch(&format!(
+            "CREATE TABLE mid AS SELECT range AS id, hash(range) % 1000 AS k FROM range({n})"
+        ))
+        .unwrap();
+    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+        id: "mid".into(),
+        source: DatasetSource::Table("mid".into()),
+        row_count: n,
+        cached: true,
+    });
+    let spec = ViewSpec {
+        sort: vec![key("k", true)],
+        ..ViewSpec::default()
+    };
+    let v = fx
+        .engine
+        .open_view("mid", &spec, &RequestKey::default())
+        .unwrap();
+    assert!(v.materializing);
+    assert_eq!(v.dataset.row_count, n);
+    assert!(matches!(
+        fx.engine.datasets.get(&v.dataset.id).unwrap().source,
+        DatasetSource::Sorting { tail: None, .. }
+    ));
+    // Expected order: k descending, ties by id (file order).
+    let conn = fx.engine.connection().unwrap();
+    let want: Vec<i64> = conn
+        .prepare("SELECT id FROM mid ORDER BY k DESC, id")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    let page = |start: u64| {
+        let bytes = fx
+            .engine
+            .fetch_rows(&v.dataset.id, start, 500, &RequestKey::default())
+            .unwrap();
+        StreamReader::try_new(Cursor::new(bytes), None)
+            .unwrap()
+            .flat_map(|b| {
+                b.unwrap()
+                    .column(0)
+                    .as_primitive::<Int64Type>()
+                    .values()
+                    .to_vec()
+            })
+            .collect::<Vec<i64>>()
+    };
+    // The first rows are ready right away.
+    assert_eq!(page(0), want[..500]);
+    assert_eq!(
+        page(MAX_HEAD - 500),
+        want[(MAX_HEAD - 500) as usize..MAX_HEAD as usize]
+    );
+
+    // A middle page waits for the full sort; finish it on another thread.
+    let engine = std::sync::Arc::new(fx.engine);
+    let id = v.dataset.id.clone();
+    let writer = {
+        let engine = std::sync::Arc::clone(&engine);
+        let id = id.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            engine.materialize_view(&id)
+        })
+    };
+    let middle = engine
+        .fetch_rows(&id, n / 2, 500, &RequestKey::default())
+        .unwrap();
+    assert!(writer.join().unwrap().unwrap());
+    let got: Vec<i64> = StreamReader::try_new(Cursor::new(middle), None)
+        .unwrap()
+        .flat_map(|b| {
+            b.unwrap()
+                .column(0)
+                .as_primitive::<Int64Type>()
+                .values()
+                .to_vec()
+        })
+        .collect();
+    assert_eq!(got, want[(n / 2) as usize..(n / 2 + 500) as usize]);
+    // Now a plain table; only it is left in the scratch database.
+    assert!(matches!(
+        engine.datasets.get(&id).unwrap().source,
+        DatasetSource::Materialized { .. }
+    ));
+    assert_eq!(scratch_tables(&engine), [format!("v_{id}")]);
+    let all = all_ids(&engine, &id, n);
+    assert_eq!(all, want);
+}
+
+#[test]
+fn the_tail_serves_the_last_rows_in_order() {
+    use bigview_lib::engine::datasets::MAX_HEAD;
+    let fx = fx();
+    let n: u64 = 3 * MAX_HEAD + 123;
+    fx.engine
+        .execute_batch(&format!(
+            "CREATE TABLE t3 AS SELECT range AS id, CASE WHEN range % 7 = 0 THEN NULL ELSE hash(range) % 50 END AS k FROM range({n})"
+        ))
+        .unwrap();
+    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+        id: "t3".into(),
+        source: DatasetSource::Table("t3".into()),
+        row_count: n,
+        cached: true,
+    });
+    let spec = ViewSpec {
+        sort: vec![key("k", false)],
+        ..ViewSpec::default()
+    };
+    let v = fx
+        .engine
+        .open_view("t3", &spec, &RequestKey::default())
+        .unwrap();
+    let conn = fx.engine.connection().unwrap();
+    let want: Vec<i64> = conn
+        .prepare("SELECT id FROM t3 ORDER BY k ASC NULLS LAST, id")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    // Write only the tail, by hand, as the background job's first stage does.
+    let ds = fx.engine.datasets.get(&v.dataset.id).unwrap();
+    let DatasetSource::Sorting {
+        reversed, params, ..
+    } = ds.source
+    else {
+        panic!("expected a partial sort");
+    };
+    fx.engine
+        .execute_batch(&format!(
+            "CREATE TABLE bv_scratch.main.manual_tail AS {reversed} LIMIT {MAX_HEAD}"
+        ))
+        .unwrap();
+    assert!(params.is_empty());
+    assert!(fx.engine.datasets.update_source(&v.dataset.id, |s| {
+        if let DatasetSource::Sorting {
+            tail, tail_rows, ..
+        } = s
+        {
+            *tail = Some("bv_scratch.main.manual_tail".into());
+            *tail_rows = MAX_HEAD;
+        }
+    }));
+    // The last rows (NULL keys, in file order) come from the tail.
+    let last = n - 300;
+    let bytes = fx
+        .engine
+        .fetch_rows(&v.dataset.id, last, 500, &RequestKey::default())
+        .unwrap();
+    let got: Vec<i64> = StreamReader::try_new(Cursor::new(bytes), None)
+        .unwrap()
+        .flat_map(|b| {
+            b.unwrap()
+                .column(0)
+                .as_primitive::<Int64Type>()
+                .values()
+                .to_vec()
+        })
+        .collect();
+    assert_eq!(got, want[last as usize..]);
+    let bytes = fx
+        .engine
+        .fetch_rows(&v.dataset.id, n - MAX_HEAD, 500, &RequestKey::default())
+        .unwrap();
+    let got: Vec<i64> = StreamReader::try_new(Cursor::new(bytes), None)
+        .unwrap()
+        .flat_map(|b| {
+            b.unwrap()
+                .column(0)
+                .as_primitive::<Int64Type>()
+                .values()
+                .to_vec()
+        })
+        .collect();
+    assert_eq!(
+        got,
+        want[(n - MAX_HEAD) as usize..(n - MAX_HEAD + 500) as usize]
+    );
 }

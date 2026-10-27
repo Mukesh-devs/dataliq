@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { gridHeader, mockTauri } from "./tauri-mock";
+import { emitEvent, gridHeader, mockTauri } from "./tauri-mock";
 
 interface Spec {
   filters?: unknown[];
@@ -45,8 +45,13 @@ test("clicking headers sorts; Shift adds keys; chips edit the sort", async ({ pa
   const bar = page.getByRole("toolbar", { name: "Filters" });
   // "name" is the second column; click its middle (not the menu button).
   await page.mouse.click(box.x + 180, box.y + 16);
-  await expect(status).toContainText("1,000 of 1,000 rows · sorted in 15 ms");
+  await expect(status).toContainText(
+    "1,000 of 1,000 rows · first rows in 15 ms, sorting the rest…",
+  );
   expect(views.at(-1)).toEqual({ sort: [{ column: "name" }] });
+  // The full sort finishes in the background.
+  await emitEvent(page, "view-ready", { datasetId: "view-1", elapsedMs: 3200 });
+  await expect(status).toContainText("1,000 of 1,000 rows · sorted in 3.20 s");
   await expect(gridHeader(page, "name ↑")).toBeAttached();
   await expect(bar.getByRole("button", { name: /Sort by name, ascending/ })).toBeVisible();
 
@@ -96,7 +101,9 @@ test("the column menu sorts and filters", async ({ page }) => {
   const editor = page.getByRole("dialog", { name: "Filter name" });
   await editor.getByLabel("Value").fill("7");
   await editor.getByRole("button", { name: "Apply" }).click();
-  await expect(page.getByRole("status")).toContainText("filtered and sorted in");
+  await expect(page.getByRole("status")).toContainText("sorting the rest…");
+  await emitEvent(page, "view-ready", { datasetId: "view-2", elapsedMs: 500 });
+  await expect(page.getByRole("status")).toContainText("filtered and sorted in 500 ms");
   expect(views.at(-1)).toEqual({
     sort: [{ column: "name", descending: true }],
     filters: [{ column: "name", op: "contains", value: "7" }],

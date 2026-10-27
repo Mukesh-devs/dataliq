@@ -1,21 +1,36 @@
 use std::sync::Arc;
 
-use tauri::State;
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::engine::{Engine, RequestKey};
 use crate::error::{AppError, Result};
 use crate::view::{OpenedView, ValueList, ViewSpec};
 
+/// Sent as `view-ready` when a view has been written out in full (all its
+/// pages are fast; a sorted view's middle rows are available).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewReady {
+    pub dataset_id: String,
+    /// Time from the open_view call until the full view was written.
+    pub elapsed_ms: u64,
+}
+
 /// Opens a filtered/sorted view of a dataset as a new pageable dataset.
 /// A newer request in the same `group` (one per tab) cancels an older one.
+/// Views that still need writing out finish in the background and announce
+/// it with a `view-ready` event.
 #[tauri::command]
 pub async fn open_view(
+    app: AppHandle,
     engine: State<'_, Arc<Engine>>,
     dataset_id: String,
     spec: ViewSpec,
     request_id: Option<String>,
     group: Option<String>,
 ) -> Result<OpenedView> {
+    let started = std::time::Instant::now();
     let engine = Arc::clone(&engine);
     let key = RequestKey {
         id: request_id,
@@ -28,10 +43,17 @@ pub async fn open_view(
             .map_err(|e| AppError::Internal(format!("view task failed: {e}")))??
     };
     if view.materializing {
-        // Deep pages of a filtered view get fast once it is written out.
         let id = view.dataset.id.clone();
         tauri::async_runtime::spawn_blocking(move || match engine.materialize_view(&id) {
-            Ok(_) | Err(AppError::Cancelled) => {}
+            Ok(true) => {
+                let ready = ViewReady {
+                    dataset_id: id,
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                };
+                let _ = app.emit("view-ready", ready);
+            }
+            // Closed or replaced meanwhile.
+            Ok(false) | Err(AppError::Cancelled) => {}
             Err(e) => tracing::warn!("could not write view {id}: {e}"),
         });
     }

@@ -35,6 +35,19 @@ export interface OpenedView {
   dataset: DatasetInfo;
   totalRows: number;
   elapsedMs: number;
+  /** Still being written out in the background (see `onViewReady`). */
+  materializing?: boolean;
+}
+
+/** A view has been written out in full (`view-ready` event). */
+export interface ViewReady {
+  datasetId: string;
+  elapsedMs: number;
+}
+
+export async function onViewReady(handler: (ready: ViewReady) => void): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<ViewReady>("view-ready", (e) => handler(e.payload));
 }
 
 export interface ValueCount {

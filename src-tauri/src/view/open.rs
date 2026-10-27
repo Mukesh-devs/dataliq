@@ -7,6 +7,7 @@ use arrow::datatypes::Int64Type;
 use serde::Serialize;
 
 use super::{BuiltView, Filter, FilterOp, Relation, ViewSpec, build};
+use crate::engine::datasets::MAX_HEAD;
 use crate::engine::sql::quote_ident;
 use crate::engine::{Dataset, DatasetSource, Engine, Param, RequestKey};
 use crate::error::{AppError, Result};
@@ -121,16 +122,28 @@ impl Engine {
             };
             (source, rows, true)
         } else {
-            let table = self.write_view(&view_id, &view, key)?;
-            let rows = self.count(&format!("SELECT count(*) FROM {table}"), &[], key);
-            let rows = match rows {
-                Ok(n) => n,
-                Err(e) => {
-                    let _ = self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"));
-                    return Err(e);
-                }
+            // A full sort of millions of rows takes a while; its first rows
+            // only need one scan (top-N). Write those now, the rest later.
+            let rows = self.count(&view.count, &view.params, key)?;
+            let head = BuiltView {
+                select: format!("{} LIMIT {MAX_HEAD}", view.select),
+                ..view.clone()
             };
-            (DatasetSource::Materialized { table }, rows, false)
+            let table = self.write_view(&format!("{view_id}_head"), &head, key)?;
+            if rows <= MAX_HEAD {
+                (DatasetSource::Materialized { table }, rows, false)
+            } else {
+                let source = DatasetSource::Sorting {
+                    head: table,
+                    head_rows: MAX_HEAD,
+                    tail: None,
+                    tail_rows: 0,
+                    select: view.select,
+                    reversed: view.reversed.unwrap_or_default(),
+                    params: view.params,
+                };
+                (source, rows, true)
+            }
         };
         let dataset = Dataset {
             id: view_id,
@@ -147,37 +160,75 @@ impl Engine {
         })
     }
 
-    /// Writes an unsorted view (opened by [`Engine::open_view`]) to a table
-    /// so deep pages are as fast as the first, then switches the dataset to
-    /// it. Same rows in the same order, so the grid doesn't notice. Returns
+    /// Finishes a view opened by [`Engine::open_view`] in the background:
+    /// an unsorted view is written to a table so deep pages are as fast as
+    /// the first; a sorted one first gets its last rows (so jumping to the
+    /// end is quick), then its full sort. The dataset then switches to the
+    /// table: same rows, same order, so the grid doesn't notice. Returns
     /// false if there was nothing to do or the view was closed meanwhile;
     /// `close_dataset` cancels a running materialization.
     pub fn materialize_view(&self, view_id: &str) -> Result<bool> {
-        let ds = self.datasets.get(view_id)?;
-        let DatasetSource::Query { sql, params } = ds.source else {
-            return Ok(false);
-        };
         let key = RequestKey {
             id: Some(materialize_request_id(view_id)),
             group: None,
         };
+        let ds = self.datasets.get(view_id)?;
+        let (select, params, partial) = match ds.source {
+            DatasetSource::Query { sql, params } => (format!("SELECT * FROM {sql}"), params, None),
+            DatasetSource::Sorting {
+                head,
+                select,
+                reversed,
+                params,
+                ..
+            } => {
+                let tail_view = BuiltView {
+                    select: format!("{reversed} LIMIT {MAX_HEAD}"),
+                    count: String::new(),
+                    reversed: None,
+                    params: params.clone(),
+                };
+                let tail = self.write_view(&format!("{view_id}_tail"), &tail_view, &key)?;
+                let switched = self.datasets.update_source(view_id, |source| {
+                    if let DatasetSource::Sorting {
+                        tail: t, tail_rows, ..
+                    } = source
+                    {
+                        *t = Some(tail.clone());
+                        *tail_rows = MAX_HEAD;
+                    }
+                });
+                if !switched {
+                    self.execute_batch(&format!("DROP TABLE IF EXISTS {tail}"))?;
+                    return Ok(false);
+                }
+                (select, params, Some((head, tail)))
+            }
+            _ => return Ok(false),
+        };
         let view = BuiltView {
-            select: format!("SELECT * FROM {sql}"),
+            select,
             count: String::new(),
+            reversed: None,
             params,
         };
         let table = self.write_view(view_id, &view, &key)?;
-        if self.datasets.replace_source(
+        let switched = self.datasets.replace_source(
             view_id,
             DatasetSource::Materialized {
                 table: table.clone(),
             },
-        ) {
-            Ok(true)
-        } else {
+        );
+        if !switched {
             self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
-            Ok(false)
         }
+        if let Some((head, tail)) = partial {
+            // Pages still reading the small tables hold their own snapshot.
+            self.execute_batch(&format!(
+                "DROP TABLE IF EXISTS {head}; DROP TABLE IF EXISTS {tail}"
+            ))?;
+        }
+        Ok(switched)
     }
 
     /// The most frequent values of `column` among the rows matching the

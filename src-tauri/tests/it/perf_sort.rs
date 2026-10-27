@@ -6,8 +6,9 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use bigview_lib::engine::{Engine, EngineConfig};
+use bigview_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, Param, RequestKey};
 use bigview_lib::settings::Settings;
+use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
 
 fn generated(name: &str) -> Option<PathBuf> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -156,7 +157,7 @@ fn perf_sort_strategies() {
         // Filter-only views: a selective and a broad filter, counted, written
         // out, and paged deep without materializing.
         for (label, filter) in [
-            ("country = 'DE'", "country = 'DE'"),
+            ("quantity = 1", "quantity = 1"),
             ("quantity > 5", "quantity > 5"),
         ] {
             time(
@@ -196,5 +197,120 @@ fn perf_sort_strategies() {
                 t.elapsed().as_secs_f64() * 1000.0
             );
         }
+    }
+}
+
+/// The app's own path on 50M cached rows: open a view, show its first page,
+/// then finish it in the background.
+#[test]
+#[ignore = "needs generated fixtures; several minutes"]
+fn perf_views_50m() {
+    let Some((engine, _tmp)) = setup() else {
+        eprintln!("sales_50m.parquet not generated, skipping");
+        return;
+    };
+    engine.datasets.insert(Dataset {
+        id: "ds".into(),
+        source: DatasetSource::Table("cache.data".into()),
+        row_count: 50_000_000,
+        cached: true,
+    });
+    let key = RequestKey::default();
+    let sort = |c: &str, d: bool| SortKey {
+        column: c.into(),
+        descending: d,
+    };
+    let filter = |c: &str, op: FilterOp| Filter {
+        column: c.into(),
+        op,
+        not: false,
+    };
+    let cases: Vec<(&str, ViewSpec)> = vec![
+        (
+            "sort customer desc",
+            ViewSpec {
+                sort: vec![sort("customer", true)],
+                ..ViewSpec::default()
+            },
+        ),
+        (
+            "sort order_date, unit_price desc",
+            ViewSpec {
+                sort: vec![sort("order_date", false), sort("unit_price", true)],
+                ..ViewSpec::default()
+            },
+        ),
+        (
+            "filter quantity > 5 (broad)",
+            ViewSpec {
+                filters: vec![filter(
+                    "quantity",
+                    FilterOp::Gt {
+                        value: Param::Int(5),
+                    },
+                )],
+                ..ViewSpec::default()
+            },
+        ),
+        (
+            "filter customer contains 'ab' (text)",
+            ViewSpec {
+                filters: vec![filter(
+                    "customer",
+                    FilterOp::Contains {
+                        value: "ab".into(),
+                        case_sensitive: false,
+                    },
+                )],
+                ..ViewSpec::default()
+            },
+        ),
+        (
+            "filter quantity = 1 + sort unit_price",
+            ViewSpec {
+                filters: vec![filter(
+                    "quantity",
+                    FilterOp::Equals {
+                        value: Param::Int(1),
+                    },
+                )],
+                sort: vec![sort("unit_price", false)],
+                ..ViewSpec::default()
+            },
+        ),
+    ];
+    for (label, spec) in cases {
+        let t = Instant::now();
+        let v = engine.open_view("ds", &spec, &key).unwrap();
+        engine.fetch_rows(&v.dataset.id, 0, 500, &key).unwrap();
+        let first = t.elapsed().as_secs_f64();
+        let rows = v.dataset.row_count;
+        let t2 = Instant::now();
+        let deep = if v.materializing && spec.sort.is_empty() {
+            engine
+                .fetch_rows(&v.dataset.id, rows / 2, 500, &key)
+                .unwrap();
+            format!(
+                ", deep page before write {:.2} s",
+                t2.elapsed().as_secs_f64()
+            )
+        } else {
+            String::new()
+        };
+        let t3 = Instant::now();
+        if v.materializing {
+            engine.materialize_view(&v.dataset.id).unwrap();
+        }
+        let full = t3.elapsed().as_secs_f64();
+        let t4 = Instant::now();
+        engine
+            .fetch_rows(&v.dataset.id, rows / 2, 500, &key)
+            .unwrap();
+        println!(
+            "{label}: {rows} rows; first rows {first:.2} s{deep}; written in background {full:.1} s; \
+             then page {:.1} ms",
+            t4.elapsed().as_secs_f64() * 1000.0
+        );
+        bigview_lib::import::close_dataset(&engine, &v.dataset.id).unwrap();
     }
 }

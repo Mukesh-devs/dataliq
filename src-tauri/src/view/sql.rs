@@ -34,6 +34,11 @@ impl Relation {
                 params: params.clone(),
                 row_order: None,
             },
+            DatasetSource::Sorting { select, params, .. } => Relation {
+                sql: format!("({select})"),
+                params: params.clone(),
+                row_order: None,
+            },
             DatasetSource::Parquet { path } => Relation {
                 sql: "read_parquet(?)".into(),
                 params: vec![Param::Text(path.clone())],
@@ -50,6 +55,10 @@ pub struct BuiltView {
     pub select: String,
     /// `SELECT count(*) FROM <relation> [WHERE ...]`
     pub count: String,
+    /// `select` in exactly the opposite order (every key and the tiebreak
+    /// flipped, NULLs first), when the view is sorted: its first rows are the
+    /// view's last rows. Same `params`.
+    pub reversed: Option<String>,
     pub params: Vec<Param>,
 }
 
@@ -80,10 +89,11 @@ pub fn build_at(
     if let Some(text) = spec.search.as_deref().filter(|s| !s.is_empty()) {
         conditions.push(b.search(text));
     }
-    let mut order = b.order_by(&spec.sort)?;
+    let mut order = b.order_by(&spec.sort, false)?;
+    let mut reversed = b.order_by(&spec.sort, true)?;
     if let (false, Some(row_order)) = (order.is_empty(), &relation.row_order) {
-        order.push_str(", ");
-        order.push_str(row_order);
+        order.push_str(&format!(", {row_order}"));
+        reversed.push_str(&format!(", {row_order} DESC"));
     }
 
     let mut from = format!("FROM {}", relation.sql);
@@ -91,14 +101,19 @@ pub fn build_at(
         from.push_str(" WHERE ");
         from.push_str(&conditions.join(" AND "));
     }
-    let mut select = format!("SELECT {projection} {from}");
-    if !order.is_empty() {
-        select.push_str(" ORDER BY ");
-        select.push_str(&order);
-    }
+    let select = format!("SELECT {projection} {from}");
+    let (select, reversed) = if order.is_empty() {
+        (select, None)
+    } else {
+        (
+            format!("{select} ORDER BY {order}"),
+            Some(format!("{select} ORDER BY {reversed}")),
+        )
+    };
     Ok(BuiltView {
         select,
         count: format!("SELECT count(*) {from}"),
+        reversed,
         params: b.params,
     })
 }
@@ -153,12 +168,18 @@ impl Builder<'_> {
         Ok(out.join(", "))
     }
 
-    fn order_by(&self, keys: &[SortKey]) -> Result<String> {
+    /// `ORDER BY` keys, NULLS LAST; `reversed` gives the exact opposite order.
+    fn order_by(&self, keys: &[SortKey], reversed: bool) -> Result<String> {
         let mut out = Vec::with_capacity(keys.len());
         for k in keys {
             let col = quote_ident(&self.column(&k.column)?.name);
-            let dir = if k.descending { "DESC" } else { "ASC" };
-            out.push(format!("{col} {dir} NULLS LAST"));
+            let dir = if k.descending != reversed {
+                "DESC"
+            } else {
+                "ASC"
+            };
+            let nulls = if reversed { "FIRST" } else { "LAST" };
+            out.push(format!("{col} {dir} NULLS {nulls}"));
         }
         Ok(out.join(", "))
     }
@@ -553,6 +574,36 @@ mod tests {
             columns: Some(vec!["name".into(), "amount".into(), "id".into()]),
         };
         insta::assert_snapshot!(sql_for(&spec));
+    }
+
+    #[test]
+    fn reversed_order_is_the_exact_opposite() {
+        let spec = ViewSpec {
+            sort: vec![
+                SortKey {
+                    column: "joined".into(),
+                    descending: true,
+                },
+                SortKey {
+                    column: "name".into(),
+                    descending: false,
+                },
+            ],
+            ..ViewSpec::default()
+        };
+        let v = build_at(&spec, &table(), &schema(), today()).unwrap();
+        assert!(
+            v.select
+                .ends_with("ORDER BY \"joined\" DESC NULLS LAST, \"name\" ASC NULLS LAST, rowid")
+        );
+        assert_eq!(
+            v.reversed.unwrap(),
+            "SELECT * FROM \"ds\".\"main\".\"data\" \
+             ORDER BY \"joined\" ASC NULLS FIRST, \"name\" DESC NULLS FIRST, rowid DESC"
+        );
+        // Unsorted views have no reverse.
+        let plain = build_at(&ViewSpec::default(), &table(), &schema(), today()).unwrap();
+        assert_eq!(plain.reversed, None);
     }
 
     #[test]
