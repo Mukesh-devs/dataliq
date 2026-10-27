@@ -546,3 +546,105 @@ fn views_page_like_datasets_and_close() {
     // The base dataset is untouched.
     assert!(fx.engine.datasets.get(&fx.dataset.id).is_ok());
 }
+
+/// Views over a Parquet file queried in place (not imported), with a schema
+/// like a call-detail record: upper-case names, timestamps, phone numbers as
+/// text with leading zeros, many NULLs.
+#[test]
+fn filters_on_parquet_queried_in_place() {
+    let tmp = tempfile::tempdir().unwrap();
+    let engine = Engine::open_in_memory(&EngineConfig {
+        memory_limit_bytes: 1 << 30,
+        temp_dir: tmp.path().join("spill"),
+        threads: Some(2),
+    })
+    .unwrap();
+    let path = tmp.path().join("cdr 2026.parquet");
+    engine
+        .execute_batch(&format!(
+            "COPY (SELECT 2757390105 + i AS RECORD_ID,
+                    TIMESTAMP '2026-07-07 00:00:00' + to_seconds(i) AS START_DATETIME,
+                    DATE '2026-07-07' AS CALL_DATE,
+                    11 AS LOCATION_ID,
+                    CASE WHEN i % 3 = 0 THEN NULL ELSE 'x' END AS CLI,
+                    '0' || (7552700000 + i % 50)::VARCHAR AS TEL_DIGIT,
+                    CASE WHEN i % 4 = 0 THEN TIMESTAMP '2026-07-07 00:00:20' + to_seconds(i) END AS CALLCONNECT
+                  FROM range(10000) t(i))
+             TO '{}' (FORMAT parquet)",
+            path.to_string_lossy().replace('\'', "''")
+        ))
+        .unwrap();
+    let source = Source::new(&path, OpenOptions::default()).unwrap();
+    source.inspect(&engine).unwrap();
+    let ds = import::open_in_place(&engine, &source).unwrap();
+    assert_eq!(ds.row_count, 10_000);
+    let count = |filters: Vec<Filter>| {
+        let v = engine
+            .open_view(
+                &ds.id,
+                &ViewSpec {
+                    filters,
+                    ..ViewSpec::default()
+                },
+                &RequestKey::default(),
+            )
+            .unwrap();
+        // The view pages like any dataset.
+        engine
+            .fetch_rows(&v.dataset.id, 0, 500, &RequestKey::default())
+            .unwrap();
+        v.dataset.row_count
+    };
+    assert_eq!(
+        count(vec![f(
+            "TEL_DIGIT",
+            FilterOp::StartsWith {
+                value: "0755270000".into(),
+                case_sensitive: false
+            }
+        )]),
+        2000
+    );
+    assert_eq!(count(vec![f("CALLCONNECT", FilterOp::NotNull)]), 2500);
+    assert_eq!(count(vec![f("CLI", FilterOp::IsNull)]), 3334);
+    assert_eq!(
+        count(vec![f(
+            "START_DATETIME",
+            FilterOp::Range {
+                min: Some(text("2026-07-07 00:01:00")),
+                max: Some(text("2026-07-07 00:01:59.999")),
+            }
+        )]),
+        60
+    );
+    assert_eq!(
+        count(vec![f(
+            "LOCATION_ID",
+            FilterOp::Equals {
+                value: Param::Int(11)
+            }
+        )]),
+        10_000
+    );
+    assert_eq!(
+        count(vec![f(
+            "RECORD_ID",
+            FilterOp::Gt {
+                value: Param::Int(2757399104)
+            }
+        )]),
+        1000
+    );
+    let values = engine
+        .column_values(
+            &ds.id,
+            &ViewSpec::default(),
+            "TEL_DIGIT",
+            Some("07552700001"),
+            10,
+            &RequestKey::default(),
+        )
+        .unwrap();
+    assert_eq!(values.values.len(), 1);
+    assert_eq!(values.values[0].count, 200);
+}
