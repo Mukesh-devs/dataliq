@@ -32,6 +32,7 @@ describe("formatRows", () => {
     expect(out[0]).toBe("id\tFull name\tamount\tjoined\tactive");
     expect(out[1]).toBe('1\t"Ann, ""the"" first"\t9.5\t2024-01-15\ttrue');
     expect(formatRows("tsv", columns.slice(0, 1), [[1n]])).toBe("id\n1");
+    expect(formatRows("tsv", columns.slice(0, 2), [[1n, "a"]], { headers: false })).toBe("1\ta");
     // Quoted because of the tab and the line break inside it.
     expect(out[3]).toBe("3\t\"O'Neil | tab\there");
   });

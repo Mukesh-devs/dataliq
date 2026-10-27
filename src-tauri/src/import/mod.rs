@@ -140,6 +140,8 @@ pub fn import(
     job_id: &str,
     on_progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<ImportOutcome> {
+    // Keeps `release_memory` away while the import runs.
+    let _busy = engine.busy();
     let started = Instant::now();
     let stamp = SourceStamp::of(&source.path)?;
     let key = cache::cache_key(&stamp, &source.options);

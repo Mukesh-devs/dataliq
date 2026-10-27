@@ -405,3 +405,22 @@ tested, and anything left over.
   registry now remembers each group's newest request and the ones it replaced; a replaced
   request's later statements start out cancelled. Unit test reproduces the old behaviour.
 - Left over: none.
+
+### Fixes from testing on Windows (after step 1)
+
+- Grid empty after switching back to a tab until a sort/filter: a page could arrive before the
+  grid reported what is on screen, and was never drawn. Now the grid redraws once it knows.
+- Changing the theme recoloured everything but the grid until a tab switch: the canvas read the
+  CSS colours before the new theme was applied. It now waits for the applied theme (also for
+  density). Playwright reads a grid pixel before and after switching to dark.
+- Panel toggles at the top right: sidebar (Ctrl+B), SQL panel (Ctrl+J), column profile
+  (Ctrl+Alt+B), kept across restarts; the profile panel offers a column list when empty (D34).
+- Right-click a cell: copy, copy with headers, copy value / column name, copy as …, only rows
+  with this value / exclude it, sort, column profile, reload file (keeps filters). The webview's
+  default menu is off outside text fields (D34).
+- Memory: after an import or a big view is written, DuckDB's cached pages are handed back
+  (D33); 166 → 61 MiB after a 100 MB CSV (`perf_memory_after_import`). Memory use while an
+  import runs is DuckDB working within its limit (50 % of RAM, `memoryLimitMb` to change).
+- Tested: Playwright for the toggles, the cell menu (copy with headers, filter by value, reload
+  keeping the filter), the context-menu suppression and the theme pixel check (fails on the old
+  code); Rust for releasing memory (limit restored, skipped while busy); Vitest for value filters.

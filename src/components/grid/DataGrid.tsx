@@ -22,7 +22,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useResolvedTheme } from "../../app/useResolvedTheme";
 import type { ColumnKind } from "../../lib/arrow";
 import {
   fitWidth,
@@ -35,7 +34,7 @@ import {
   type ColumnLayout,
 } from "../../lib/layout";
 import { sortMark, type Bin, type SortKey } from "../../lib/view";
-import { useSettings } from "../../stores/settings";
+import { useAppliedTheme } from "../../stores/appliedTheme";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
 import { chartColor, gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
 import { CHART_HEIGHT, paintHistogram } from "./headerChart";
@@ -103,6 +102,11 @@ interface DataGridProps {
   /** Search text to highlight in text cells. */
   highlight?: string;
   /**
+   * Right-click on a cell (`row` 0-based), at `point` in client coordinates.
+   * The cell is selected first unless it is already part of the selection.
+   */
+  onCellMenu?: (column: string, row: number, point: { x: number; y: number }) => void;
+  /**
    * Small histograms drawn under the header titles, by column name. Given
    * (even empty, while loading) makes the headers taller to fit them.
    */
@@ -137,14 +141,16 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     onHeaderClick,
     highlight,
     histograms,
+    onCellMenu,
   },
   ref,
 ) {
   const editor = useRef<DataEditorRef>(null);
   const container = useRef<HTMLDivElement>(null);
   const visible = useRef<Rectangle>({ x: 0, y: 0, width: 0, height: 0 });
-  const resolvedTheme = useResolvedTheme();
-  const density = useSettings((s) => s.density);
+  const redrawWhenVisible = useRef(false);
+  // Changes once the theme / density attributes are applied (CSS tokens).
+  const themeVersion = useAppliedTheme((s) => s.version);
   const [fontsReady, setFontsReady] = useState(false);
   const [selection, setSelection] = useState<GridSelection>(emptySelection);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -159,12 +165,11 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
 
   // Recomputed when theme, density or fonts change; tokens come from CSS.
   const { theme, cellStyle, height } = useMemo(() => {
-    void resolvedTheme;
-    void density;
+    void themeVersion;
     void fontsReady;
     const style: CellStyle = { nullColor: nullColor(), nullFont: "italic 12px" };
     return { theme: gridTheme(), cellStyle: style, height: rowHeight() };
-  }, [resolvedTheme, density, fontsReady]);
+  }, [themeVersion, fontsReady]);
 
   // The layout for this source's columns, and the source index of each
   // shown column (display order).
@@ -228,6 +233,12 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
   useEffect(() => {
     return source.subscribe((start, end) => {
       const v = visible.current;
+      // Glide hasn't said what is on screen yet (e.g. just mounted after a
+      // tab switch, with a fast page): redraw once it does.
+      if (v.width === 0 || v.height === 0) {
+        redrawWhenVisible.current = true;
+        return;
+      }
       const from = Math.max(start, v.y);
       const to = Math.min(end, v.y + v.height + 1);
       if (from >= to) return;
@@ -245,16 +256,26 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     (range: Rectangle) => {
       visible.current = range;
       source.ensure(range.y, range.y + range.height + 1);
+      if (redrawWhenVisible.current && range.width > 0 && range.height > 0) {
+        redrawWhenVisible.current = false;
+        const cells: { cell: Item }[] = [];
+        for (let r = range.y; r < Math.min(range.y + range.height + 1, source.rowCount); r++) {
+          for (let c = range.x; c < Math.min(range.x + range.width + 1, shown.length); c++) {
+            cells.push({ cell: [c, r] });
+          }
+        }
+        editor.current?.updateCells(cells);
+      }
       onVisibleRowsChange?.(range.y, range.height);
     },
-    [source, onVisibleRowsChange],
+    [source, onVisibleRowsChange, shown.length],
   );
 
   // Search matches: painted behind the text of left-aligned text cells.
   const matchFill = useMemo(() => {
-    void resolvedTheme;
+    void themeVersion;
     return matchColor();
-  }, [resolvedTheme]);
+  }, [themeVersion]);
   const drawCell = useMemo<DrawCellCallback | undefined>(() => {
     if (!highlight) return undefined;
     return (args, drawContent) => {
@@ -278,9 +299,9 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
   // Header histograms: the title moves up and the bars fill the bottom.
   const headerHeight = histograms ? CHART_HEADER_HEIGHT : HEADER_HEIGHT;
   const barColor = useMemo(() => {
-    void resolvedTheme;
+    void themeVersion;
     return chartColor();
-  }, [resolvedTheme]);
+  }, [themeVersion]);
   const drawHeader = useMemo<DrawHeaderCallback | undefined>(() => {
     if (!histograms) return undefined;
     return ({ ctx, column, rect, menuBounds }, drawContent) => {
@@ -454,6 +475,30 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           setSelection(emptySelection);
           const name = nameAt(col);
           if (name !== undefined) onHeaderClick(name, e.shiftKey);
+        }}
+        onCellContextMenu={([col, row], e) => {
+          if (!onCellMenu) return;
+          e.preventDefault();
+          const name = nameAt(col);
+          if (name === undefined) return;
+          const range = selection.current?.range;
+          const inRange =
+            range &&
+            col >= range.x &&
+            col < range.x + range.width &&
+            row >= range.y &&
+            row < range.y + range.height;
+          if (!inRange && !selection.rows.hasIndex(row) && !selection.columns.hasIndex(col)) {
+            setSelection({
+              ...emptySelection,
+              current: {
+                cell: [col, row],
+                range: { x: col, y: row, width: 1, height: 1 },
+                rangeStack: [],
+              },
+            });
+          }
+          onCellMenu(name, row, { x: e.bounds.x + e.localEventX, y: e.bounds.y + e.localEventY });
         }}
         onHeaderContextMenu={(col, e) => {
           if (!onHeaderMenu) return;

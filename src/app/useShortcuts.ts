@@ -12,6 +12,9 @@ export interface ShortcutHandlers {
   copyAs: () => void;
   /** Ctrl+J. */
   toggleSql: () => void;
+  /** Ctrl+B: left sidebar; Ctrl+Alt+B: right panel (column profile). */
+  toggleSidebar: () => void;
+  toggleProfile: () => void;
 }
 
 /**
@@ -36,6 +39,10 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       } else if (mod && e.shiftKey && key === "c") {
         e.preventDefault();
         handlers.copyAs();
+      } else if (mod && !e.shiftKey && key === "b") {
+        e.preventDefault();
+        if (e.altKey) handlers.toggleProfile();
+        else handlers.toggleSidebar();
       } else if (mod && !e.shiftKey && key === "j") {
         e.preventDefault();
         handlers.toggleSql();

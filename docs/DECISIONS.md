@@ -338,3 +338,30 @@ panel shows the first 10,000 rows and says so.
 The dialect for highlighting and completion is CodeMirror's PostgreSQL,
 the closest it ships to DuckDB; formatting uses sql-formatter's DuckDB
 dialect.
+
+## D33 — Give DuckDB's cached pages back after imports and big views
+
+While a file imports (or a big sort is written), DuckDB uses memory up to
+its limit (50 % of RAM by default) and then keeps the pages cached; the
+process stayed at 1–1.5 GB after a large import on Windows. Once an import
+or a view write finishes, the engine lowers the memory limit for a moment
+and restores it, which makes DuckDB evict its unpinned pages (166 → 61 MiB
+after a 100 MB CSV here). The grid reads them back from the cache files on
+demand (operating-system file cache), at no visible cost. It only happens
+when nothing runs: every query, statement and import holds a shared "busy"
+guard, and the release only proceeds if it can take it exclusively without
+waiting. The limit itself stays configurable (`memoryLimitMb` in
+`settings.json`); memory use during an import is expected.
+
+## D34 — Layout toggles and the cell menu
+
+The left sidebar (Ctrl+B), the SQL panel (Ctrl+J) and the column-profile
+panel (Ctrl+Alt+B) have show/hide buttons at the top right of the window,
+like editors have; the choice is kept. The right panel asks for a column
+when none was profiled yet. Right-clicking a cell selects it (unless it is
+part of the selection) and opens a menu: copy (TSV like Ctrl+C), copy with
+headers, copy the cell value or the column name, copy as CSV/TSV/JSON/
+Markdown/SQL INSERT, keep or exclude rows with this value, sort, profile and
+reload the file (filters kept). The webview's own menu (reload, print,
+inspect) is turned off everywhere except in text fields, which keep
+cut/copy/paste.

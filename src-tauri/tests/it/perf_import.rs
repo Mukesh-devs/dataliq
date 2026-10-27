@@ -144,3 +144,78 @@ fn import_5gb_ndjson_gz() {
 fn import_1m_row_xlsx() {
     measure("sales_1m.xlsx");
 }
+
+/// Current resident memory (VmRSS) in MiB, Linux only.
+fn rss_mib() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let line = status.lines().find(|l| l.starts_with("VmRSS:"))?;
+    line.split_whitespace()
+        .nth(1)?
+        .parse::<u64>()
+        .ok()
+        .map(|kb| kb / 1024)
+}
+
+/// Memory held after an import, and what releasing DuckDB's cache gives back.
+/// `cargo test -p bigview --test it perf_memory -- --ignored --nocapture`
+#[test]
+#[ignore = "needs generated fixtures"]
+fn perf_memory_after_import() {
+    let Some(path) = generated("sales_100mb.csv") else {
+        return;
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let mut cfg = EngineConfig::from_settings(&Settings::default());
+    cfg.temp_dir = tmp.path().join("spill");
+    let engine = Engine::open_in_memory(&cfg).unwrap();
+    println!("engine open: {:?} MiB", rss_mib());
+    let cache = Cache::new(CacheConfig {
+        dir: tmp.path().join("cache"),
+        max_bytes: 100 << 30,
+        enabled: true,
+    })
+    .unwrap();
+    let target = ImportTarget {
+        cache: &cache,
+        temp_dir: tmp.path().join("tmp"),
+    };
+    let source = Source::new(&path, OpenOptions::default())
+        .unwrap()
+        .resolve_dialect(&engine)
+        .unwrap();
+    import::import(
+        &engine,
+        &Imports::default(),
+        &target,
+        &source,
+        "job",
+        &|_| {},
+    )
+    .unwrap();
+    let duckdb = |engine: &Engine| {
+        let out = engine
+            .query(
+                "SELECT (sum(memory_usage_bytes) / 1048576)::BIGINT FROM duckdb_memory()",
+                &[],
+                1,
+                &Default::default(),
+            )
+            .unwrap();
+        use arrow::array::AsArray;
+        out.batches[0]
+            .column(0)
+            .as_primitive::<arrow::datatypes::Int64Type>()
+            .value(0)
+    };
+    println!(
+        "after import: RSS {:?} MiB, DuckDB buffers {} MiB",
+        rss_mib(),
+        duckdb(&engine)
+    );
+    engine.release_memory().unwrap();
+    println!(
+        "after release: RSS {:?} MiB, DuckDB buffers {} MiB",
+        rss_mib(),
+        duckdb(&engine)
+    );
+}

@@ -93,6 +93,9 @@ pub struct Engine {
     requests: RequestRegistry,
     /// Tables the grid can page through.
     pub datasets: Datasets,
+    /// Held (shared) by every running query and import; `release_memory`
+    /// only runs when it can take it exclusively, i.e. when nothing runs.
+    busy: parking_lot::RwLock<()>,
     /// The SQL panel's own connection, so temp tables and `SET` last from
     /// one statement to the next. Created on first use.
     session: Mutex<Option<Connection>>,
@@ -126,6 +129,7 @@ impl Engine {
             root: Mutex::new(conn),
             scratch: Mutex::new(None),
             session: Mutex::new(None),
+            busy: parking_lot::RwLock::new(()),
             temp_dir: cfg.temp_dir.clone(),
             requests: RequestRegistry::default(),
             datasets: Datasets::default(),
@@ -158,6 +162,7 @@ impl Engine {
     /// cancellable through `key` like a query.
     pub fn execute_keyed(&self, sql: &str, params: &[Param], key: &RequestKey) -> Result<usize> {
         let conn = self.connection()?;
+        let _busy = self.busy();
         let guard = self.requests.register(key, conn.interrupt_handle());
         // An interrupt only stops a running statement: check before and after.
         if guard.is_cancelled() {
@@ -224,6 +229,7 @@ impl Engine {
         max_rows: usize,
         key: &RequestKey,
     ) -> Result<QueryBatches> {
+        let _busy = self.busy();
         let guard = self.requests.register(key, conn.interrupt_handle());
         if guard.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -298,6 +304,28 @@ impl Engine {
             batches.push(batch.slice(0, take));
         }
         batches_to_ipc(&schema, &batches)
+    }
+
+    /// Gives DuckDB's cached data pages back (they are read again from the
+    /// cache files when needed) by lowering the memory limit for a moment.
+    /// Does nothing while a query or import runs, so none runs short of memory.
+    pub fn release_memory(&self) -> Result<bool> {
+        let Some(_idle) = self.busy.try_write() else {
+            return Ok(false);
+        };
+        let conn = self.connection()?;
+        let limit: String =
+            conn.query_row("SELECT current_setting('memory_limit')", [], |r| r.get(0))?;
+        conn.execute_batch("SET memory_limit = '64MB'")?;
+        // Always restore, even if eviction complained.
+        conn.execute_batch(&format!("SET memory_limit = '{}'", limit.replace('\'', "")))?;
+        Ok(true)
+    }
+
+    /// Marks work in progress for [`Engine::release_memory`] until dropped.
+    /// Nesting is fine: the exclusive side is only ever tried, never waited for.
+    pub fn busy(&self) -> parking_lot::RwLockReadGuard<'_, ()> {
+        self.busy.read()
     }
 
     /// Runs statements that return no rows (DDL, SET, …).

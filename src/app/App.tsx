@@ -20,6 +20,7 @@ import { modKey } from "../lib/platform";
 import { onViewReady } from "../lib/view";
 import { useApp } from "../stores/app";
 import { useRegisterCommands, type Command } from "../stores/commands";
+import { useLayout } from "../stores/layout";
 import { useNotice } from "../stores/notice";
 import { useSettings, type ThemePreference } from "../stores/settings";
 import { useSql } from "../stores/sql";
@@ -90,8 +91,20 @@ function useSubscription(subscribe: () => Promise<() => void>) {
 }
 
 export function App() {
-  const { tabs, activeId, setActive, openPaths, reopen, cancelImport, readDirect, close, cycle } =
-    useTabs();
+  const {
+    tabs,
+    activeId,
+    setActive,
+    openPaths,
+    reopen,
+    reload,
+    cancelImport,
+    readDirect,
+    close,
+    cycle,
+  } = useTabs();
+  const sidebar = useLayout((s) => s.sidebar);
+  const profileOpen = useLayout((s) => s.profile);
   const applyProgress = useTabs((s) => s.applyProgress);
   const setView = useTabs((s) => s.setView);
   const setLayout = useTabs((s) => s.setLayout);
@@ -152,6 +165,14 @@ export function App() {
         setSqlOpen(open);
         if (open) setTimeout(() => useSql.getState().editor?.focus(), 0);
       },
+      toggleSidebar: () => {
+        const l = useLayout.getState();
+        l.setSidebar(!l.sidebar);
+      },
+      toggleProfile: () => {
+        const l = useLayout.getState();
+        l.setProfile(!l.profile);
+      },
     }),
     [openFile, close, cycle, setSqlOpen],
   );
@@ -202,6 +223,32 @@ export function App() {
         run: () => void openPaths([file.path]),
       });
     }
+    list.push(
+      {
+        id: "toggle-sidebar",
+        title: sidebar ? "Hide sidebar" : "Show sidebar",
+        group: "Layout",
+        shortcut: `${modKey}+B`,
+        keywords: "left panel files columns",
+        run: shortcuts.toggleSidebar,
+      },
+      {
+        id: "toggle-profile",
+        title: profileOpen ? "Hide column profile panel" : "Show column profile panel",
+        group: "Layout",
+        shortcut: `${modKey}+Alt+B`,
+        keywords: "right panel statistics",
+        run: shortcuts.toggleProfile,
+      },
+    );
+    if (activeId)
+      list.push({
+        id: "reload-file",
+        title: "Reload file (keep filters)",
+        group: "File",
+        keywords: "refresh",
+        run: () => void reload(activeId),
+      });
     list.push({
       id: "toggle-sql",
       title: sqlOpen ? "Hide SQL panel" : "Show SQL panel",
@@ -269,6 +316,9 @@ export function App() {
     setHeaderCharts,
     clearCache,
     sqlOpen,
+    sidebar,
+    profileOpen,
+    reload,
     runEditor,
     formatEditor,
     notice,
@@ -300,6 +350,18 @@ export function App() {
     ),
   );
 
+  // The webview's own context menu (reload, print, inspect …) makes no
+  // sense in an app; text fields keep it for cut/copy/paste.
+  useEffect(() => {
+    const onMenu = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, [contenteditable='true']")) return;
+      e.preventDefault();
+    };
+    window.addEventListener("contextmenu", onMenu);
+    return () => window.removeEventListener("contextmenu", onMenu);
+  }, []);
+
   // Keep the cache size in the sidebar current as imports finish.
   const importsDone = tabs.filter((t) => t.import?.status === "done").length;
   useEffect(() => {
@@ -316,6 +378,14 @@ export function App() {
         onClose={close}
         onOpen={() => void openFile()}
         onCommands={() => setPalette({ query: "" })}
+        panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
+        onTogglePanel={(panel) =>
+          panel === "left"
+            ? shortcuts.toggleSidebar()
+            : panel === "right"
+              ? shortcuts.toggleProfile()
+              : shortcuts.toggleSql()
+        }
       />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.
@@ -325,17 +395,20 @@ export function App() {
         initialQuery={palette?.query}
       />
       <div className="flex min-h-0 flex-1">
-        <Sidebar
-          tabs={tabs}
-          active={active}
-          onLayoutChange={active ? (l) => setLayout(active.id, l) : undefined}
-        />
+        {sidebar && (
+          <Sidebar
+            tabs={tabs}
+            active={active}
+            onLayoutChange={active ? (l) => setLayout(active.id, l) : undefined}
+          />
+        )}
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
           {active ? (
             <FileView
               key={active.id}
               tab={active}
               onReopen={(o) => void reopen(active.id, o)}
+              onReload={() => void reload(active.id)}
               onCancelImport={() => void cancelImport(active.id)}
               onReadDirect={() => void readDirect(active.id)}
               onViewChange={(v) => void setView(active.id, v)}

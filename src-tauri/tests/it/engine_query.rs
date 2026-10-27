@@ -330,3 +330,28 @@ fn newer_request_in_group_cancels_older() {
     let old = old.join().unwrap();
     assert!(matches!(old, Err(AppError::Cancelled)), "{:?}", old.err());
 }
+
+#[test]
+fn releasing_memory_keeps_the_limit_and_waits_for_idle() {
+    let tmp = tempfile::tempdir().unwrap();
+    let engine = Engine::open_in_memory(&EngineConfig {
+        memory_limit_bytes: 1 << 30,
+        temp_dir: tmp.path().join("spill"),
+        threads: Some(2),
+    })
+    .unwrap();
+    let limit = |e: &Engine| -> String {
+        e.connection()
+            .unwrap()
+            .query_row("SELECT current_setting('memory_limit')", [], |r| r.get(0))
+            .unwrap()
+    };
+    let before = limit(&engine);
+    assert!(engine.release_memory().unwrap());
+    assert_eq!(limit(&engine), before);
+    // Not while something runs.
+    let busy = engine.busy();
+    assert!(!engine.release_memory().unwrap());
+    drop(busy);
+    assert!(engine.release_memory().unwrap());
+}

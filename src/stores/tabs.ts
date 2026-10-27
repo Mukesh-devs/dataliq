@@ -89,6 +89,11 @@ interface TabsState {
   cycle: (step: 1 | -1) => void;
   /** Re-opens a tab's file with new import settings. */
   reopen: (id: string, options: OpenOptions) => Promise<void>;
+  /**
+   * Reads the file again (e.g. it changed on disk), keeping the tab's
+   * filters, sort and column layout. An unchanged file reopens from the cache.
+   */
+  reload: (id: string) => Promise<void>;
   cancelImport: (id: string) => Promise<void>;
   /** Reads the file directly instead of importing (e.g. low disk space). */
   readDirect: (id: string) => Promise<void>;
@@ -227,6 +232,8 @@ export const useTabs = create<TabsState>()((set, get) => {
       if (!current || current.options !== options) return; // superseded or closed
       patch(id, { status: "ready", info, preview, previewMs: performance.now() - started });
       if (!info.dataset) void startImport(id, path, options);
+      // Data available at once (Parquet in place): a kept view applies now.
+      else if (find(id)?.view) void applyView(id);
     } catch (err) {
       const current = find(id);
       if (!current || current.options !== options) return;
@@ -289,6 +296,17 @@ export const useTabs = create<TabsState>()((set, get) => {
         layout: undefined,
       });
       await load(id, tab.path, options);
+    },
+    reload: async (id) => {
+      const tab = find(id);
+      if (!tab) return;
+      release(tab);
+      patch(id, {
+        info: tab.info ? { ...tab.info, dataset: null } : tab.info,
+        viewState: tab.view ? { status: "waiting", requestId: "" } : undefined,
+      });
+      // A new options object: `load` tells a newer load by identity.
+      await load(id, tab.path, { ...tab.options });
     },
     cancelImport: async (id) => {
       const job = find(id)?.import;
