@@ -278,3 +278,18 @@ tested, and anything left over.
   added a second key (↓1 / ↑2, chips "1. amount" "2. city"). Found and fixed: a sort click also
   selected the column.
 - Left over: none for this step.
+
+### Step 4 — Global search with highlighted matches ✅
+
+- Search box at the right of the toolbar (Ctrl+F focuses it): rows where any text column contains
+  the text, case-insensitively, combined with filters and sort (`ViewSpec.search`, bound as a
+  parameter; LIKE wildcards and quotes are literal). Debounced typing, Enter searches at once,
+  Escape / × clears. Matches are highlighted behind the text in text cells (a `--match` token per
+  theme), never in null / "" markers, numbers or dates.
+- Tested: Rust (people.csv: case, unicode, apostrophes, `%` `_` `'` `"` `\` literal, numbers and
+  dates not searched, search + filter); Vitest (match finding incl. Unicode lower-casing that
+  changes length, painting offsets, the search box's debounce / Enter / Escape); Playwright
+  (Ctrl+F, one request after typing, search + filter, Escape keeps the filter).
+- Smoke (real app, people.csv): Ctrl+F, "smith" → "300 of 1,000 rows · filtered in 12 ms" (300
+  matches the file), "smith"/"Smith" highlighted in the name column only.
+- Left over: none.
