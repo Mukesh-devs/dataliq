@@ -602,4 +602,18 @@ tested, and anything left over.
   dates, and the sample size for scatter plots; image checks (PNG data, SVG document, only those
   extensions, whole files); Playwright for copying and for PNG and SVG export from the toolbar
   and the palette.
+- Smoke (real app, people.csv, dark theme): bars by month → Export → PNG image → GTK save dialog
+  with `people-chart.png` suggested → a 2032×1202 PNG on the dark background, rounded bars,
+  readable labels; SVG image → a standalone 1016×601 SVG document; Copy chart as SQL → the
+  formatted query over `read_csv('…/people.csv', …)` with `date_trunc('month', …)`.
+- Left over: none.
+
+### v0.4.0 release ✅
+
+- Version test list: all Rust tests (chart SQL snapshots, every chart checked against the parsed
+  CSV, copied chart SQL in plain DuckDB), Vitest (205), Playwright (50: charts, theme colours,
+  export), Tauri debug build; on demand `perf_charts_50m`.
+- Measured (docs/BENCHMARKS.md): every chart type on 50M rows in 0.09–1.68 s (budget < 2 s).
+- Done criteria: charts are fast on huge files (aggregated in DuckDB, one small result) and
+  always match the filtered view (the same view builder as the grid; tests with filters).
 - Left over: none.

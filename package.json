@@ -1,7 +1,7 @@
 {
   "name": "bigview",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Open huge tabular files instantly. Filter, query with SQL, chart and export without loading them into RAM.",
   "license": "MIT",
   "type": "module",
