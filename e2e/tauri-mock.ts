@@ -18,7 +18,7 @@ export interface MockOptions {
   /** Builds Arrow IPC (base64) for `fetch_rows`; runs in Node. */
   fetchRows?: (start: number, count: number, datasetId: string) => string | Promise<string>;
   /** Row count of a view (`open_view`); runs in Node. Throw to fail it. */
-  views?: (spec: unknown) => number;
+  views?: (spec: unknown) => number | Promise<number>;
   /** Value list for `column_values`; runs in Node. */
   values?: (column: string, search: string | null) => { value: string | null; count: number }[];
   /** Result of `column_profile`; runs in Node. */
@@ -134,7 +134,10 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               };
             case "cancel_import":
             case "close_dataset":
+            case "cancel_query":
               return true;
+            case "view_sql":
+              return `-- the view as SQL\nSELECT * FROM ${String(args.reader)};`;
             case "import_file": {
               const plan = imports[String(args.path)];
               if (!plan) return new Promise(() => {}); // never finishes

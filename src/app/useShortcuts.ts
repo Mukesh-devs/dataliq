@@ -6,6 +6,10 @@ export interface ShortcutHandlers {
   closeTab: () => void;
   nextTab: () => void;
   previousTab: () => void;
+  /** Ctrl+K. */
+  commandPalette: () => void;
+  /** Shift+Ctrl+C: the "copy as" choices. */
+  copyAs: () => void;
 }
 
 /**
@@ -27,6 +31,12 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       } else if (mod && !e.shiftKey && key === "w") {
         e.preventDefault();
         handlers.closeTab();
+      } else if (mod && e.shiftKey && key === "c") {
+        e.preventDefault();
+        handlers.copyAs();
+      } else if (mod && !e.shiftKey && key === "k") {
+        e.preventDefault();
+        handlers.commandPalette();
       }
     };
     window.addEventListener("keydown", onKey);

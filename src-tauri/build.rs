@@ -20,6 +20,7 @@ fn main() {
             "column_values",
             "column_profile",
             "column_histograms",
+            "view_sql",
         ]),
     ))
     .expect("failed to run tauri-build");

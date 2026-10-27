@@ -56,6 +56,25 @@ pub struct OpenedView {
 }
 
 impl Engine {
+    /// The view of `spec` on dataset `id` as standalone SQL over `reader`
+    /// (see [`super::standalone_sql`]), with "today" as the local date.
+    pub fn view_sql(
+        &self,
+        id: &str,
+        spec: &ViewSpec,
+        reader: &str,
+        labels: &std::collections::HashMap<String, String>,
+    ) -> Result<String> {
+        let schema = self.dataset_columns(id)?;
+        super::standalone_sql(
+            spec,
+            reader,
+            &schema,
+            labels,
+            chrono::Local::now().date_naive(),
+        )
+    }
+
     /// Column names and DuckDB types of an open dataset.
     pub fn dataset_columns(&self, id: &str) -> Result<Vec<ColumnMeta>> {
         let ds = self.datasets.get(id)?;

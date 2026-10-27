@@ -10,9 +10,10 @@ interface TabBarProps {
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onOpen: () => void;
+  onCommands?: () => void;
 }
 
-export function TabBar({ tabs, activeId, onSelect, onClose, onOpen }: TabBarProps) {
+export function TabBar({ tabs, activeId, onSelect, onClose, onOpen, onCommands }: TabBarProps) {
   return (
     <header className="flex h-[var(--chrome-height)] shrink-0 items-center gap-1 border-b border-border bg-surface pr-2 pl-2">
       <div role="tablist" aria-label="Open files" className="flex min-w-0 items-center gap-0.5">
@@ -66,6 +67,8 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onOpen }: TabBarProp
         type="button"
         className="flex h-7 w-56 items-center gap-2 rounded-[var(--radius)] border border-border bg-bg px-2 text-fg-subtle hover:border-border-strong"
         aria-label="Search commands"
+        title={`Command palette (${modKey}+K)`}
+        onClick={onCommands}
       >
         <Search className="size-3.5" aria-hidden />
         <span className="flex-1 text-left">Search…</span>

@@ -118,6 +118,75 @@ pub fn build_at(
     })
 }
 
+/// The view as one standalone statement over `reader`, a table expression
+/// with literal values such as `read_csv('/data/a.csv', delim = ';')`: the
+/// shown columns in order (`spec.columns`, else all) under their display
+/// names (`labels`), then filters, search and sort, with every value inlined.
+/// Rows with equal sort keys keep file order, as in the app. For "Copy as
+/// SQL": it runs as-is in plain DuckDB and gives the rows of the view.
+pub fn standalone_sql(
+    spec: &ViewSpec,
+    reader: &str,
+    schema: &[ColumnMeta],
+    labels: &std::collections::HashMap<String, String>,
+    today: NaiveDate,
+) -> Result<String> {
+    let mut b = Builder {
+        schema,
+        params: Vec::new(),
+        today,
+    };
+    let names: Vec<String> = match &spec.columns {
+        Some(c) => c.clone(),
+        None => schema.iter().map(|c| c.name.clone()).collect(),
+    };
+    if names.is_empty() {
+        return Err(AppError::Query(
+            "Choose at least one column to show.".into(),
+        ));
+    }
+    let mut projection = Vec::with_capacity(names.len());
+    for name in &names {
+        let q = quote_ident(&b.column(name)?.name);
+        projection.push(match labels.get(name).filter(|l| *l != name) {
+            Some(l) => format!("{q} AS {}", quote_ident(l)),
+            None => q,
+        });
+    }
+    let mut conditions = Vec::new();
+    for f in &spec.filters {
+        conditions.push(b.filter(f)?);
+    }
+    if let Some(text) = spec.search.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push(b.search(text));
+    }
+    let mut order = b.order_by(&spec.sort, false)?;
+
+    let mut sql = format!("SELECT {}\n", projection.join(", "));
+    if order.is_empty() {
+        sql.push_str(&format!("FROM {reader}"));
+    } else {
+        // Number the rows in file order (an unused name) as the tiebreak.
+        let mut row = "bigview_row".to_string();
+        while schema.iter().any(|c| c.name == row) {
+            row.insert(0, '_');
+        }
+        let row = quote_ident(&row);
+        sql.push_str(&format!(
+            "FROM (SELECT *, row_number() OVER () AS {row} FROM {reader})"
+        ));
+        order.push_str(&format!(", {row}"));
+    }
+    if !conditions.is_empty() {
+        sql.push_str(&format!("\nWHERE {}", conditions.join("\n  AND ")));
+    }
+    if !order.is_empty() {
+        sql.push_str(&format!("\nORDER BY {order}"));
+    }
+    sql.push(';');
+    Ok(crate::engine::sql::inline_params(&sql, &b.params))
+}
+
 struct Builder<'a> {
     schema: &'a [ColumnMeta],
     params: Vec<Param>,

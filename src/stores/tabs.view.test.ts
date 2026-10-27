@@ -186,6 +186,86 @@ describe("tabs store: cancelling views", () => {
   });
 });
 
+describe("tabs store: cancel button", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("cancelling a running view goes back to the rows on screen", async () => {
+    const second = deferred<unknown>();
+    let n = 0;
+    const calls = backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () =>
+        ++n === 1
+          ? { dataset: { id: "view-1", rowCount: 10 }, totalRows: 1000, elapsedMs: 5 }
+          : second.promise,
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    await useTabs.getState().setView(id, { filters: [nameFilter] });
+    void useTabs.getState().setView(id, {
+      filters: [nameFilter],
+      sort: [{ column: "id", descending: true }],
+    });
+    await settle();
+    const requestId = tab().viewState?.requestId;
+    useTabs.getState().cancelView(id);
+    expect(calls.filter((c) => c.cmd === "cancel_query").map((c) => c.args)).toEqual([
+      { requestId },
+    ]);
+    // Filters of the rows on screen, not the cancelled sort.
+    expect(tab().view).toEqual({ filters: [nameFilter] });
+    expect(tab().viewState).toMatchObject({ status: "done", dataset: { id: "view-1" } });
+    // The cancelled request's answer is dropped and its dataset closed.
+    second.resolve({ dataset: { id: "view-2", rowCount: 1 }, totalRows: 1000, elapsedMs: 1 });
+    await settle();
+    expect(tab().viewState?.dataset?.id).toBe("view-1");
+    expect(calls.filter((c) => c.cmd === "close_dataset").map((c) => c.args.datasetId)).toContain(
+      "view-2",
+    );
+  });
+
+  it("cancelling the first view shows the whole file again", async () => {
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => new Promise(() => {}),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    void useTabs.getState().setView(tab().id, { filters: [nameFilter] });
+    await settle();
+    useTabs.getState().cancelView(tab().id);
+    expect(tab().view).toBeUndefined();
+    expect(tab().viewState).toBeUndefined();
+  });
+
+  it("stopping a background sort keeps the filters", async () => {
+    const specs: unknown[] = [];
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: (args) => {
+        specs.push(args.spec);
+        return {
+          dataset: { id: `view-${specs.length}`, rowCount: 10 },
+          totalRows: 1000,
+          elapsedMs: 5,
+          materializing: true,
+        };
+      },
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    await useTabs.getState().setView(id, { filters: [nameFilter], sort: [{ column: "id" }] });
+    expect(tab().viewState?.sorting).toBe(true);
+    useTabs.getState().cancelView(id);
+    await settle();
+    expect(specs.at(-1)).toEqual({ filters: [nameFilter], sort: [] });
+    expect(tab().viewState).toMatchObject({ sorting: false, dataset: { id: "view-2" } });
+  });
+});
+
 describe("tabs store: background sorts", () => {
   beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
   afterEach(() => clearMocks());

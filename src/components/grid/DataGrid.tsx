@@ -60,6 +60,28 @@ export interface DataGridHandle {
   scrollToRow(row: number): void;
   /** Sets a column's width to fit its header and the rows on screen. */
   autoFit(column: string): void;
+  /**
+   * The selected cells: shown columns in display order and row indices in
+   * order, at most `maxRows + 1` of them (so callers can tell there are more).
+   * Selected rows take every shown column; selected columns every row.
+   * Null when nothing is selected.
+   */
+  selected(maxRows: number): SelectedCells | null;
+}
+
+export interface SelectedCells {
+  columns: string[];
+  rows: number[];
+}
+
+/** Up to `max` indices of a selection, in order. */
+function take(sel: Iterable<number>, max: number): number[] {
+  const out: number[] = [];
+  for (const i of sel) {
+    if (out.length >= max) break;
+    out.push(i);
+  }
+  return out;
 }
 
 interface DataGridProps {
@@ -328,6 +350,26 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           ),
         );
       },
+      selected(maxRows: number): SelectedCells | null {
+        const names = (cols: number[]) =>
+          cols.map((c) => nameAt(c)).filter((n): n is string => n !== undefined);
+        const all = shown.map((_, c) => c);
+        if (selection.rows.length > 0) {
+          return { columns: names(all), rows: take(selection.rows, maxRows + 1) };
+        }
+        if (selection.columns.length > 0) {
+          const rows = Array.from({ length: Math.min(source.rowCount, maxRows + 1) }, (_, i) => i);
+          return { columns: names(selection.columns.toArray()), rows };
+        }
+        const range = selection.current?.range;
+        if (!range) return null;
+        const cols = Array.from({ length: range.width }, (_, i) => range.x + i);
+        const rows = Array.from(
+          { length: Math.min(range.height, maxRows + 1) },
+          (_, i) => range.y + i,
+        );
+        return { columns: names(cols), rows };
+      },
       autoFit(column: string) {
         const src = source.columns.findIndex((c) => c.name === column);
         const col = source.columns[src];
@@ -361,7 +403,19 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         onLayoutChange(setWidth(layout, column, width));
       },
     }),
-    [source, height, headerHeight, layout, onLayoutChange, theme, cellStyle, sort],
+    [
+      source,
+      height,
+      headerHeight,
+      layout,
+      onLayoutChange,
+      theme,
+      cellStyle,
+      sort,
+      selection,
+      shown,
+      nameAt,
+    ],
   );
 
   const digits = String(source.rowCount).length;

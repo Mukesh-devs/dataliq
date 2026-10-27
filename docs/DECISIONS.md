@@ -286,3 +286,32 @@ and boolean column, after a single scan for all their ranges. They are
 exact (not sampled) and load behind the grid; the headers grow from 32 to
 46 px to fit them, and the status bar has a toggle to turn them off
 (persisted).
+
+## D31 — "Copy as SQL" reads the file itself; copy and cancel rules
+
+"Copy view as SQL" must run as-is in plain DuckDB and give the rows on
+screen, so it cannot name the app's cache table. It selects from the file's
+own reader call (`read_csv(...)` with the detected dialect, `read_json`,
+`read_parquet`) with every value inlined as a literal (`?` inside quoted
+strings and identifiers left alone), the shown columns in display order
+under their display names, and, when sorted, a `row_number() OVER ()`
+tiebreak so equal keys keep file order as they do in the app (rowid). Tests
+run the copied SQL in a fresh DuckDB connection and compare every value
+with the app's view, ties included.
+
+Excel sheets are read with DuckDB's `excel` extension (`read_xlsx`): the
+rows below the header (`header = false`, an open-ended `range`), blank rows
+dropped as the import does, each column aliased to the app's name, and
+integer columns cast back from DOUBLE. An on-demand test downloads the
+extension and checks it against the app's import cell by cell. DuckDB can't
+read `.xls`, so for those the SQL names the sheet as a table to load first.
+
+Copying a selection as CSV/TSV/JSON/Markdown/SQL INSERT reads the rows
+through the grid's page cache in chunks of 5,000 and stops at 100,000 rows
+(the status bar says so); bigger extracts belong to Export (v0.3).
+Shift+Ctrl+C opens the command palette already filtered to "Copy ".
+
+Cancel (status bar or palette) abandons a view still being computed: the
+tab goes back to the rows on screen and the filters they were computed for.
+For a sort finishing in the background (D29) it drops the sort and keeps
+filters and search, since a half-written sort can't page its middle rows.

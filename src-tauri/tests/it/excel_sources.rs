@@ -232,3 +232,49 @@ fn excel_imports_into_the_cache() {
     assert_ne!(out.dataset.id, out2.dataset.id);
     assert_eq!(out2.dataset.row_count, 1);
 }
+
+/// The reader SQL ("Copy as SQL") gives the same table in DuckDB's `excel`
+/// extension. Ignored by default: it downloads the extension.
+/// `cargo test -p bigview --test it excel_reader_sql -- --ignored`
+#[test]
+#[ignore = "downloads DuckDB's excel extension"]
+fn excel_reader_sql_reads_the_same_table_in_duckdb() {
+    let (engine, _t) = engine();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch("INSTALL excel; LOAD excel;").unwrap();
+    for sheet in [None, Some("Notes")] {
+        let opts = ExcelOptions {
+            sheet: sheet.map(String::from),
+            header_row: None,
+        };
+        let (info, batch) = open(&engine, "excel/multi_sheet.xlsx", opts).unwrap();
+        let sql = format!("SELECT * FROM {}", info.reader_sql);
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let arrow: Vec<RecordBatch> = stmt.query_arrow([]).unwrap().collect();
+        let theirs = arrow::compute::concat_batches(&arrow[0].schema(), &arrow).unwrap();
+        let names: Vec<String> = theirs
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().clone())
+            .collect();
+        assert_eq!(
+            names,
+            info.columns
+                .iter()
+                .map(|c| c.name.clone())
+                .collect::<Vec<_>>(),
+            "{sql}"
+        );
+        assert_eq!(theirs.num_rows(), batch.num_rows(), "{sql}");
+        for c in 0..batch.num_columns() {
+            for r in 0..batch.num_rows() {
+                assert_eq!(
+                    text(&theirs, c, r),
+                    text(&batch, c, r),
+                    "column {c} row {r}: {sql}"
+                );
+            }
+        }
+    }
+}

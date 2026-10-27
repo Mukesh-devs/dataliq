@@ -335,3 +335,29 @@ tested, and anything left over.
 - Smoke (real app, people.csv): bars under id, amount, joined and active; "Column profile" on
   amount → 1,000 rows, 20 nulls (2.0%), 974 distinct, −98.46 … 998.5, mean 454.8815, 19 ms.
 - Left over: none.
+
+### Step 7 — Productivity ✅
+
+- Command palette (Ctrl+K, or the search box in the tab bar): every action — open, recent files,
+  tabs, theme, header histograms, clear cache, search, go to row, clear filters/sort/search,
+  show all columns, filter / sort / profile any column, copy as …, copy view as SQL, cancel —
+  found by words in any order, run with Enter; shortcuts shown next to them. Components register
+  their commands while mounted (`stores/commands.ts`).
+- Copy selection as CSV, TSV, JSON, Markdown table or SQL INSERT (Shift+Ctrl+C opens the palette
+  on "Copy "): shown columns with display names, typed JSON values, typed SQL literals; rows read
+  through the page cache in 5,000-row chunks, up to 100,000 rows (D31). Ctrl+C still copies TSV.
+- Copy view as SQL (`view_sql`): the view over the file's own reader call with every value
+  inlined, display names as aliases and a file-order tiebreak for sorts; Excel through DuckDB's
+  `read_xlsx` (D31). Runs as-is in plain DuckDB.
+- Cancel in the status bar while a view runs (back to the rows on screen) and "Stop sorting"
+  while a sort finishes in the background (keeps filters). Status bar timings: preview, import,
+  filter/sort ("first rows in …", "sorted in …"), and notices such as "Copied 2 rows as CSV".
+- Tested: Rust — the copied SQL run in a fresh DuckDB matches the app's view value for value
+  (filters of every kind, search, ties in sorts, chosen columns), display-name aliases, `?`
+  inside quoted text, and (on demand, downloads the extension) the Excel reader against the
+  import; Vitest — every copy format, chunked row reading, command matching and registration,
+  the palette's keyboard use, status bar notices and the cancel button, the store's cancel rules;
+  Playwright — palette sort, copy as Markdown/JSON from a selection, copy view as SQL, cancel.
+- Smoke (real app, people.csv): Ctrl+K → "sort by amount desc" → Enter sorted the grid; "view as
+  sql" copied a query that plain DuckDB ran with the same first rows (971, 58, 883).
+- Left over: none.

@@ -41,6 +41,8 @@ export interface ViewState {
   requestId: string;
   /** The view's rows; kept while a newer view is computed. */
   dataset?: DatasetInfo;
+  /** The spec `dataset` was computed for (what is on screen). */
+  spec?: ViewSpec;
   /** Rows in the whole file. */
   totalRows?: number;
   /** Time until the view's rows were on screen. */
@@ -95,6 +97,12 @@ interface TabsState {
   applyProgress: (progress: ImportProgress) => void;
   /** Changes a tab's view (filters, …); the grid follows when it is computed. */
   setView: (id: string, view: ViewSpec) => Promise<void>;
+  /**
+   * Stops the tab's view work: a view still being computed is abandoned
+   * (the tab goes back to the rows on screen and their filters); a sort
+   * still finishing in the background is dropped (filters and search stay).
+   */
+  cancelView: (id: string) => void;
   /** Applies a `view-ready` event (subscribed once by the App). */
   applyViewReady: (ready: ViewReady) => void;
   setLayout: (id: string, layout: ColumnLayout) => void;
@@ -185,6 +193,7 @@ export const useTabs = create<TabsState>()((set, get) => {
           status: "done",
           requestId,
           dataset: out.dataset,
+          spec,
           totalRows: out.totalRows,
           elapsedMs: out.elapsedMs,
           // Only a sort makes the user wait for the background part.
@@ -330,6 +339,23 @@ export const useTabs = create<TabsState>()((set, get) => {
       if (!find(id)) return;
       patch(id, { view: isIdentity(view) ? undefined : view });
       await applyView(id);
+    },
+    cancelView: (id) => {
+      const tab = find(id);
+      const vs = tab?.viewState;
+      if (!tab || !vs) return;
+      if (vs.status === "running") {
+        void cancelQuery(vs.requestId).catch(() => {});
+        patch(id, {
+          view: vs.dataset ? vs.spec : undefined,
+          // A new request id: the cancelled request's result is ignored.
+          viewState: vs.dataset
+            ? { ...vs, status: "done", requestId: `${vs.requestId}:cancelled` }
+            : undefined,
+        });
+      } else if (vs.sorting) {
+        void get().setView(id, { ...tab.view, sort: [] });
+      }
     },
     close: (id) => {
       const tab = find(id);

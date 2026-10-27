@@ -2,11 +2,16 @@ import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
-import { formatBytes } from "../../lib/format";
-import { isMac } from "../../lib/platform";
+import { formatBytes, formatCount } from "../../lib/format";
+import { COPY_FORMATS, formatRows, tableName, type CopyFormat } from "../../lib/copyAs";
+import { isMac, modKey } from "../../lib/platform";
+import { useRegisterCommands, type Command } from "../../stores/commands";
+import { useNotice } from "../../stores/notice";
+import { useTabs } from "../../stores/tabs";
 import type { Tab } from "../../stores/tabs";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
+import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
 import { useSettings } from "../../stores/settings";
@@ -16,6 +21,7 @@ import {
   columnValues,
   statsSpec,
   toggleSort,
+  viewSql,
   type Bin,
   type ColumnProfile,
   type Filter,
@@ -31,6 +37,7 @@ import {
   rename,
   setHidden,
   setPinned,
+  showAll,
   visible,
   type ColumnLayout,
 } from "../../lib/layout";
@@ -63,6 +70,16 @@ const rectAnchor = (r: { x: number; y: number; width: number; height: number }):
 
 const CHART_KINDS = new Set(["integer", "number", "date", "timestamp", "boolean"]);
 const NO_CHARTS: ReadonlyMap<string, Bin[]> = new Map();
+
+/** Where editors opened from the palette appear: over the grid's top left. */
+const gridAnchor = (): Anchor => ({
+  getBoundingClientRect: () => {
+    const r = document.querySelector("[data-testid='data-grid']")?.getBoundingClientRect();
+    return new DOMRect((r?.x ?? 0) + 60, r?.y ?? 0, 1, 32);
+  },
+});
+
+const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
 
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
 
@@ -192,6 +209,212 @@ export function FileView({
   const grid = useRef<DataGridHandle>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const [goToOpen, setGoToOpen] = useState(false);
+  const notice = useNotice((s) => s.show);
+  const cancelView = useTabs((s) => s.cancelView);
+
+  /** Copies the selected cells (shown columns, display names) as `format`. */
+  const copySelection = useCallback(
+    async (format: CopyFormat) => {
+      const sel = source && grid.current?.selected(MAX_COPY_ROWS);
+      if (!source || !sel || sel.rows.length === 0 || sel.columns.length === 0) {
+        notice("Select some cells, rows or columns to copy first");
+        return;
+      }
+      const cut = sel.rows.length > MAX_COPY_ROWS;
+      const rows = cut ? sel.rows.slice(0, MAX_COPY_ROWS) : sel.rows;
+      const index = new Map(source.columns.map((c, i) => [c.name, i]));
+      const cols = sel.columns.filter((n) => index.has(n));
+      const name = COPY_FORMATS.find((f) => f.format === format)?.label ?? format;
+      try {
+        const values = await readRows(
+          source,
+          rows,
+          cols.map((n) => index.get(n)!),
+        );
+        const text = formatRows(
+          format,
+          cols.map((n) => ({
+            name: n,
+            label: label(layout, n),
+            format: source.columns[index.get(n)!]!,
+          })),
+          values,
+          { table: tableName(tab.title) },
+        );
+        await navigator.clipboard.writeText(text);
+        notice(
+          `Copied ${plural(rows.length, "row")} as ${name}` +
+            (cut ? ` (the first ${formatCount(MAX_COPY_ROWS)} of the selection)` : ""),
+        );
+      } catch (e) {
+        notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [source, layout, notice, tab.title],
+  );
+
+  /** Copies the view (shown columns, names, filters, search, sort) as runnable SQL. */
+  const readerSql = tab.info?.readerSql;
+  const copyViewSql = useCallback(async () => {
+    if (!baseId || !readerSql) return;
+    try {
+      const sql = await viewSql(
+        baseId,
+        { ...view, columns: visible(layout) },
+        readerSql,
+        layout.labels,
+      );
+      await navigator.clipboard.writeText(sql);
+      notice("Copied the view as SQL");
+    } catch (e) {
+      notice(`Couldn't copy the view: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [baseId, readerSql, view, layout, notice]);
+
+  const running = tab.viewState?.status === "running";
+  const sorting = !!tab.viewState?.sorting;
+  const importing = tab.import?.status === "running";
+  const commands = useMemo<Command[]>(() => {
+    if (tab.status !== "ready" || !source) return [];
+    const list: Command[] = [];
+    const add = (c: Command) => list.push(c);
+    if (onViewChange) {
+      // Command closures run when picked in the palette, never during render.
+      // eslint-disable-next-line react-hooks/refs
+      add({
+        id: "search",
+        title: "Search in data",
+        group: "View",
+        shortcut: `${modKey}+F`,
+        run: () => searchInput.current?.focus(),
+      });
+    }
+    add({
+      id: "go-to-row",
+      title: "Go to row…",
+      group: "View",
+      shortcut: `${modKey}+G`,
+      run: () => setGoToOpen(true),
+    });
+    if (onViewChange && filters.length > 0)
+      add({
+        id: "clear-filters",
+        title: "Clear filters",
+        group: "View",
+        run: () => setFilters([]),
+      });
+    if (onViewChange && sort.length > 0)
+      add({ id: "clear-sort", title: "Clear sort", group: "View", run: () => setSort([]) });
+    if (onViewChange && view.search)
+      add({
+        id: "clear-search",
+        title: "Clear search",
+        group: "View",
+        run: () => onViewChange({ ...view, search: undefined }),
+      });
+    if (onLayoutChange && layout.hidden.length > 0)
+      add({
+        id: "show-all-columns",
+        title: "Show all columns",
+        group: "Columns",
+        run: () => onLayoutChange(showAll(layout)),
+      });
+    if (running)
+      add({
+        id: "cancel-view",
+        title: "Cancel running query",
+        group: "View",
+        keywords: "stop",
+        run: () => cancelView(tab.id),
+      });
+    else if (sorting)
+      add({
+        id: "stop-sorting",
+        title: "Stop sorting (keep filters)",
+        group: "View",
+        keywords: "cancel",
+        run: () => cancelView(tab.id),
+      });
+    if (importing && onCancelImport)
+      add({ id: "cancel-import", title: "Cancel import", group: "File", run: onCancelImport });
+    for (const f of COPY_FORMATS) {
+      // eslint-disable-next-line react-hooks/refs -- runs when picked, not during render
+      add({
+        id: `copy-${f.format}`,
+        title: `Copy selection as ${f.label}`,
+        group: "Copy",
+        shortcut: f.format === "tsv" ? `${modKey}+C` : undefined,
+        run: () => void copySelection(f.format),
+      });
+    }
+    if (baseId && readerSql)
+      add({
+        id: "copy-view-sql",
+        title: "Copy view as SQL",
+        group: "Copy",
+        keywords: "query duckdb",
+        run: () => void copyViewSql(),
+      });
+    for (const name of visible(layout)) {
+      const column = columns.find((c) => c.name === name);
+      if (!column) continue;
+      const shown = label(layout, name);
+      if (onViewChange) {
+        add({
+          id: `filter:${name}`,
+          title: `Filter ${shown}…`,
+          group: "Columns",
+          run: () => filterColumn(column, gridAnchor()),
+        });
+        add({
+          id: `sort-asc:${name}`,
+          title: `Sort by ${shown} ascending`,
+          group: "Columns",
+          run: () => setSort([{ column: name, descending: false }]),
+        });
+        add({
+          id: `sort-desc:${name}`,
+          title: `Sort by ${shown} descending`,
+          group: "Columns",
+          run: () => setSort([{ column: name, descending: true }]),
+        });
+      }
+      if (baseId)
+        add({
+          id: `profile:${name}`,
+          title: `Column profile: ${shown}`,
+          group: "Columns",
+          keywords: "statistics stats",
+          run: () => setProfiled(name),
+        });
+    }
+    return list;
+    // setFilters, setSort and filterColumn are recreated each render; the
+    // state they read is listed, so the list only changes when it should.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    tab.status,
+    tab.id,
+    source,
+    onViewChange,
+    onLayoutChange,
+    onCancelImport,
+    filters,
+    sort,
+    view,
+    layout,
+    columns,
+    running,
+    sorting,
+    importing,
+    baseId,
+    readerSql,
+    copySelection,
+    copyViewSql,
+    cancelView,
+  ]);
+  useRegisterCommands("file", commands);
+
   const showSettings =
     isCsv(tab) || (tab.status === "error" && /\.(csv|tsv|txt|tab)/i.test(tab.path));
 

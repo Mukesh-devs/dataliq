@@ -24,6 +24,7 @@
     "allow-open-view",
     "allow-column-values",
     "allow-column-profile",
-    "allow-column-histograms"
+    "allow-column-histograms",
+    "allow-view-sql"
   ]
 }

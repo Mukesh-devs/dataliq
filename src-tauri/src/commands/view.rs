@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -134,4 +135,18 @@ pub async fn column_histograms(
     })
     .await
     .map_err(|e| AppError::Internal(format!("histogram task failed: {e}")))?
+}
+
+/// The view as SQL that runs on its own in DuckDB ("Copy as SQL"): over
+/// `reader` (the file's reader call, from its info), with the shown columns
+/// under their display names (`labels`) and every value inlined.
+#[tauri::command]
+pub fn view_sql(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    spec: ViewSpec,
+    reader: String,
+    labels: HashMap<String, String>,
+) -> Result<String> {
+    engine.view_sql(&dataset_id, &spec, &reader, &labels)
 }

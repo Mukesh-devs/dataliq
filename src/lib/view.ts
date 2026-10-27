@@ -266,3 +266,16 @@ export function columnHistograms(
 ): Promise<ColumnHistogram[]> {
   return call("column_histograms", { datasetId, spec: statsSpec(spec), columns, group });
 }
+
+/**
+ * The view as standalone DuckDB SQL over `reader` (the file's reader call):
+ * `spec.columns` in order, renamed by `labels`, every value inlined.
+ */
+export function viewSql(
+  datasetId: string,
+  spec: ViewSpec,
+  reader: string,
+  labels: Record<string, string>,
+): Promise<string> {
+  return call("view_sql", { datasetId, spec, reader, labels });
+}
