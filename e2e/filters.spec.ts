@@ -61,10 +61,14 @@ test("add, edit and remove filters; the grid and status follow", async ({ page }
   await expect(gridCell(page, "match 1")).toBeAttached();
   expect(views.at(-1)).toEqual({ filters: [{ column: "name", op: "contains", value: "ann" }] });
 
-  // A second filter, opened from the column header (right-click).
+  // A second filter, from the column header menu (right-click → Filter…).
   const grid = page.getByTestId("data-grid");
   const box = (await grid.boundingBox())!;
   await page.mouse.click(box.x + 60, box.y + 16, { button: "right" });
+  await page
+    .getByRole("menu", { name: "id column" })
+    .getByRole("menuitem", { name: "Filter…" })
+    .click();
   const idEditor = page.getByRole("dialog", { name: "Filter id" });
   await idEditor.getByLabel("Condition").selectOption("gt");
   await idEditor.getByLabel("Value").fill("100");

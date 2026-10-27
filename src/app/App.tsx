@@ -21,6 +21,15 @@ import { useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
 
+/** "filtered", "sorted" or "filtered and sorted", for the status bar. */
+function viewVerb(tab: Tab): { ed: string; ing: string } {
+  const filtered = (tab.view?.filters?.length ?? 0) > 0 || !!tab.view?.search;
+  const sorted = (tab.view?.sort?.length ?? 0) > 0;
+  if (filtered && sorted) return { ed: "filtered and sorted", ing: "filtering and sorting" };
+  if (sorted) return { ed: "sorted", ing: "sorting" };
+  return { ed: "filtered", ing: "filtering" };
+}
+
 function statusMessage(tab: Tab | undefined, engineVersion: string | null): string {
   const parts: string[] = [];
   if (!tab) parts.push("Ready");
@@ -33,10 +42,12 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     const v = tab.viewState;
     const rows = v.dataset ? formatCount(v.dataset.rowCount) : "";
     parts.push(`${rows} of ${formatCount(v.totalRows ?? tab.info.dataset.rowCount)} rows`);
-    if (v.status === "running") parts.push("filtering…");
-    else parts.push(`filtered in ${formatDuration(v.elapsedMs ?? 0)}`);
+    const verb = viewVerb(tab);
+    if (v.status === "running") parts.push(`${verb.ing}…`);
+    else parts.push(`${verb.ed} in ${formatDuration(v.elapsedMs ?? 0)}`);
   } else if (tab.viewState?.status === "running") {
-    parts.push("Filtering…");
+    const ing = viewVerb(tab).ing;
+    parts.push(`${ing[0]!.toUpperCase()}${ing.slice(1)}…`);
   } else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
     if (tab.import?.fromCache) parts.push("from cache");

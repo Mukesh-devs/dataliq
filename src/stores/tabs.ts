@@ -13,6 +13,7 @@ import {
   type DatasetInfo,
   type SourceInfo,
 } from "../lib/files";
+import { cancelQuery } from "../lib/ipc";
 import { isIdentity, openView, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
 
@@ -149,6 +150,9 @@ export const useTabs = create<TabsState>()((set, get) => {
     const shown = tab.viewState?.dataset;
     if (isIdentity(spec) || !base) {
       if (shown) void closeDataset(shown.id).catch(() => {});
+      // Stop a long sort that is no longer wanted.
+      if (tab.viewState?.status === "running")
+        void cancelQuery(tab.viewState.requestId).catch(() => {});
       patch(id, {
         viewState: isIdentity(spec) ? undefined : { status: "waiting", requestId: "" },
       });

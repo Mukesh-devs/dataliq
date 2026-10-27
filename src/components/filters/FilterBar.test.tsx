@@ -60,3 +60,32 @@ describe("FilterBar", () => {
     expect(onAdd).toHaveBeenCalledWith(columns[2], expect.any(HTMLElement));
   });
 });
+
+describe("FilterBar sort chips", () => {
+  it("shows the sort keys in order; click reverses, × removes", async () => {
+    const onSortChange = vi.fn();
+    render(
+      <FilterBar
+        filters={[]}
+        columns={columns}
+        onEdit={vi.fn()}
+        onRemove={vi.fn()}
+        onClear={vi.fn()}
+        onAdd={vi.fn()}
+        sort={[{ column: "joined", descending: true }, { column: "name" }]}
+        onSortChange={onSortChange}
+      />,
+    );
+    const user = userEvent.setup();
+    expect(screen.getByRole("toolbar")).toHaveTextContent("Sorted by1.joined2.name");
+    await user.click(
+      screen.getByRole("button", { name: "Sort by joined, descending (click to reverse)" }),
+    );
+    expect(onSortChange).toHaveBeenLastCalledWith([
+      { column: "joined", descending: false },
+      { column: "name" },
+    ]);
+    await user.click(screen.getByRole("button", { name: "Remove sort by name" }));
+    expect(onSortChange).toHaveBeenLastCalledWith([{ column: "joined", descending: true }]);
+  });
+});

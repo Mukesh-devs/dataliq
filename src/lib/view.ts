@@ -169,3 +169,28 @@ export function describeFilter(f: Filter, kind?: ColumnKind): string {
   }
   return `${prefix}${f.column} ${label}${rest}`;
 }
+
+/**
+ * The sort after a click on `column`'s header. A plain click sorts by that
+ * column alone, cycling ascending → descending → unsorted; with `add` (Shift)
+ * the column is added as the next key, or its direction cycles in place.
+ */
+export function toggleSort(sort: SortKey[], column: string, add: boolean): SortKey[] {
+  const i = sort.findIndex((k) => k.column === column);
+  const current = sort[i];
+  const next = !current ? { column } : !current.descending ? { column, descending: true } : null;
+  if (add) {
+    if (i < 0) return [...sort, { column }];
+    return next ? sort.map((k, j) => (j === i ? next : k)) : sort.filter((_, j) => j !== i);
+  }
+  if (sort.length > 1 || !current) return [{ column }];
+  return next ? [next] : [];
+}
+
+/** Header arrow for a sorted column: "↑", "↓", or "↑2" when several keys. */
+export function sortMark(sort: SortKey[], column: string): string {
+  const i = sort.findIndex((k) => k.column === column);
+  if (i < 0) return "";
+  const arrow = sort[i]!.descending ? "↓" : "↑";
+  return sort.length > 1 ? `${arrow}${i + 1}` : arrow;
+}

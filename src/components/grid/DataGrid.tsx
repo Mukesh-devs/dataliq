@@ -21,6 +21,7 @@ import {
 } from "react";
 import { useResolvedTheme } from "../../app/useResolvedTheme";
 import type { ColumnKind } from "../../lib/arrow";
+import { sortMark, type SortKey } from "../../lib/view";
 import { useSettings } from "../../stores/settings";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
 import { gridTheme, nullColor, rowHeight } from "./gridTheme";
@@ -52,7 +53,14 @@ interface DataGridProps {
   onHeaderMenu?: (col: number, bounds: Rectangle) => void;
   /** Columns with an active filter, marked in the header. */
   filteredColumns?: ReadonlySet<string>;
+  /** Current sort, shown as arrows in the headers. */
+  sort?: SortKey[];
+  /** Header clicked (outside its menu button); `add` = Shift held. */
+  onHeaderClick?: (col: number, add: boolean) => void;
 }
+
+/** Width of Glide's header menu button (`menuButtonSize` in its source). */
+const MENU_BUTTON_WIDTH = 30;
 
 const HEADER_HEIGHT = 32;
 
@@ -66,7 +74,7 @@ const emptySelection: GridSelection = {
  * arrive asynchronously and only the affected cells are redrawn.
  */
 export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataGrid(
-  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns },
+  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns, sort, onHeaderClick },
   ref,
 ) {
   const editor = useRef<DataEditorRef>(null);
@@ -100,7 +108,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     () =>
       source.columns.map((c) => ({
         id: c.name,
-        title: c.name,
+        title: sort?.length ? `${c.name} ${sortMark(sort, c.name)}`.trim() : c.name,
         icon: ICONS[c.kind] ?? GridColumnIcon.HeaderString,
         width: widths[c.name] ?? initialWidth(c.name, c.kind),
         hasMenu: onHeaderMenu !== undefined,
@@ -108,7 +116,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           themeOverride: { textHeader: theme.accentColor, bgIconHeader: theme.accentColor },
         }),
       })),
-    [source, widths, onHeaderMenu, filteredColumns, theme],
+    [source, widths, onHeaderMenu, filteredColumns, theme, sort],
   );
 
   const getCellContent = useCallback(
@@ -219,6 +227,13 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         gridSelection={selection}
         onGridSelectionChange={setSelection}
         onHeaderMenuClick={onHeaderMenu}
+        onHeaderClicked={(col, e) => {
+          if (!onHeaderClick) return;
+          // The menu button has its own handler.
+          if (onHeaderMenu && e.localEventX > e.bounds.width - MENU_BUTTON_WIDTH) return;
+          e.preventDefault(); // sort instead of selecting the column
+          onHeaderClick(col, e.shiftKey);
+        }}
         onHeaderContextMenu={(col, e) => {
           if (!onHeaderMenu) return;
           e.preventDefault();

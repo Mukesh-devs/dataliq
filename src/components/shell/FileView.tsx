@@ -9,7 +9,8 @@ import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
-import { columnValues, type Filter, type ViewSpec } from "../../lib/view";
+import { columnValues, toggleSort, type Filter, type SortKey, type ViewSpec } from "../../lib/view";
+import { ColumnMenu } from "../filters/ColumnMenu";
 import { FilterBar } from "../filters/FilterBar";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
 import { ExcelSettings } from "../import/ExcelSettings";
@@ -70,6 +71,9 @@ export function FileView({
   const filters = useMemo(() => view.filters ?? [], [view]);
   const filtered = useMemo(() => new Set(filters.map((f) => f.column)), [filters]);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
+  const sort = useMemo(() => view.sort ?? [], [view]);
+  const setSort = (next: SortKey[]) => onViewChange?.({ ...view, sort: next });
   const baseId = tab.info?.dataset?.id;
   const setFilters = (next: Filter[]) => onViewChange?.({ ...view, filters: next });
   const editColumn = editing?.column.name;
@@ -84,12 +88,22 @@ export function FileView({
   const onHeaderMenu = useCallback(
     (col: number, bounds: { x: number; y: number; width: number; height: number }) => {
       const column = columns[col];
-      if (!column) return;
-      // Edit the column's filter if it has one, else start a new one.
-      const index = filters.findIndex((f) => f.column === column.name);
-      setEditing({ column, index: index < 0 ? undefined : index, anchor: rectAnchor(bounds) });
+      if (column) setMenu({ column, anchor: rectAnchor(bounds) });
     },
-    [columns, filters],
+    [columns],
+  );
+  /** Edit the column's filter if it has one, else start a new one. */
+  const filterColumn = (column: ColumnInfo, anchor: Anchor) => {
+    const index = filters.findIndex((f) => f.column === column.name);
+    setEditing({ column, index: index < 0 ? undefined : index, anchor });
+  };
+  const viewSort = view.sort;
+  const onHeaderClick = useCallback(
+    (col: number, add: boolean) => {
+      const column = columns[col];
+      if (column) onViewChange?.({ ...view, sort: toggleSort(viewSort ?? [], column.name, add) });
+    },
+    [columns, onViewChange, view, viewSort],
   );
   const settings = useApp((s) => s.settings);
   const grid = useRef<DataGridHandle>(null);
@@ -156,6 +170,8 @@ export function FileView({
           }}
           onRemove={(index) => setFilters(filters.filter((_, i) => i !== index))}
           onClear={() => setFilters([])}
+          sort={sort}
+          onSortChange={setSort}
         />
       )}
       {tab.viewState?.status === "error" && (
@@ -166,6 +182,16 @@ export function FileView({
           <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />
           <span className="text-fg-muted">Couldn't apply the filters: {tab.viewState.error}</span>
         </div>
+      )}
+      {menu && (
+        <ColumnMenu
+          column={menu.column.name}
+          anchor={menu.anchor}
+          sort={sort}
+          onOpenChange={(o) => !o && setMenu(null)}
+          onSort={setSort}
+          onFilter={() => filterColumn(menu.column, menu.anchor)}
+        />
       )}
       {editing && (
         <FilterEditor
@@ -207,7 +233,9 @@ export function FileView({
             ref={grid}
             source={source}
             onHeaderMenu={onViewChange ? onHeaderMenu : undefined}
+            onHeaderClick={onViewChange ? onHeaderClick : undefined}
             filteredColumns={filtered}
+            sort={sort}
           />
           <GoToRow
             open={goToOpen}

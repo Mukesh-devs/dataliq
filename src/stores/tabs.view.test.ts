@@ -44,6 +44,7 @@ function backend(opts: {
           return opts.openView(args);
         case "close_dataset":
         case "cancel_import":
+        case "cancel_query":
           return true;
         default:
           throw new Error(`unexpected ${cmd}`);
@@ -157,5 +158,30 @@ describe("tabs store: views", () => {
     useTabs.getState().close(tab().id);
     const closed = calls.filter((c) => c.cmd === "close_dataset").map((c) => c.args.datasetId);
     expect(closed).toEqual(expect.arrayContaining(["ds1", "view-7"]));
+  });
+});
+
+describe("tabs store: cancelling views", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("clearing the view cancels a sort still running", async () => {
+    const pending = deferred<unknown>();
+    const calls = backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => pending.promise,
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    void useTabs.getState().setView(id, { sort: [{ column: "id", descending: true }] });
+    await settle();
+    const requestId = tab().viewState?.requestId;
+    expect(tab().viewState?.status).toBe("running");
+    await useTabs.getState().setView(id, {});
+    expect(calls.find((c) => c.cmd === "cancel_query")?.args).toEqual({ requestId });
+    pending.resolve({ dataset: { id: "view-9", rowCount: 1 }, totalRows: 1000, elapsedMs: 1 });
+    await settle();
+    expect(tab().viewState).toBeUndefined();
   });
 });
