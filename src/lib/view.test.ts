@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeFilter, filterFamily, isIdentity } from "./view";
+import { describeFilter, filterFamily, isIdentity, sortMark, toggleSort } from "./view";
 
 describe("view helpers", () => {
   it("knows when a view changes nothing", () => {
@@ -44,5 +44,37 @@ describe("view helpers", () => {
     expect(d({ column: "x", op: "isNull" })).toBe("x is null");
     expect(d({ column: "x", op: "empty", not: true })).toBe("x is not empty");
     expect(d({ column: "x", op: "lastDays", days: 3, not: true })).toBe("not x in the last 3 days");
+  });
+});
+
+describe("sorting from the header", () => {
+  it("a click cycles ascending, descending, unsorted", () => {
+    let s = toggleSort([], "a", false);
+    expect(s).toEqual([{ column: "a" }]);
+    s = toggleSort(s, "a", false);
+    expect(s).toEqual([{ column: "a", descending: true }]);
+    expect(toggleSort(s, "a", false)).toEqual([]);
+    // Another column replaces the sort.
+    expect(toggleSort(s, "b", false)).toEqual([{ column: "b" }]);
+  });
+
+  it("Shift adds keys and cycles them in place", () => {
+    let s = toggleSort([{ column: "a" }], "b", true);
+    expect(s).toEqual([{ column: "a" }, { column: "b" }]);
+    s = toggleSort(s, "a", true);
+    expect(s).toEqual([{ column: "a", descending: true }, { column: "b" }]);
+    s = toggleSort(s, "a", true);
+    expect(s).toEqual([{ column: "b" }]);
+    // A plain click on a multi-key sort starts over with that column.
+    expect(toggleSort([{ column: "a" }, { column: "b" }], "b", false)).toEqual([{ column: "b" }]);
+  });
+
+  it("marks sorted headers", () => {
+    expect(sortMark([], "a")).toBe("");
+    expect(sortMark([{ column: "a", descending: true }], "a")).toBe("↓");
+    const two = [{ column: "a" }, { column: "b", descending: true }];
+    expect(sortMark(two, "a")).toBe("↑1");
+    expect(sortMark(two, "b")).toBe("↓2");
+    expect(sortMark(two, "c")).toBe("");
   });
 });

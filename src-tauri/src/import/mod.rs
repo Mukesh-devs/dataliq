@@ -95,9 +95,23 @@ fn attach(engine: &Engine, key: &str, db: &std::path::Path, row_count: u64) -> R
 
 /// Closes a dataset: removes it from the registry and detaches its database.
 pub fn close_dataset(engine: &Engine, id: &str) -> Result<()> {
+    // Stop a view that is still being written in the background.
+    engine.cancel(&crate::view::materialize_request_id(id));
     if let Some(ds) = engine.datasets.remove(id) {
-        if let DatasetSource::Table(_) = ds.source {
-            engine.execute_batch(&format!("DETACH DATABASE IF EXISTS {}", alias(id)))?;
+        match ds.source {
+            DatasetSource::Table(_) => {
+                engine.execute_batch(&format!("DETACH DATABASE IF EXISTS {}", alias(id)))?;
+            }
+            DatasetSource::Materialized { table } => {
+                engine.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
+            }
+            DatasetSource::Sorting { head, tail, .. } => {
+                engine.execute_batch(&format!("DROP TABLE IF EXISTS {head}"))?;
+                if let Some(tail) = tail {
+                    engine.execute_batch(&format!("DROP TABLE IF EXISTS {tail}"))?;
+                }
+            }
+            DatasetSource::Query { .. } | DatasetSource::Parquet { .. } => {}
         }
     }
     Ok(())

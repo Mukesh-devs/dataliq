@@ -2,7 +2,10 @@ import "@glideapps/glide-data-grid/dist/index.css";
 import {
   CompactSelection,
   DataEditor,
+  GridCellKind,
   GridColumnIcon,
+  type DrawCellCallback,
+  type DrawHeaderCallback,
   type DataEditorRef,
   type GridCell,
   type GridColumn,
@@ -21,9 +24,22 @@ import {
 } from "react";
 import { useResolvedTheme } from "../../app/useResolvedTheme";
 import type { ColumnKind } from "../../lib/arrow";
+import {
+  fitWidth,
+  label,
+  move,
+  pinnedCount,
+  reconcile,
+  setWidth,
+  visible as visibleColumns,
+  type ColumnLayout,
+} from "../../lib/layout";
+import { sortMark, type Bin, type SortKey } from "../../lib/view";
 import { useSettings } from "../../stores/settings";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
-import { gridTheme, nullColor, rowHeight } from "./gridTheme";
+import { chartColor, gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
+import { CHART_HEIGHT, paintHistogram } from "./headerChart";
+import { paintMatches } from "./highlight";
 import type { RowSource } from "./rowSource";
 import { scrollToRow } from "./scrollToRow";
 
@@ -42,19 +58,63 @@ const ICONS: Partial<Record<ColumnKind, GridColumnIcon>> = {
 export interface DataGridHandle {
   /** Scrolls so `row` (0-based) is visible and selects its first cell. */
   scrollToRow(row: number): void;
+  /** Sets a column's width to fit its header and the rows on screen. */
+  autoFit(column: string): void;
+  /**
+   * The selected cells: shown columns in display order and row indices in
+   * order, at most `maxRows + 1` of them (so callers can tell there are more).
+   * Selected rows take every shown column; selected columns every row.
+   * Null when nothing is selected.
+   */
+  selected(maxRows: number): SelectedCells | null;
+}
+
+export interface SelectedCells {
+  columns: string[];
+  rows: number[];
+}
+
+/** Up to `max` indices of a selection, in order. */
+function take(sel: Iterable<number>, max: number): number[] {
+  const out: number[] = [];
+  for (const i of sel) {
+    if (out.length >= max) break;
+    out.push(i);
+  }
+  return out;
 }
 
 interface DataGridProps {
   source: RowSource;
   /** Called with the first visible row and the number of visible rows. */
   onVisibleRowsChange?: (first: number, count: number) => void;
-  /** Header menu (or right-click) on column `col`; `bounds` is in client coordinates. */
-  onHeaderMenu?: (col: number, bounds: Rectangle) => void;
+  /** Column order, hidden/pinned columns, names and widths (all columns by default). */
+  layout?: ColumnLayout;
+  /** Resizing, auto-fit or dragging a header to a new place changes the layout. */
+  onLayoutChange?: (layout: ColumnLayout) => void;
+  /** Header menu (or right-click) on a column; `bounds` is in client coordinates. */
+  onHeaderMenu?: (column: string, bounds: Rectangle) => void;
   /** Columns with an active filter, marked in the header. */
   filteredColumns?: ReadonlySet<string>;
+  /** Current sort, shown as arrows in the headers. */
+  sort?: SortKey[];
+  /** Header clicked (outside its menu button); `add` = Shift held. */
+  onHeaderClick?: (column: string, add: boolean) => void;
+  /** Search text to highlight in text cells. */
+  highlight?: string;
+  /**
+   * Small histograms drawn under the header titles, by column name. Given
+   * (even empty, while loading) makes the headers taller to fit them.
+   */
+  histograms?: ReadonlyMap<string, Bin[]>;
 }
 
+/** Width of Glide's header menu button (`menuButtonSize` in its source). */
+const MENU_BUTTON_WIDTH = 30;
+
 const HEADER_HEIGHT = 32;
+/** Header height with room for a histogram under the title. */
+const CHART_HEADER_HEIGHT = HEADER_HEIGHT + CHART_HEIGHT + 4;
 
 const emptySelection: GridSelection = {
   columns: CompactSelection.empty(),
@@ -66,7 +126,18 @@ const emptySelection: GridSelection = {
  * arrive asynchronously and only the affected cells are redrawn.
  */
 export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataGrid(
-  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns },
+  {
+    source,
+    layout: layoutIn,
+    onLayoutChange,
+    onVisibleRowsChange,
+    onHeaderMenu,
+    filteredColumns,
+    sort,
+    onHeaderClick,
+    highlight,
+    histograms,
+  },
   ref,
 ) {
   const editor = useRef<DataEditorRef>(null);
@@ -75,7 +146,6 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
   const resolvedTheme = useResolvedTheme();
   const density = useSettings((s) => s.density);
   const [fontsReady, setFontsReady] = useState(false);
-  const [widths, setWidths] = useState<Record<string, number>>({});
   const [selection, setSelection] = useState<GridSelection>(emptySelection);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -96,27 +166,53 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     return { theme: gridTheme(), cellStyle: style, height: rowHeight() };
   }, [resolvedTheme, density, fontsReady]);
 
+  // The layout for this source's columns, and the source index of each
+  // shown column (display order).
+  const layout = useMemo(
+    () =>
+      reconcile(
+        layoutIn,
+        source.columns.map((c) => c.name),
+      ),
+    [layoutIn, source],
+  );
+  const shown = useMemo(() => {
+    const index = new Map(source.columns.map((c, i) => [c.name, i]));
+    return visibleColumns(layout)
+      .map((name) => index.get(name))
+      .filter((i): i is number => i !== undefined);
+  }, [layout, source]);
+  const nameAt = useCallback(
+    (col: number) => source.columns[shown[col] ?? -1]?.name,
+    [source, shown],
+  );
+
   const columns: GridColumn[] = useMemo(
     () =>
-      source.columns.map((c) => ({
-        id: c.name,
-        title: c.name,
-        icon: ICONS[c.kind] ?? GridColumnIcon.HeaderString,
-        width: widths[c.name] ?? initialWidth(c.name, c.kind),
-        hasMenu: onHeaderMenu !== undefined,
-        ...(filteredColumns?.has(c.name) && {
-          themeOverride: { textHeader: theme.accentColor, bgIconHeader: theme.accentColor },
-        }),
-      })),
-    [source, widths, onHeaderMenu, filteredColumns, theme],
+      shown.map((i) => {
+        const c = source.columns[i]!;
+        const title = label(layout, c.name);
+        return {
+          id: c.name,
+          title: sort?.length ? `${title} ${sortMark(sort, c.name)}`.trim() : title,
+          icon: ICONS[c.kind] ?? GridColumnIcon.HeaderString,
+          width: layout.widths[c.name] ?? initialWidth(title, c.kind),
+          hasMenu: onHeaderMenu !== undefined,
+          ...(filteredColumns?.has(c.name) && {
+            themeOverride: { textHeader: theme.accentColor, bgIconHeader: theme.accentColor },
+          }),
+        };
+      }),
+    [source, shown, layout, onHeaderMenu, filteredColumns, theme, sort],
   );
 
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
-      const column = source.columns[col] ?? { kind: "other" as const };
-      return toGridCell(source.getValue(row, col), column, cellStyle);
+      const src = shown[col] ?? -1;
+      const column = source.columns[src] ?? { kind: "other" as const };
+      return toGridCell(source.getValue(row, src), column, cellStyle);
     },
-    [source, cellStyle],
+    [source, shown, cellStyle],
   );
 
   // A new source (e.g. preview -> imported data) must load what is on screen
@@ -137,13 +233,13 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       if (from >= to) return;
       const cells: { cell: Item }[] = [];
       for (let r = from; r < to; r++) {
-        for (let c = v.x; c < Math.min(v.x + v.width + 1, source.columns.length); c++) {
+        for (let c = v.x; c < Math.min(v.x + v.width + 1, shown.length); c++) {
           cells.push({ cell: [c, r] });
         }
       }
       editor.current?.updateCells(cells);
     });
-  }, [source]);
+  }, [source, shown]);
 
   const onVisibleRegionChanged = useCallback(
     (range: Rectangle) => {
@@ -153,6 +249,69 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     },
     [source, onVisibleRowsChange],
   );
+
+  // Search matches: painted behind the text of left-aligned text cells.
+  const matchFill = useMemo(() => {
+    void resolvedTheme;
+    return matchColor();
+  }, [resolvedTheme]);
+  const drawCell = useMemo<DrawCellCallback | undefined>(() => {
+    if (!highlight) return undefined;
+    return (args, drawContent) => {
+      const { cell, ctx, rect, theme: t } = args;
+      // Search covers text columns only, and never the null / "" markers.
+      if (
+        cell.kind === GridCellKind.Text &&
+        cell.copyData !== "" &&
+        source.columns[shown[args.col] ?? -1]?.kind === "text"
+      ) {
+        paintMatches(ctx, cell.displayData, highlight, rect, {
+          font: `${t.baseFontStyle} ${t.fontFamily}`,
+          padding: t.cellHorizontalPadding,
+          color: matchFill,
+        });
+      }
+      drawContent();
+    };
+  }, [highlight, matchFill, source, shown]);
+
+  // Header histograms: the title moves up and the bars fill the bottom.
+  const headerHeight = histograms ? CHART_HEADER_HEIGHT : HEADER_HEIGHT;
+  const barColor = useMemo(() => {
+    void resolvedTheme;
+    return chartColor();
+  }, [resolvedTheme]);
+  const drawHeader = useMemo<DrawHeaderCallback | undefined>(() => {
+    if (!histograms) return undefined;
+    return ({ ctx, column, rect, menuBounds }, drawContent) => {
+      ctx.save();
+      ctx.translate(0, -(CHART_HEIGHT + 4) / 2);
+      drawContent();
+      ctx.restore();
+      const bins = histograms.get(column.id ?? column.title);
+      if (!bins) return;
+      const left = rect.x + 8;
+      // Stop short of the menu button.
+      const right = (column.hasMenu ? menuBounds.x : rect.x + rect.width) - 4;
+      paintHistogram(
+        ctx,
+        bins,
+        {
+          x: left,
+          y: rect.y + rect.height - CHART_HEIGHT - 4,
+          width: right - left,
+          height: CHART_HEIGHT,
+        },
+        barColor,
+      );
+    };
+  }, [histograms, barColor]);
+
+  // Glide doesn't redraw headers for a new drawHeader; damage them (row -1).
+  useEffect(() => {
+    if (histograms === undefined) return;
+    editor.current?.updateCells(shown.map((_, c) => ({ cell: [c, -1] as Item })));
+  }, [histograms, shown]);
 
   const getCellsForSelection = useCallback(
     (rect: Rectangle) => async () => {
@@ -174,7 +333,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       scrollToRow(row: number) {
         const target = Math.max(0, Math.min(source.rowCount - 1, Math.floor(row)));
         const scroller = container.current?.querySelector<HTMLElement>(".dvn-scroller");
-        if (scroller) scrollToRow(scroller, target, height, HEADER_HEIGHT, source.rowCount);
+        if (scroller) scrollToRow(scroller, target, height, headerHeight, source.rowCount);
         // Select only once the jump has rendered: Glide scrolls to a newly
         // selected cell with a relative scroll that is wrong for huge tables,
         // but does nothing when the cell is already in view.
@@ -191,8 +350,72 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           ),
         );
       },
+      selected(maxRows: number): SelectedCells | null {
+        const names = (cols: number[]) =>
+          cols.map((c) => nameAt(c)).filter((n): n is string => n !== undefined);
+        const all = shown.map((_, c) => c);
+        if (selection.rows.length > 0) {
+          return { columns: names(all), rows: take(selection.rows, maxRows + 1) };
+        }
+        if (selection.columns.length > 0) {
+          const rows = Array.from({ length: Math.min(source.rowCount, maxRows + 1) }, (_, i) => i);
+          return { columns: names(selection.columns.toArray()), rows };
+        }
+        const range = selection.current?.range;
+        if (!range) return null;
+        const cols = Array.from({ length: range.width }, (_, i) => range.x + i);
+        const rows = Array.from(
+          { length: Math.min(range.height, maxRows + 1) },
+          (_, i) => range.y + i,
+        );
+        return { columns: names(cols), rows };
+      },
+      autoFit(column: string) {
+        const src = source.columns.findIndex((c) => c.name === column);
+        const col = source.columns[src];
+        if (!col || !onLayoutChange) return;
+        // Measure the header and the rows on screen (those are loaded).
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ctx) return;
+        const font = theme.fontFamily ?? "monospace";
+        const measureWith = (f: string) => (s: string) => {
+          ctx.font = f;
+          return ctx.measureText(s).width;
+        };
+        const v = visible.current;
+        const values: string[] = [];
+        for (let r = v.y; r < Math.min(source.rowCount, v.y + Math.max(v.height, 50)); r++) {
+          const cell = toGridCell(source.getValue(r, src), col, cellStyle);
+          if (cell.kind === GridCellKind.Text || cell.kind === GridCellKind.Number)
+            values.push(cell.displayData);
+        }
+        const title = `${label(layout, column)} ${sortMark(sort ?? [], column)}`.trim();
+        const width = fitWidth(
+          title,
+          values,
+          {
+            header: measureWith(`${theme.headerFontStyle ?? "600 12px"} ${font}`),
+            cell: measureWith(`${theme.baseFontStyle ?? "12px"} ${font}`),
+          },
+          // Type icon + gap, and the menu button.
+          { padding: theme.cellHorizontalPadding ?? 8, headerExtra: 26 + MENU_BUTTON_WIDTH },
+        );
+        onLayoutChange(setWidth(layout, column, width));
+      },
     }),
-    [source, height],
+    [
+      source,
+      height,
+      headerHeight,
+      layout,
+      onLayoutChange,
+      theme,
+      cellStyle,
+      sort,
+      selection,
+      shown,
+      nameAt,
+    ],
   );
 
   const digits = String(source.rowCount).length;
@@ -218,23 +441,43 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         getCellsForSelection={getCellsForSelection}
         gridSelection={selection}
         onGridSelectionChange={setSelection}
-        onHeaderMenuClick={onHeaderMenu}
+        onHeaderMenuClick={(col, bounds) => {
+          const name = nameAt(col);
+          if (name !== undefined) onHeaderMenu?.(name, bounds);
+        }}
+        onHeaderClicked={(col, e) => {
+          if (!onHeaderClick) return;
+          // The menu button has its own handler.
+          if (onHeaderMenu && e.localEventX > e.bounds.width - MENU_BUTTON_WIDTH) return;
+          e.preventDefault(); // sort instead of selecting the column
+          // Glide selected the column on mouse down; a sort click shouldn't.
+          setSelection(emptySelection);
+          const name = nameAt(col);
+          if (name !== undefined) onHeaderClick(name, e.shiftKey);
+        }}
         onHeaderContextMenu={(col, e) => {
           if (!onHeaderMenu) return;
           e.preventDefault();
-          onHeaderMenu(col, e.bounds); // client coordinates, like the menu click
+          const name = nameAt(col);
+          // Client coordinates, like the menu click.
+          if (name !== undefined) onHeaderMenu(name, e.bounds);
         }}
         onColumnResize={(column, newSize) =>
-          setWidths((w) => ({ ...w, [column.id ?? column.title]: newSize }))
+          onLayoutChange?.(setWidth(layout, column.id ?? column.title, newSize))
         }
+        onColumnMoved={
+          onLayoutChange ? (from, to) => onLayoutChange(move(layout, from, to)) : undefined
+        }
+        drawCell={drawCell}
+        drawHeader={drawHeader}
         rowMarkers="number"
         rowMarkerWidth={Math.max(40, digits * 8 + 20)}
         rowHeight={height}
-        headerHeight={HEADER_HEIGHT}
+        headerHeight={headerHeight}
         smoothScrollX
         smoothScrollY
         theme={theme}
-        freezeColumns={0}
+        freezeColumns={pinnedCount(layout)}
         keybindings={{ search: false, selectAll: true, copy: true }}
       />
     </div>

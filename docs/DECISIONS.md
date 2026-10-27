@@ -244,3 +244,74 @@ file states explicitly, and BigView shows NULL and empty text differently.
 We read CSV/TSV with `allow_quoted_nulls = false`: an unquoted empty field is
 NULL and `""` is an empty string. The cache format version was bumped so
 files imported before the change are imported again.
+
+## D29 — Sorted views: first and last rows first, full sort in the background
+
+A sort has to read every row, and writing 50M sorted rows takes 20–40 s on
+a 4-core machine — over the 10 s budget. What the user needs first is the
+top of the sort (and often the bottom), which DuckDB answers with a single
+scan using a top-N heap (about 1 s). So a sorted view writes its first
+10,000 rows at once and opens; a background job then writes the last 10,000
+(from the exact reverse order: every key flipped, NULLs first, tiebreak
+descending) and finally the full sort into the session's scratch database,
+and the dataset switches to that table. Pages in the head or tail are served
+immediately; pages in the middle wait for the full table. A `view-ready`
+event tells the UI when it is done ("first rows in …, sorting the rest…" →
+"sorted in …").
+
+Filter-only views are counted immediately (and read through their query)
+and written out in the background too, so deep pages get fast without
+delaying the count. Views live in a scratch database on disk (compressed,
+not counted against the memory limit) that is deleted on exit; leftovers
+from a crash are removed at the next start. Ties keep file order for
+imported tables (rowid tiebreak).
+
+Sorting only the row ids (15.6 s) and joining back for each page was
+rejected: pages took over a second each.
+
+## D30 — Column profiles from one aggregate query per column, not SUMMARIZE
+
+The plan suggests DuckDB's `SUMMARIZE`. It profiles every column of a
+relation at once, computing approximate quantiles and `approx_unique` for
+all of them, so profiling one column of a 9-column, 50M-row view pays for
+all nine. Instead a profile runs three queries over the view (filters and
+search, no sort): one aggregate (count, non-null count, min, max, mean,
+sample std dev, distinct — exact up to 10M rows, HyperLogLog above, marked
+"≈"), a fixed-width histogram, and the 10 most common values, grouped by the
+typed value and cast to text only for the rows kept. Each column takes
+0.4–2.8 s on 50M rows (budget < 3 s).
+
+Header mini-histograms use the same histogram query for every number, date
+and boolean column, after a single scan for all their ranges. They are
+exact (not sampled) and load behind the grid; the headers grow from 32 to
+46 px to fit them, and the status bar has a toggle to turn them off
+(persisted).
+
+## D31 — "Copy as SQL" reads the file itself; copy and cancel rules
+
+"Copy view as SQL" must run as-is in plain DuckDB and give the rows on
+screen, so it cannot name the app's cache table. It selects from the file's
+own reader call (`read_csv(...)` with the detected dialect, `read_json`,
+`read_parquet`) with every value inlined as a literal (`?` inside quoted
+strings and identifiers left alone), the shown columns in display order
+under their display names, and, when sorted, a `row_number() OVER ()`
+tiebreak so equal keys keep file order as they do in the app (rowid). Tests
+run the copied SQL in a fresh DuckDB connection and compare every value
+with the app's view, ties included.
+
+Excel sheets are read with DuckDB's `excel` extension (`read_xlsx`): the
+rows below the header (`header = false`, an open-ended `range`), blank rows
+dropped as the import does, each column aliased to the app's name, and
+integer columns cast back from DOUBLE. An on-demand test downloads the
+extension and checks it against the app's import cell by cell. DuckDB can't
+read `.xls`, so for those the SQL names the sheet as a table to load first.
+
+Copying a selection as CSV/TSV/JSON/Markdown/SQL INSERT reads the rows
+through the grid's page cache in chunks of 5,000 and stops at 100,000 rows
+(the status bar says so); bigger extracts belong to Export (v0.3).
+Shift+Ctrl+C opens the command palette already filtered to "Copy ".
+
+Cancel (status bar or palette) abandons a view still being computed: the
+tab goes back to the rows on screen and the filters they were computed for.
+For a sort finishing in the background (D29) it drops the sort and keeps
+filters and search, since a half-written sort can't page its middle rows.

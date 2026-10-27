@@ -12,15 +12,17 @@ use bigview_lib::sources::{OpenOptions, Source};
 use bigview_lib::view::{Filter, FilterOp, ViewSpec};
 
 #[derive(Debug)]
-struct Person {
-    name: Option<String>,
-    city: Option<String>,
-    amount: Option<f64>,
-    joined: Option<String>,
-    active: Option<bool>,
+pub(crate) struct Person {
+    pub id: i64,
+    pub name: Option<String>,
+    pub city: Option<String>,
+    pub amount: Option<f64>,
+    pub joined: Option<String>,
+    pub active: Option<bool>,
 }
 
-fn people() -> Vec<Person> {
+/// The rows of `fixtures/csv/people.csv`, parsed independently of DuckDB.
+pub(crate) fn people() -> Vec<Person> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/csv/people.csv");
     let text = std::fs::read_to_string(path).unwrap();
     let opt = |s: &str| (!s.is_empty()).then(|| s.to_string());
@@ -30,6 +32,7 @@ fn people() -> Vec<Person> {
             let f: Vec<&str> = line.split(',').collect();
             assert_eq!(f.len(), 6, "{line}");
             Person {
+                id: f[0].parse().unwrap(),
                 // `""` is an empty string; an empty field is NULL.
                 name: if f[1] == "\"\"" {
                     Some(String::new())
@@ -45,14 +48,15 @@ fn people() -> Vec<Person> {
         .collect()
 }
 
-struct Fx {
-    engine: Engine,
-    dataset: Dataset,
-    people: Vec<Person>,
+pub(crate) struct Fx {
+    pub engine: Engine,
+    pub dataset: Dataset,
+    pub people: Vec<Person>,
     _tmp: tempfile::TempDir,
 }
 
-fn fx() -> Fx {
+/// people.csv imported into the cache, as the app does.
+pub(crate) fn fx() -> Fx {
     let tmp = tempfile::tempdir().unwrap();
     let engine = Engine::open_in_memory(&EngineConfig {
         memory_limit_bytes: 1 << 30,
@@ -647,4 +651,58 @@ fn filters_on_parquet_queried_in_place() {
         .unwrap();
     assert_eq!(values.values.len(), 1);
     assert_eq!(values.values[0].count, 200);
+}
+
+/// Global search: case-insensitive "contains" over the text columns only,
+/// with SQL-special characters taken literally, combined with filters and
+/// sorting.
+#[test]
+fn search_covers_text_columns_literally() {
+    let fx = fx();
+    let count = |search: &str, filters: Vec<Filter>| {
+        fx.engine
+            .open_view(
+                &fx.dataset.id,
+                &ViewSpec {
+                    search: Some(search.into()),
+                    filters,
+                    ..ViewSpec::default()
+                },
+                &RequestKey::default(),
+            )
+            .unwrap()
+            .dataset
+            .row_count
+    };
+    let hit = |p: &Person, s: &str| {
+        let s = s.to_lowercase();
+        lower(p).contains(&s) || p.city.as_deref().unwrap_or("").to_lowercase().contains(&s)
+    };
+    for term in ["smith", "PARIS", "ø", "東京", "o'n", "an"] {
+        let want = fx.expect(|p| hit(p, term));
+        assert!(want > 0, "{term}");
+        assert_eq!(count(term, vec![]), want, "search {term:?}");
+    }
+    // LIKE wildcards and quotes are plain characters.
+    for term in ["%", "_", "'", "\"", "\\", "a%n"] {
+        assert_eq!(
+            count(term, vec![]),
+            fx.expect(|p| hit(p, term)),
+            "search {term:?}"
+        );
+    }
+    // Numbers and dates are not searched.
+    assert_eq!(count("882.05", vec![]), 0);
+    assert_eq!(count("2024-", vec![]), 0);
+    // Search + filter.
+    let active = f(
+        "active",
+        FilterOp::Equals {
+            value: Param::Bool(true),
+        },
+    );
+    assert_eq!(
+        count("müller", vec![active]),
+        fx.expect(|p| hit(p, "müller") && p.active == Some(true))
+    );
 }

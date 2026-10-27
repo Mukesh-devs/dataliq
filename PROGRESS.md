@@ -254,3 +254,125 @@ tested, and anything left over.
   type "par", Enter → "167 of 1,000 rows · filtered in 2 ms" (167 matches the CSV); a second
   boolean filter from the header with Enter.
 - Left over: deep pages of a filtered view use LIMIT/OFFSET until step 3 materializes views.
+
+### Step 3 — Multi-column sort with materialized view paging ✅
+
+- Sort from the header: click sorts by a column (ascending → descending → off), Shift+click adds
+  it as the next key; arrows (numbered for several keys) in the headers. The header menu (▼ or
+  right-click) has sort ascending/descending, add to / remove from sort, and Filter…. Sort chips
+  in the toolbar reverse or remove a key. Clearing the view cancels a sort still running.
+- Views are written to a session-only scratch database (D29): a sorted view writes its first
+  10,000 rows at once (~1 s on 50M rows), then its last 10,000 and the full sort in the
+  background, switching over transparently; filter-only views are counted at once and written
+  out in the background. Stable paging (rowid ranges on the written table; ties in file order).
+  Closing a view drops its tables; a newer view in the tab cancels an older one.
+- Merged v0.1.0 + steps 1–2 into `main` (mukesh-dsnl/dataliq#1, merge commit).
+- Tested: integration tests for exact order (NULLs last, stable ties) on people.csv, multi-key
+  sorts with filters, head/tail/middle paging on 30,000 rows (middle waits for the full sort),
+  background materialization, cleanup and cancellation, Parquet in place; unit tests for the
+  reversed order; Vitest for sort toggling, the column menu, sort chips and the store (view-ready,
+  cancelling); Playwright for header click / Shift+click / chips / column menu. Perf: see
+  docs/BENCHMARKS.md (filter budget met; full 50M sort 20–37 s in the background, first rows ~1 s).
+- Smoke (real app, people.csv): clicking "amount" twice → "1,000 of 1,000 rows · sorted in 5 ms"
+  with 998.5, 998.18, … at the top, ↓ in the header and an "amount ↓" chip; Shift+click "city"
+  added a second key (↓1 / ↑2, chips "1. amount" "2. city"). Found and fixed: a sort click also
+  selected the column.
+- Left over: none for this step.
+
+### Step 4 — Global search with highlighted matches ✅
+
+- Search box at the right of the toolbar (Ctrl+F focuses it): rows where any text column contains
+  the text, case-insensitively, combined with filters and sort (`ViewSpec.search`, bound as a
+  parameter; LIKE wildcards and quotes are literal). Debounced typing, Enter searches at once,
+  Escape / × clears. Matches are highlighted behind the text in text cells (a `--match` token per
+  theme), never in null / "" markers, numbers or dates.
+- Tested: Rust (people.csv: case, unicode, apostrophes, `%` `_` `'` `"` `\` literal, numbers and
+  dates not searched, search + filter); Vitest (match finding incl. Unicode lower-casing that
+  changes length, painting offsets, the search box's debounce / Enter / Escape); Playwright
+  (Ctrl+F, one request after typing, search + filter, Escape keeps the filter).
+- Smoke (real app, people.csv): Ctrl+F, "smith" → "300 of 1,000 rows · filtered in 12 ms" (300
+  matches the file), "smith"/"Smith" highlighted in the name column only.
+- Left over: none.
+
+### Step 5 — Column management ✅
+
+- Per-tab column layout (`src/lib/layout.ts`): display order, hidden and pinned columns, display
+  names, widths. Display only: filters, sorting and SQL keep the real names; the grid maps shown
+  columns to the data without re-querying. Reset when import settings change the columns.
+- Header menu: Pin to the left / Unpin, Hide column (never the last one), Rename… (popover with
+  Reset), Auto-fit width (header + rows on screen, 50–500 px). Drag a header to move it; dropping
+  into the pinned block pins it (Glide `freezeColumns`). Sidebar "Columns": every column in
+  display order with a show/hide checkbox, pin marker, "N of M shown" and Show all.
+- Tested: Vitest for the layout model (hidden columns keep their place, pin order, drag in/out of
+  the pinned block, reconcile with new columns, width limits, fit width), the menu items, rename
+  popover and sidebar list; Playwright for hide from the menu / show from the sidebar / Show
+  all, pin, rename, dragging a header and auto-fit.
+- Smoke (real app, people.csv): pinned "amount" from its menu → first column, pin marker in the
+  sidebar; Auto-fit on "name" narrowed it to fit "O'Neil Nakamura".
+- Left over: none.
+
+### Step 6 — Column profile ✅
+
+- `column_profile` (Rust, `src-tauri/src/view/profile.rs`): over the view's filters and search
+  (not its sort), one aggregate query (rows, nulls, distinct — exact up to 10M rows, HyperLogLog
+  above, shown with "≈" — min, max, mean, std dev), a histogram (20 equal bars, or one bar per
+  value for small integer ranges; dates and timestamps binned by epoch seconds) and the 10 most
+  common values. Cancellable per tab (`profile:<tab>` group). D30 explains why not `SUMMARIZE`.
+- Side panel from the header menu ("Column profile"): stats, distribution with edges formatted by
+  type, most common values with share bars; follows filter and search changes, keeps the last
+  result on screen while the next loads.
+- Header mini-histograms for every number, date and boolean column (`column_histograms`: one scan
+  for all ranges, then one per column), drawn under the titles through Glide's `drawHeader`;
+  headers grow to 46 px. Toggle in the status bar (persisted).
+- 50M rows: profiles 0.4–2.8 s per column (budget < 3 s, met), header histograms 4.0 s for 7
+  columns in the background. Grouping top values by the typed value instead of its text took a
+  near-unique timestamp from 7.5 s to 2.8 s.
+- Tested: Rust against statistics computed independently from people.csv (counts, nulls, exact
+  distinct, min/max/mean/std dev, histogram bars with the same edges, top values with ties, with
+  filters, booleans, dates, all-null and empty views, edge cases of the header query); Vitest
+  for value formatting, the panel and the header bar geometry; Playwright for the header charts
+  (screenshots with and without), the toggle, and a profile that follows a new filter.
+- Smoke (real app, people.csv): bars under id, amount, joined and active; "Column profile" on
+  amount → 1,000 rows, 20 nulls (2.0%), 974 distinct, −98.46 … 998.5, mean 454.8815, 19 ms.
+- Left over: none.
+
+### Step 7 — Productivity ✅
+
+- Command palette (Ctrl+K, or the search box in the tab bar): every action — open, recent files,
+  tabs, theme, header histograms, clear cache, search, go to row, clear filters/sort/search,
+  show all columns, filter / sort / profile any column, copy as …, copy view as SQL, cancel —
+  found by words in any order, run with Enter; shortcuts shown next to them. Components register
+  their commands while mounted (`stores/commands.ts`).
+- Copy selection as CSV, TSV, JSON, Markdown table or SQL INSERT (Shift+Ctrl+C opens the palette
+  on "Copy "): shown columns with display names, typed JSON values, typed SQL literals; rows read
+  through the page cache in 5,000-row chunks, up to 100,000 rows (D31). Ctrl+C still copies TSV.
+- Copy view as SQL (`view_sql`): the view over the file's own reader call with every value
+  inlined, display names as aliases and a file-order tiebreak for sorts; Excel through DuckDB's
+  `read_xlsx` (D31). Runs as-is in plain DuckDB.
+- Cancel in the status bar while a view runs (back to the rows on screen) and "Stop sorting"
+  while a sort finishes in the background (keeps filters). Status bar timings: preview, import,
+  filter/sort ("first rows in …", "sorted in …"), and notices such as "Copied 2 rows as CSV".
+- Tested: Rust — the copied SQL run in a fresh DuckDB matches the app's view value for value
+  (filters of every kind, search, ties in sorts, chosen columns), display-name aliases, `?`
+  inside quoted text, and (on demand, downloads the extension) the Excel reader against the
+  import; Vitest — every copy format, chunked row reading, command matching and registration,
+  the palette's keyboard use, status bar notices and the cancel button, the store's cancel rules;
+  Playwright — palette sort, copy as Markdown/JSON from a selection, copy view as SQL, cancel.
+- Smoke (real app, people.csv): Ctrl+K → "sort by amount desc" → Enter sorted the grid; "view as
+  sql" copied a query that plain DuckDB ran with the same first rows (971, 58, 883).
+- Left over: none.
+
+### v0.2.0 release ✅
+
+- Version test list: all Rust unit + integration tests (incl. the copied-SQL equivalence tests),
+  Vitest, Playwright flows (filters, sort, search, columns, profile, palette, copy, cancel),
+  Tauri debug build; on demand: `perf_views_50m`, `perf_profile_50m`, `perf_sort_strategies`,
+  `excel_reader_sql_reads_the_same_table_in_duckdb`, `bench_small`.
+- Measured (docs/BENCHMARKS.md): filters on 50M rows 0.06–0.79 s to first rows and count; sorts
+  0.8–1.2 s to first and last rows (full sort 20–37 s in the background, D29); column profiles
+  0.44–2.78 s; the small suite unchanged from v0.1.0 when both are run on the same machine today.
+- Done criteria: a subset of a 50M-row file is found in seconds (filters, search, value lists,
+  sorted ends); "Copy view as SQL" reproduces the view exactly — tests run the copied SQL in a
+  fresh DuckDB and compare every value, order of ties included.
+- Left over: the full 50M-row sort stays over 10 s on 4 cores (D29) and goes to the v1.0
+  performance pass with the per-OS budgets.

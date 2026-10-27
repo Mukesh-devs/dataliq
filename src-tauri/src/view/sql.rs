@@ -14,22 +14,35 @@ use crate::sources::ColumnMeta;
 pub struct Relation {
     pub sql: String,
     pub params: Vec<Param>,
+    /// Expression giving the file order (e.g. `rowid`), appended to every
+    /// sort so rows with equal keys keep their original order.
+    pub row_order: Option<String>,
 }
 
 impl Relation {
     pub fn of(source: &DatasetSource) -> Relation {
         match source {
-            DatasetSource::Table(name) => Relation {
+            DatasetSource::Table(name) | DatasetSource::Materialized { table: name } => Relation {
                 sql: name.clone(),
                 params: Vec::new(),
+                row_order: Some("rowid".into()),
             },
+            // Ties keep DuckDB's order here; the view is written to a table
+            // once, so its pages stay stable either way.
             DatasetSource::Query { sql, params } => Relation {
                 sql: sql.clone(),
                 params: params.clone(),
+                row_order: None,
+            },
+            DatasetSource::Sorting { select, params, .. } => Relation {
+                sql: format!("({select})"),
+                params: params.clone(),
+                row_order: None,
             },
             DatasetSource::Parquet { path } => Relation {
                 sql: "read_parquet(?)".into(),
                 params: vec![Param::Text(path.clone())],
+                row_order: None,
             },
         }
     }
@@ -42,6 +55,10 @@ pub struct BuiltView {
     pub select: String,
     /// `SELECT count(*) FROM <relation> [WHERE ...]`
     pub count: String,
+    /// `select` in exactly the opposite order (every key and the tiebreak
+    /// flipped, NULLs first), when the view is sorted: its first rows are the
+    /// view's last rows. Same `params`.
+    pub reversed: Option<String>,
     pub params: Vec<Param>,
 }
 
@@ -72,23 +89,102 @@ pub fn build_at(
     if let Some(text) = spec.search.as_deref().filter(|s| !s.is_empty()) {
         conditions.push(b.search(text));
     }
-    let order = b.order_by(&spec.sort)?;
+    let mut order = b.order_by(&spec.sort, false)?;
+    let mut reversed = b.order_by(&spec.sort, true)?;
+    if let (false, Some(row_order)) = (order.is_empty(), &relation.row_order) {
+        order.push_str(&format!(", {row_order}"));
+        reversed.push_str(&format!(", {row_order} DESC"));
+    }
 
     let mut from = format!("FROM {}", relation.sql);
     if !conditions.is_empty() {
         from.push_str(" WHERE ");
         from.push_str(&conditions.join(" AND "));
     }
-    let mut select = format!("SELECT {projection} {from}");
-    if !order.is_empty() {
-        select.push_str(" ORDER BY ");
-        select.push_str(&order);
-    }
+    let select = format!("SELECT {projection} {from}");
+    let (select, reversed) = if order.is_empty() {
+        (select, None)
+    } else {
+        (
+            format!("{select} ORDER BY {order}"),
+            Some(format!("{select} ORDER BY {reversed}")),
+        )
+    };
     Ok(BuiltView {
         select,
         count: format!("SELECT count(*) {from}"),
+        reversed,
         params: b.params,
     })
+}
+
+/// The view as one standalone statement over `reader`, a table expression
+/// with literal values such as `read_csv('/data/a.csv', delim = ';')`: the
+/// shown columns in order (`spec.columns`, else all) under their display
+/// names (`labels`), then filters, search and sort, with every value inlined.
+/// Rows with equal sort keys keep file order, as in the app. For "Copy as
+/// SQL": it runs as-is in plain DuckDB and gives the rows of the view.
+pub fn standalone_sql(
+    spec: &ViewSpec,
+    reader: &str,
+    schema: &[ColumnMeta],
+    labels: &std::collections::HashMap<String, String>,
+    today: NaiveDate,
+) -> Result<String> {
+    let mut b = Builder {
+        schema,
+        params: Vec::new(),
+        today,
+    };
+    let names: Vec<String> = match &spec.columns {
+        Some(c) => c.clone(),
+        None => schema.iter().map(|c| c.name.clone()).collect(),
+    };
+    if names.is_empty() {
+        return Err(AppError::Query(
+            "Choose at least one column to show.".into(),
+        ));
+    }
+    let mut projection = Vec::with_capacity(names.len());
+    for name in &names {
+        let q = quote_ident(&b.column(name)?.name);
+        projection.push(match labels.get(name).filter(|l| *l != name) {
+            Some(l) => format!("{q} AS {}", quote_ident(l)),
+            None => q,
+        });
+    }
+    let mut conditions = Vec::new();
+    for f in &spec.filters {
+        conditions.push(b.filter(f)?);
+    }
+    if let Some(text) = spec.search.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push(b.search(text));
+    }
+    let mut order = b.order_by(&spec.sort, false)?;
+
+    let mut sql = format!("SELECT {}\n", projection.join(", "));
+    if order.is_empty() {
+        sql.push_str(&format!("FROM {reader}"));
+    } else {
+        // Number the rows in file order (an unused name) as the tiebreak.
+        let mut row = "bigview_row".to_string();
+        while schema.iter().any(|c| c.name == row) {
+            row.insert(0, '_');
+        }
+        let row = quote_ident(&row);
+        sql.push_str(&format!(
+            "FROM (SELECT *, row_number() OVER () AS {row} FROM {reader})"
+        ));
+        order.push_str(&format!(", {row}"));
+    }
+    if !conditions.is_empty() {
+        sql.push_str(&format!("\nWHERE {}", conditions.join("\n  AND ")));
+    }
+    if !order.is_empty() {
+        sql.push_str(&format!("\nORDER BY {order}"));
+    }
+    sql.push(';');
+    Ok(crate::engine::sql::inline_params(&sql, &b.params))
 }
 
 struct Builder<'a> {
@@ -141,12 +237,18 @@ impl Builder<'_> {
         Ok(out.join(", "))
     }
 
-    fn order_by(&self, keys: &[SortKey]) -> Result<String> {
+    /// `ORDER BY` keys, NULLS LAST; `reversed` gives the exact opposite order.
+    fn order_by(&self, keys: &[SortKey], reversed: bool) -> Result<String> {
         let mut out = Vec::with_capacity(keys.len());
         for k in keys {
             let col = quote_ident(&self.column(&k.column)?.name);
-            let dir = if k.descending { "DESC" } else { "ASC" };
-            out.push(format!("{col} {dir} NULLS LAST"));
+            let dir = if k.descending != reversed {
+                "DESC"
+            } else {
+                "ASC"
+            };
+            let nulls = if reversed { "FIRST" } else { "LAST" };
+            out.push(format!("{col} {dir} NULLS {nulls}"));
         }
         Ok(out.join(", "))
     }
@@ -304,6 +406,7 @@ mod tests {
         Relation {
             sql: "\"ds\".\"main\".\"data\"".into(),
             params: vec![],
+            row_order: Some("rowid".into()),
         }
     }
 
@@ -540,6 +643,36 @@ mod tests {
             columns: Some(vec!["name".into(), "amount".into(), "id".into()]),
         };
         insta::assert_snapshot!(sql_for(&spec));
+    }
+
+    #[test]
+    fn reversed_order_is_the_exact_opposite() {
+        let spec = ViewSpec {
+            sort: vec![
+                SortKey {
+                    column: "joined".into(),
+                    descending: true,
+                },
+                SortKey {
+                    column: "name".into(),
+                    descending: false,
+                },
+            ],
+            ..ViewSpec::default()
+        };
+        let v = build_at(&spec, &table(), &schema(), today()).unwrap();
+        assert!(
+            v.select
+                .ends_with("ORDER BY \"joined\" DESC NULLS LAST, \"name\" ASC NULLS LAST, rowid")
+        );
+        assert_eq!(
+            v.reversed.unwrap(),
+            "SELECT * FROM \"ds\".\"main\".\"data\" \
+             ORDER BY \"joined\" ASC NULLS FIRST, \"name\" DESC NULLS FIRST, rowid DESC"
+        );
+        // Unsorted views have no reverse.
+        let plain = build_at(&ViewSpec::default(), &table(), &schema(), today()).unwrap();
+        assert_eq!(plain.reversed, None);
     }
 
     #[test]

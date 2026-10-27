@@ -1,5 +1,6 @@
 import { FileUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CommandPalette } from "../components/palette/CommandPalette";
 import { EmptyState } from "../components/shell/EmptyState";
 import { FileView } from "../components/shell/FileView";
 import { Sidebar } from "../components/shell/Sidebar";
@@ -14,12 +15,25 @@ import {
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
+import { modKey } from "../lib/platform";
+import { onViewReady } from "../lib/view";
 import { useApp } from "../stores/app";
+import { useRegisterCommands, type Command } from "../stores/commands";
+import { useSettings, type ThemePreference } from "../stores/settings";
 import { useEngine } from "../stores/engine";
 import { useRecent } from "../stores/recent";
 import { useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
+
+/** "filtered", "sorted" or "filtered and sorted", for the status bar. */
+function viewVerb(tab: Tab): { ed: string; ing: string } {
+  const filtered = (tab.view?.filters?.length ?? 0) > 0 || !!tab.view?.search;
+  const sorted = (tab.view?.sort?.length ?? 0) > 0;
+  if (filtered && sorted) return { ed: "filtered and sorted", ing: "filtering and sorting" };
+  if (sorted) return { ed: "sorted", ing: "sorting" };
+  return { ed: "filtered", ing: "filtering" };
+}
 
 function statusMessage(tab: Tab | undefined, engineVersion: string | null): string {
   const parts: string[] = [];
@@ -33,10 +47,14 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     const v = tab.viewState;
     const rows = v.dataset ? formatCount(v.dataset.rowCount) : "";
     parts.push(`${rows} of ${formatCount(v.totalRows ?? tab.info.dataset.rowCount)} rows`);
-    if (v.status === "running") parts.push("filtering…");
-    else parts.push(`filtered in ${formatDuration(v.elapsedMs ?? 0)}`);
+    const verb = viewVerb(tab);
+    if (v.status === "running") parts.push(`${verb.ing}…`);
+    else if (v.sorting)
+      parts.push(`first rows in ${formatDuration(v.elapsedMs ?? 0)}, sorting the rest…`);
+    else parts.push(`${verb.ed} in ${formatDuration(v.fullMs ?? v.elapsedMs ?? 0)}`);
   } else if (tab.viewState?.status === "running") {
-    parts.push("Filtering…");
+    const ing = viewVerb(tab).ing;
+    parts.push(`${ing[0]!.toUpperCase()}${ing.slice(1)}…`);
   } else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
     if (tab.import?.fromCache) parts.push("from cache");
@@ -72,6 +90,15 @@ export function App() {
     useTabs();
   const applyProgress = useTabs((s) => s.applyProgress);
   const setView = useTabs((s) => s.setView);
+  const setLayout = useTabs((s) => s.setLayout);
+  const applyViewReady = useTabs((s) => s.applyViewReady);
+  const cancelView = useTabs((s) => s.cancelView);
+  const clearCache = useApp((s) => s.clearCache);
+  const setTheme = useSettings((s) => s.setTheme);
+  const headerCharts = useSettings((s) => s.headerCharts);
+  const setHeaderCharts = useSettings((s) => s.setHeaderCharts);
+  // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
+  const [palette, setPalette] = useState<{ query: string } | null>(null);
   const engineVersion = useEngine((s) => s.version);
   const probeEngine = useEngine((s) => s.probe);
   const loadApp = useApp((s) => s.load);
@@ -108,12 +135,92 @@ export function App() {
       },
       nextTab: () => cycle(1),
       previousTab: () => cycle(-1),
+      commandPalette: () => setPalette({ query: "" }),
+      copyAs: () => setPalette({ query: "Copy " }),
     }),
     [openFile, close, cycle],
   );
   useShortcuts(shortcuts);
 
+  // App-wide commands; the open file adds its own (FileView).
+  const commands = useMemo<Command[]>(() => {
+    const list: Command[] = [
+      {
+        id: "open-file",
+        title: "Open file…",
+        group: "File",
+        shortcut: `${modKey}+O`,
+        run: shortcuts.openFile,
+      },
+    ];
+    if (activeId) {
+      list.push(
+        {
+          id: "close-tab",
+          title: "Close tab",
+          group: "Tabs",
+          shortcut: `${modKey}+W`,
+          run: shortcuts.closeTab,
+        },
+        {
+          id: "next-tab",
+          title: "Next tab",
+          group: "Tabs",
+          shortcut: "Ctrl+Tab",
+          run: shortcuts.nextTab,
+        },
+        {
+          id: "previous-tab",
+          title: "Previous tab",
+          group: "Tabs",
+          shortcut: "Ctrl+Shift+Tab",
+          run: shortcuts.previousTab,
+        },
+      );
+    }
+    for (const file of recent) {
+      list.push({
+        id: `recent:${file.path}`,
+        title: `Open recent: ${file.name}`,
+        group: "File",
+        keywords: file.path,
+        run: () => void openPaths([file.path]),
+      });
+    }
+    const themes: [ThemePreference, string][] = [
+      ["light", "Light"],
+      ["dark", "Dark"],
+      ["system", "Follow system"],
+    ];
+    for (const [theme, name] of themes) {
+      list.push({
+        id: `theme-${theme}`,
+        title: `Theme: ${name}`,
+        group: "Appearance",
+        run: () => setTheme(theme),
+      });
+    }
+    list.push(
+      {
+        id: "header-charts",
+        title: headerCharts ? "Hide column histograms" : "Show column histograms",
+        group: "Appearance",
+        keywords: "header charts",
+        run: () => setHeaderCharts(!headerCharts),
+      },
+      {
+        id: "clear-cache",
+        title: "Clear cache",
+        group: "App",
+        run: () => void clearCache(),
+      },
+    );
+    return list;
+  }, [shortcuts, activeId, recent, openPaths, setTheme, headerCharts, setHeaderCharts, clearCache]);
+  useRegisterCommands("app", commands);
+
   useSubscription(useMemo(() => () => onImportProgress(applyProgress), [applyProgress]));
+  useSubscription(useMemo(() => () => onViewReady(applyViewReady), [applyViewReady]));
   // A second `bigview <files>` launch forwards its files here.
   useSubscription(useMemo(() => () => onOpenFiles((p) => void openPaths(p)), [openPaths]));
   useSubscription(
@@ -152,9 +259,21 @@ export function App() {
         onSelect={setActive}
         onClose={close}
         onOpen={() => void openFile()}
+        onCommands={() => setPalette({ query: "" })}
+      />
+      <CommandPalette
+        // A fresh body (and starting text) each time it opens.
+        key={palette ? `open:${palette.query}` : "closed"}
+        open={palette !== null}
+        onOpenChange={(o) => !o && setPalette(null)}
+        initialQuery={palette?.query}
       />
       <div className="flex min-h-0 flex-1">
-        <Sidebar tabs={tabs} />
+        <Sidebar
+          tabs={tabs}
+          active={active}
+          onLayoutChange={active ? (l) => setLayout(active.id, l) : undefined}
+        />
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
           {active ? (
             <FileView
@@ -164,6 +283,7 @@ export function App() {
               onCancelImport={() => void cancelImport(active.id)}
               onReadDirect={() => void readDirect(active.id)}
               onViewChange={(v) => void setView(active.id, v)}
+              onLayoutChange={(l) => setLayout(active.id, l)}
             />
           ) : (
             <EmptyState
@@ -183,7 +303,16 @@ export function App() {
           )}
         </main>
       </div>
-      <StatusBar message={statusMessage(active, engineVersion)} />
+      <StatusBar
+        message={statusMessage(active, engineVersion)}
+        action={
+          active?.viewState?.status === "running"
+            ? { label: "Cancel", run: () => cancelView(active.id) }
+            : active?.viewState?.sorting
+              ? { label: "Stop sorting", run: () => cancelView(active.id) }
+              : undefined
+        }
+      />
     </div>
   );
 }

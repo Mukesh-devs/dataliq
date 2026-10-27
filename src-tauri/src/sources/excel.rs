@@ -57,6 +57,64 @@ impl ColType {
     }
 }
 
+/// Spreadsheet column letters for a 1-based index: 1 -> A, 27 -> AA.
+pub fn column_letters(mut n: usize) -> String {
+    let mut out = Vec::new();
+    while n > 0 {
+        let r = (n - 1) % 26;
+        out.push(b'A' + r as u8);
+        n = (n - 1) / 26;
+    }
+    out.reverse();
+    String::from_utf8(out).unwrap_or_default()
+}
+
+/// A table expression reading the same columns with DuckDB's `excel`
+/// extension, for "Copy as SQL": every row below the header except blank
+/// ones (as the import does), each column under the name used here (integer
+/// columns cast back from DOUBLE). DuckDB reads only .xlsx files; for .xls
+/// the result names the sheet as a table to load first.
+pub fn reader_sql(path: &Path, is_xlsx: bool, sheet: &Sheet) -> String {
+    if !is_xlsx {
+        return format!(
+            "{} /* DuckDB reads only .xlsx files: load this .xls sheet as a table first */",
+            quote_ident(&sheet.info.sheet)
+        );
+    }
+    let width = sheet.names.len().max(1);
+    let letters: Vec<String> = (1..=width).map(column_letters).collect();
+    let columns: Vec<String> = sheet
+        .names
+        .iter()
+        .zip(&sheet.types)
+        .zip(&letters)
+        .map(|((name, t), letter)| {
+            let src = quote_ident(letter);
+            let value = if *t == ColType::BigInt {
+                format!("CAST({src} AS BIGINT)")
+            } else {
+                src
+            };
+            format!("{value} AS {}", quote_ident(name))
+        })
+        .collect();
+    let blank: Vec<String> = letters
+        .iter()
+        .map(|l| format!("{} IS NULL", quote_ident(l)))
+        .collect();
+    let lit = |s: &str| format!("'{}'", s.replace('\'', "''"));
+    // An open-ended range ("A2:F") reads to the end of the sheet.
+    let range = format!("A{}:{}", sheet.info.header_row + 1, letters[width - 1]);
+    format!(
+        "(SELECT {} FROM read_xlsx({}, sheet = {}, header = false, range = {}, stop_at_empty = false) WHERE NOT ({}))",
+        columns.join(", "),
+        lit(&path.to_string_lossy()),
+        lit(&sheet.info.sheet),
+        lit(&range),
+        blank.join(" AND "),
+    )
+}
+
 /// A sheet read into memory: names, inferred types and data rows.
 pub struct Sheet {
     pub info: ExcelInfo,
@@ -362,6 +420,15 @@ pub fn write_table(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn column_letters_like_spreadsheets() {
+        assert_eq!(column_letters(1), "A");
+        assert_eq!(column_letters(26), "Z");
+        assert_eq!(column_letters(27), "AA");
+        assert_eq!(column_letters(702), "ZZ");
+        assert_eq!(column_letters(16_384), "XFD");
+    }
 
     #[test]
     fn civil_days() {

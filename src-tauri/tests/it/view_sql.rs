@@ -60,6 +60,7 @@ fn fixture() -> Fixture {
         relation: Relation {
             sql: "data".into(),
             params: vec![],
+            row_order: Some("rowid".into()),
         },
         schema,
         _tmp: tmp,

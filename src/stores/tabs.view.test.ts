@@ -44,6 +44,7 @@ function backend(opts: {
           return opts.openView(args);
         case "close_dataset":
         case "cancel_import":
+        case "cancel_query":
           return true;
         default:
           throw new Error(`unexpected ${cmd}`);
@@ -157,5 +158,153 @@ describe("tabs store: views", () => {
     useTabs.getState().close(tab().id);
     const closed = calls.filter((c) => c.cmd === "close_dataset").map((c) => c.args.datasetId);
     expect(closed).toEqual(expect.arrayContaining(["ds1", "view-7"]));
+  });
+});
+
+describe("tabs store: cancelling views", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("clearing the view cancels a sort still running", async () => {
+    const pending = deferred<unknown>();
+    const calls = backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => pending.promise,
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    void useTabs.getState().setView(id, { sort: [{ column: "id", descending: true }] });
+    await settle();
+    const requestId = tab().viewState?.requestId;
+    expect(tab().viewState?.status).toBe("running");
+    await useTabs.getState().setView(id, {});
+    expect(calls.find((c) => c.cmd === "cancel_query")?.args).toEqual({ requestId });
+    pending.resolve({ dataset: { id: "view-9", rowCount: 1 }, totalRows: 1000, elapsedMs: 1 });
+    await settle();
+    expect(tab().viewState).toBeUndefined();
+  });
+});
+
+describe("tabs store: cancel button", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("cancelling a running view goes back to the rows on screen", async () => {
+    const second = deferred<unknown>();
+    let n = 0;
+    const calls = backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () =>
+        ++n === 1
+          ? { dataset: { id: "view-1", rowCount: 10 }, totalRows: 1000, elapsedMs: 5 }
+          : second.promise,
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    await useTabs.getState().setView(id, { filters: [nameFilter] });
+    void useTabs.getState().setView(id, {
+      filters: [nameFilter],
+      sort: [{ column: "id", descending: true }],
+    });
+    await settle();
+    const requestId = tab().viewState?.requestId;
+    useTabs.getState().cancelView(id);
+    expect(calls.filter((c) => c.cmd === "cancel_query").map((c) => c.args)).toEqual([
+      { requestId },
+    ]);
+    // Filters of the rows on screen, not the cancelled sort.
+    expect(tab().view).toEqual({ filters: [nameFilter] });
+    expect(tab().viewState).toMatchObject({ status: "done", dataset: { id: "view-1" } });
+    // The cancelled request's answer is dropped and its dataset closed.
+    second.resolve({ dataset: { id: "view-2", rowCount: 1 }, totalRows: 1000, elapsedMs: 1 });
+    await settle();
+    expect(tab().viewState?.dataset?.id).toBe("view-1");
+    expect(calls.filter((c) => c.cmd === "close_dataset").map((c) => c.args.datasetId)).toContain(
+      "view-2",
+    );
+  });
+
+  it("cancelling the first view shows the whole file again", async () => {
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => new Promise(() => {}),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    void useTabs.getState().setView(tab().id, { filters: [nameFilter] });
+    await settle();
+    useTabs.getState().cancelView(tab().id);
+    expect(tab().view).toBeUndefined();
+    expect(tab().viewState).toBeUndefined();
+  });
+
+  it("stopping a background sort keeps the filters", async () => {
+    const specs: unknown[] = [];
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: (args) => {
+        specs.push(args.spec);
+        return {
+          dataset: { id: `view-${specs.length}`, rowCount: 10 },
+          totalRows: 1000,
+          elapsedMs: 5,
+          materializing: true,
+        };
+      },
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    await useTabs.getState().setView(id, { filters: [nameFilter], sort: [{ column: "id" }] });
+    expect(tab().viewState?.sorting).toBe(true);
+    useTabs.getState().cancelView(id);
+    await settle();
+    expect(specs.at(-1)).toEqual({ filters: [nameFilter], sort: [] });
+    expect(tab().viewState).toMatchObject({ sorting: false, dataset: { id: "view-2" } });
+  });
+});
+
+describe("tabs store: background sorts", () => {
+  beforeEach(() => useTabs.setState({ tabs: [], activeId: null }));
+  afterEach(() => clearMocks());
+
+  it("marks a big sort as still sorting until view-ready", async () => {
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => ({
+        dataset: { id: "view-3", rowCount: 1000 },
+        totalRows: 1000,
+        elapsedMs: 900,
+        materializing: true,
+      }),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    const id = tab().id;
+    await useTabs.getState().setView(id, { sort: [{ column: "id" }] });
+    expect(tab().viewState).toMatchObject({ status: "done", sorting: true, elapsedMs: 900 });
+    // Another view's event changes nothing.
+    useTabs.getState().applyViewReady({ datasetId: "view-99", elapsedMs: 1 });
+    expect(tab().viewState?.sorting).toBe(true);
+    useTabs.getState().applyViewReady({ datasetId: "view-3", elapsedMs: 31_000 });
+    expect(tab().viewState).toMatchObject({ sorting: false, fullMs: 31_000 });
+  });
+
+  it("filter-only views are never shown as sorting", async () => {
+    backend({
+      importDone: Promise.resolve({ dataset: base, fromCache: true, elapsedMs: 1 }),
+      openView: () => ({
+        dataset: { id: "view-4", rowCount: 10 },
+        totalRows: 1000,
+        elapsedMs: 5,
+        materializing: true,
+      }),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    await useTabs.getState().setView(tab().id, { filters: [nameFilter] });
+    expect(tab().viewState?.sorting).toBe(false);
   });
 });

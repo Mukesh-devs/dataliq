@@ -22,6 +22,9 @@
     "allow-get-settings",
     "allow-take-startup-files",
     "allow-open-view",
-    "allow-column-values"
+    "allow-column-values",
+    "allow-column-profile",
+    "allow-column-histograms",
+    "allow-view-sql"
   ]
 }

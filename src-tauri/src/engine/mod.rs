@@ -23,6 +23,29 @@ pub use param::Param;
 use crate::error::{AppError, Result};
 use crate::settings::Settings;
 
+/// File name prefix of scratch databases (`views-<pid>-<n>.duckdb`).
+pub const SCRATCH_PREFIX: &str = "views-";
+
+fn next_scratch() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(1);
+    N.fetch_add(1, Ordering::Relaxed)
+}
+
+/// Deletes scratch databases left in `dir` by an earlier session that did
+/// not exit cleanly. Call once at app start (the app is single-instance).
+pub fn remove_stale_scratch(dir: &std::path::Path) {
+    let own = format!("{SCRATCH_PREFIX}{}-", std::process::id());
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for e in rd.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.starts_with(SCRATCH_PREFIX) && !name.starts_with(&own) {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
+}
+
 /// Engine configuration derived from [`Settings`].
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
@@ -63,6 +86,10 @@ pub struct Engine {
     /// Root connection. Only used to create per-query connections, which
     /// share the same database; DuckDB connections are not `Sync`.
     root: Mutex<Connection>,
+    /// Session-only on-disk database for materialized views, attached on
+    /// first use and deleted when the engine is dropped.
+    scratch: Mutex<Option<PathBuf>>,
+    temp_dir: PathBuf,
     requests: RequestRegistry,
     /// Tables the grid can page through.
     pub datasets: Datasets,
@@ -94,10 +121,49 @@ impl Engine {
         let conn = unsafe { Connection::open_from_raw(raw.handle())? };
         Ok(Engine {
             root: Mutex::new(conn),
+            scratch: Mutex::new(None),
+            temp_dir: cfg.temp_dir.clone(),
             requests: RequestRegistry::default(),
             datasets: Datasets::default(),
             raw,
         })
+    }
+
+    /// Schema for session-only tables (materialized views), attached on first
+    /// use: `bv_scratch.main`. On disk, so big views are compressed and
+    /// don't count against the memory limit.
+    pub fn scratch_schema(&self) -> Result<&'static str> {
+        let mut scratch = self.scratch.lock();
+        if scratch.is_none() {
+            let path = self.temp_dir.join(format!(
+                "{SCRATCH_PREFIX}{}-{}.duckdb",
+                std::process::id(),
+                next_scratch()
+            ));
+            let _ = std::fs::remove_file(&path);
+            self.execute_batch(&format!(
+                "ATTACH '{}' AS bv_scratch",
+                path.to_string_lossy().replace('\'', "''")
+            ))?;
+            *scratch = Some(path);
+        }
+        Ok("bv_scratch.main")
+    }
+
+    /// Runs a statement that returns no rows (e.g. `CREATE TABLE … AS`),
+    /// cancellable through `key` like a query.
+    pub fn execute_keyed(&self, sql: &str, params: &[Param], key: &RequestKey) -> Result<usize> {
+        let conn = self.connection()?;
+        let guard = self.requests.register(key, conn.interrupt_handle());
+        // An interrupt only stops a running statement: check before and after.
+        if guard.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let result = conn.execute(sql, duckdb::params_from_iter(params.iter()));
+        if guard.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        Ok(result?)
     }
 
     /// A raw connection for a long statement whose progress can be polled.
@@ -198,5 +264,18 @@ impl Engine {
     /// Cancels a running request. Returns false if it was not running.
     pub fn cancel(&self, request_id: &str) -> bool {
         self.requests.cancel(request_id)
+    }
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        if let Some(path) = self.scratch.lock().take() {
+            let _ = self
+                .root
+                .lock()
+                .execute_batch("DETACH DATABASE IF EXISTS bv_scratch");
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(path.with_extension("duckdb.wal"));
+        }
     }
 }

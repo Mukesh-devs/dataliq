@@ -7,6 +7,7 @@
 //! Small benchmark suite for the CI regression guard: `node scripts/bench.mjs`
 
 mod bench_small;
+mod copy_sql;
 mod csv_sources;
 mod engine_query;
 mod excel_sources;
@@ -16,5 +17,8 @@ mod json_parquet_sources;
 mod paging;
 mod perf_import;
 mod perf_preview;
+mod perf_sort;
+mod profile;
+mod sort;
 mod ui_recordings;
 mod view_sql;

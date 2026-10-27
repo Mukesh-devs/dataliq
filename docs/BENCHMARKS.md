@@ -49,6 +49,9 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Idle memory, whole app incl. webview (release) | < 200 MB | 241 MiB PSS, of which 77 MiB private — see below | v0.1.0 |
 | Installer size (Linux) | < 40 MB | .deb 19.4 MB, .rpm 19.4 MB, .AppImage 92.5 MB — see below | v0.1.0 |
 | Grid scroll, 50M rows (Chromium, mocked backend) | ~60 fps, no blank page > 100 ms | 60 fps; page wait p95 42 ms / max 51 ms (fast scroll), p95 56 / max 77 ms (fling) | v0.1.0 |
+| Simple filter on 50M rows (first rows + count) | < 2 s | 0.06–0.79 s | v0.2 step 3 |
+| Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
+| Column stats on 50M rows | < 3 s | 0.44–2.78 s per column | v0.2 step 6 |
 
 Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
@@ -136,3 +139,74 @@ is woken when the import ends).
 
 Windows and macOS numbers (all budgets) are not measured yet: CI only builds
 and tests there. They are part of the v1.0 performance pass.
+
+## v0.2 — views on 50M cached rows (linux-dev)
+
+`cargo test -p bigview --test it perf_views_50m -- --ignored --nocapture` on
+`sales_50m.parquet` imported into a cache database (9 columns: ids, dates,
+timestamps, text, decimals, booleans). "First rows" is `open_view` plus the
+first 500-row page, i.e. what the user waits for.
+
+| View | Matching rows | First rows | Written in background | Page afterwards |
+| --- | --- | --- | --- | --- |
+| Sort by `customer` (text) desc | 50,000,000 | 1.19 s | 37.0 s | 18 ms |
+| Sort by `order_date`, `unit_price` desc | 50,000,000 | 0.81 s | 20.3 s | 16 ms |
+| Filter `quantity > 5` (broad) | 37,502,068 | 0.06 s (deep page before the write: 0.98 s) | 14.1 s | 12 ms |
+| Filter `customer` contains "ab" (text) | 0 | 0.79 s | 0.7 s | 3 ms |
+| Filter `quantity = 1` + sort `unit_price` | 2,500,387 | 0.38 s | 1.6 s | 4 ms |
+
+Budgets: **simple filter on 50M rows < 2 s — met** (0.06–0.8 s to the first
+rows and the count). **Sort 50M rows < 10 s — first and last rows met (about
+1 s), full sort missed** on this 4-vCPU machine (20–37 s; the reference
+laptop has twice the cores). The full sort runs in the background while the
+first and last 10,000 sorted rows are already on screen; only pages in the
+middle wait for it (D29).
+
+Strategies measured before choosing (`perf_sort_strategies`): a sort of only
+the row ids is faster (15.6 s) but fetching a page by id list then takes
+1.1 s; writing full sorted rows to an in-memory table instead of the on-disk
+scratch database saves little (26–55 s) and holds memory.
+
+### Small suite at v0.2.0 (linux-dev)
+
+`pnpm bench` at v0.2.0, and v0.1.0 rebuilt and run right after on the same
+machine (best of 5 runs each). The local guard flagged several flows against
+the v0.1 numbers above, but v0.1.0 itself measures the same today: the shared
+container is slower than when v0.1 was recorded, not the code.
+
+| Flow | v0.1.0 (today) | v0.2.0 |
+| --- | --- | --- |
+| first_rows_100mb_csv | 345 ms | 297 ms |
+| first_rows_100mb_csv_gz | 1,181 ms | 1,255 ms |
+| first_rows_100mb_ndjson_gz | 367 ms | 366 ms |
+| first_rows_100k_xlsx | 68 ms | 72 ms |
+| import_100mb_csv | 1,545 ms | 1,581 ms |
+| import_100mb_csv_gz | 3,161 ms | 3,292 ms |
+| import_100mb_ndjson_gz | 2,810 ms | 2,756 ms |
+| import_100k_xlsx | 1,995 ms | 1,981 ms |
+| reopen_cached_100mb_csv | 1.2 ms | 1.3 ms |
+| page_1m_parquet | 12.4 ms | 12.9 ms |
+
+The CI guard (baseline from the runner, D26) runs on the v0.2.0 tag.
+
+### Column profiles (v0.2 step 6)
+
+`cargo test -p bigview --test it perf_profile_50m -- --ignored --nocapture`, same 50M rows,
+warm cache. One profile is the stats query (count, nulls, min, max, mean, std dev, distinct —
+HyperLogLog above 10M rows), the histogram and the 10 most common values.
+
+| Column | Distinct | Profile |
+| --- | --- | --- |
+| `quantity` INTEGER | 21 | 1.21 s |
+| `unit_price` DECIMAL(10,2) | ≈ 219K | 2.21 s |
+| `order_ts` TIMESTAMP | ≈ 39.5M | 2.78 s |
+| `customer` VARCHAR | ≈ 84K | 2.19 s |
+| `country` VARCHAR | 9 | 0.44 s |
+| `returned` BOOLEAN | 2 | 0.47 s |
+| Header histograms, 7 columns (background) | — | 4.0 s |
+
+Budget: **stats < 3 s per column on 50M rows — met**. Grouping the most common values by the
+typed column and casting only the kept rows to text took `order_ts` from 7.5 s to 2.8 s (a
+near-unique column builds a 39M-entry hash table either way, but of 8-byte keys instead of
+strings). The header histograms read every column's range in one scan, then one scan per number
+or date column; they load behind the grid and are cancelled by the next view change.

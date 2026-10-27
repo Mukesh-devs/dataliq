@@ -1,8 +1,8 @@
 import * as Popover from "@radix-ui/react-popover";
-import { ListFilter, Plus, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ListFilter, Plus, X } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ColumnInfo } from "../../lib/arrow";
-import { describeFilter, type Filter } from "../../lib/view";
+import { describeFilter, type Filter, type SortKey } from "../../lib/view";
 import { Button } from "../ui/Button";
 
 interface FilterBarProps {
@@ -14,10 +14,24 @@ interface FilterBarProps {
   onClear: () => void;
   /** Start a new filter on `column`, anchored at the "Filter" button. */
   onAdd: (column: ColumnInfo, anchor: HTMLElement) => void;
+  sort?: SortKey[];
+  onSortChange?: (sort: SortKey[]) => void;
+  /** Shown at the right end of the bar (the search box). */
+  end?: ReactNode;
 }
 
 /** Toolbar with one removable chip per filter and a button to add one. */
-export function FilterBar({ filters, columns, onEdit, onRemove, onClear, onAdd }: FilterBarProps) {
+export function FilterBar({
+  filters,
+  columns,
+  onEdit,
+  onRemove,
+  onClear,
+  onAdd,
+  sort = [],
+  onSortChange,
+  end,
+}: FilterBarProps) {
   const kinds = useMemo(() => new Map(columns.map((c) => [c.name, c.kind])), [columns]);
   return (
     <div
@@ -54,11 +68,54 @@ export function FilterBar({ filters, columns, onEdit, onRemove, onClear, onAdd }
           </span>
         );
       })}
+      {sort.length > 0 && (
+        <span className="ml-1 text-[12px] text-fg-subtle" aria-hidden>
+          Sorted by
+        </span>
+      )}
+      {sort.map((k, i) => {
+        const dir = k.descending ? "descending" : "ascending";
+        const Arrow = k.descending ? ArrowDown : ArrowUp;
+        return (
+          <span
+            key={k.column}
+            className="inline-flex h-6 items-center rounded-full border border-border bg-surface-2 text-[12px] text-fg"
+          >
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-l-full pr-1 pl-2.5 hover:text-accent"
+              aria-label={`Sort by ${k.column}, ${dir} (click to reverse)`}
+              title="Reverse"
+              onClick={() =>
+                onSortChange?.(
+                  sort.map((s, j) =>
+                    j === i ? { column: s.column, descending: !s.descending } : s,
+                  ),
+                )
+              }
+            >
+              {sort.length > 1 && <span className="text-fg-subtle">{i + 1}.</span>}
+              {k.column}
+              <Arrow className="size-3" aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove sort by ${k.column}`}
+              title="Remove sort"
+              className="mr-1 inline-flex size-4 items-center justify-center rounded-full text-fg-muted hover:bg-hover hover:text-fg"
+              onClick={() => onSortChange?.(sort.filter((_, j) => j !== i))}
+            >
+              <X className="size-3" aria-hidden />
+            </button>
+          </span>
+        );
+      })}
       {filters.length > 1 && (
         <Button size="sm" variant="ghost" onClick={onClear}>
           Clear filters
         </Button>
       )}
+      {end}
     </div>
   );
 }

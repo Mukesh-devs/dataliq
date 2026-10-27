@@ -2,15 +2,47 @@ import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
-import { formatBytes } from "../../lib/format";
-import { isMac } from "../../lib/platform";
+import { formatBytes, formatCount } from "../../lib/format";
+import { COPY_FORMATS, formatRows, tableName, type CopyFormat } from "../../lib/copyAs";
+import { isMac, modKey } from "../../lib/platform";
+import { useRegisterCommands, type Command } from "../../stores/commands";
+import { useNotice } from "../../stores/notice";
+import { useTabs } from "../../stores/tabs";
 import type { Tab } from "../../stores/tabs";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
+import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
-import { columnValues, type Filter, type ViewSpec } from "../../lib/view";
+import { useSettings } from "../../stores/settings";
+import {
+  columnHistograms,
+  columnProfile,
+  columnValues,
+  statsSpec,
+  toggleSort,
+  viewSql,
+  type Bin,
+  type ColumnProfile,
+  type Filter,
+  type SortKey,
+  type ViewSpec,
+} from "../../lib/view";
+import { ProfilePanel } from "../profile/ProfilePanel";
+import { ColumnMenu } from "../filters/ColumnMenu";
+import { RenameColumn } from "../filters/RenameColumn";
+import {
+  label,
+  reconcile,
+  rename,
+  setHidden,
+  setPinned,
+  showAll,
+  visible,
+  type ColumnLayout,
+} from "../../lib/layout";
 import { FilterBar } from "../filters/FilterBar";
+import { SearchBox } from "../filters/SearchBox";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
 import { ExcelSettings } from "../import/ExcelSettings";
 import { ImportBar } from "../import/ImportBar";
@@ -22,6 +54,7 @@ interface FileViewProps {
   onCancelImport?: () => void;
   onReadDirect?: () => void;
   onViewChange?: (view: ViewSpec) => void;
+  onLayoutChange?: (layout: ColumnLayout) => void;
 }
 
 /** The filter editor being shown: a new filter on `column`, or filter `index`. */
@@ -34,6 +67,19 @@ interface Editing {
 const rectAnchor = (r: { x: number; y: number; width: number; height: number }): Anchor => ({
   getBoundingClientRect: () => new DOMRect(r.x, r.y, r.width, r.height),
 });
+
+const CHART_KINDS = new Set(["integer", "number", "date", "timestamp", "boolean"]);
+const NO_CHARTS: ReadonlyMap<string, Bin[]> = new Map();
+
+/** Where editors opened from the palette appear: over the grid's top left. */
+const gridAnchor = (): Anchor => ({
+  getBoundingClientRect: () => {
+    const r = document.querySelector("[data-testid='data-grid']")?.getBoundingClientRect();
+    return new DOMRect((r?.x ?? 0) + 60, r?.y ?? 0, 1, 32);
+  },
+});
+
+const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
 
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
 
@@ -63,6 +109,7 @@ export function FileView({
   onCancelImport,
   onReadDirect,
   onViewChange,
+  onLayoutChange,
 }: FileViewProps) {
   const source = useRowSource(tab);
   const columns = useMemo(() => (tab.preview ? describeColumns(tab.preview) : []), [tab.preview]);
@@ -70,6 +117,26 @@ export function FileView({
   const filters = useMemo(() => view.filters ?? [], [view]);
   const filtered = useMemo(() => new Set(filters.map((f) => f.column)), [filters]);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
+  const [renaming, setRenaming] = useState<{ column: string; anchor: Anchor } | null>(null);
+  const [profiled, setProfiled] = useState<string | null>(null);
+  // The last profile result and what it was computed for (column + view).
+  const [profile, setProfile] = useState<{
+    key: string;
+    column: string;
+    data?: ColumnProfile;
+    error?: string;
+  } | null>(null);
+  const layout = useMemo(
+    () =>
+      reconcile(
+        tab.layout,
+        columns.map((c) => c.name),
+      ),
+    [tab.layout, columns],
+  );
+  const sort = useMemo(() => view.sort ?? [], [view]);
+  const setSort = (next: SortKey[]) => onViewChange?.({ ...view, sort: next });
   const baseId = tab.info?.dataset?.id;
   const setFilters = (next: Filter[]) => onViewChange?.({ ...view, filters: next });
   const editColumn = editing?.column.name;
@@ -81,19 +148,273 @@ export function FileView({
         : undefined,
     [baseId, editColumn, view, tab.id],
   );
+  // The open profile follows the view's filters and search (not its sort).
+  const statsKey = JSON.stringify(statsSpec(view));
+  const profileKey = `${profiled}\u0000${baseId}\u0000${statsKey}`;
+  useEffect(() => {
+    if (!profiled || !baseId) return;
+    let alive = true;
+    const key = `${profiled}\u0000${baseId}\u0000${statsKey}`;
+    columnProfile(baseId, JSON.parse(statsKey) as ViewSpec, profiled, `profile:${tab.id}`)
+      .then((data) => alive && setProfile({ key, column: profiled, data }))
+      .catch((e: unknown) => {
+        if (!alive || (e as { kind?: string }).kind === "cancelled") return;
+        setProfile({ key, column: profiled, error: e instanceof Error ? e.message : String(e) });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [profiled, baseId, statsKey, tab.id]);
+
+  // Header histograms for every number, date and boolean column, following
+  // the view's filters and search. The previous ones stay up while new ones load.
+  const headerCharts = useSettings((s) => s.headerCharts);
+  const chartColumns = useMemo(
+    () => columns.filter((c) => CHART_KINDS.has(c.kind)).map((c) => c.name),
+    [columns],
+  );
+  const chartsWanted = headerCharts && baseId !== undefined && chartColumns.length > 0;
+  const [charts, setCharts] = useState<ReadonlyMap<string, Bin[]>>(NO_CHARTS);
+  useEffect(() => {
+    if (!chartsWanted || !baseId) return;
+    let alive = true;
+    columnHistograms(baseId, JSON.parse(statsKey) as ViewSpec, chartColumns, `charts:${tab.id}`)
+      .then((list) => alive && setCharts(new Map(list.map((h) => [h.column, h.bins]))))
+      // Headers simply go without charts (cancelled, or the view failed).
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [chartsWanted, baseId, statsKey, chartColumns, tab.id]);
+
   const onHeaderMenu = useCallback(
-    (col: number, bounds: { x: number; y: number; width: number; height: number }) => {
-      const column = columns[col];
-      if (!column) return;
-      // Edit the column's filter if it has one, else start a new one.
-      const index = filters.findIndex((f) => f.column === column.name);
-      setEditing({ column, index: index < 0 ? undefined : index, anchor: rectAnchor(bounds) });
+    (name: string, bounds: { x: number; y: number; width: number; height: number }) => {
+      const column = columns.find((c) => c.name === name);
+      if (column) setMenu({ column, anchor: rectAnchor(bounds) });
     },
-    [columns, filters],
+    [columns],
+  );
+  /** Edit the column's filter if it has one, else start a new one. */
+  const filterColumn = (column: ColumnInfo, anchor: Anchor) => {
+    const index = filters.findIndex((f) => f.column === column.name);
+    setEditing({ column, index: index < 0 ? undefined : index, anchor });
+  };
+  const viewSort = view.sort;
+  const onHeaderClick = useCallback(
+    (name: string, add: boolean) =>
+      onViewChange?.({ ...view, sort: toggleSort(viewSort ?? [], name, add) }),
+    [onViewChange, view, viewSort],
   );
   const settings = useApp((s) => s.settings);
   const grid = useRef<DataGridHandle>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [goToOpen, setGoToOpen] = useState(false);
+  const notice = useNotice((s) => s.show);
+  const cancelView = useTabs((s) => s.cancelView);
+
+  /** Copies the selected cells (shown columns, display names) as `format`. */
+  const copySelection = useCallback(
+    async (format: CopyFormat) => {
+      const sel = source && grid.current?.selected(MAX_COPY_ROWS);
+      if (!source || !sel || sel.rows.length === 0 || sel.columns.length === 0) {
+        notice("Select some cells, rows or columns to copy first");
+        return;
+      }
+      const cut = sel.rows.length > MAX_COPY_ROWS;
+      const rows = cut ? sel.rows.slice(0, MAX_COPY_ROWS) : sel.rows;
+      const index = new Map(source.columns.map((c, i) => [c.name, i]));
+      const cols = sel.columns.filter((n) => index.has(n));
+      const name = COPY_FORMATS.find((f) => f.format === format)?.label ?? format;
+      try {
+        const values = await readRows(
+          source,
+          rows,
+          cols.map((n) => index.get(n)!),
+        );
+        const text = formatRows(
+          format,
+          cols.map((n) => ({
+            name: n,
+            label: label(layout, n),
+            format: source.columns[index.get(n)!]!,
+          })),
+          values,
+          { table: tableName(tab.title) },
+        );
+        await navigator.clipboard.writeText(text);
+        notice(
+          `Copied ${plural(rows.length, "row")} as ${name}` +
+            (cut ? ` (the first ${formatCount(MAX_COPY_ROWS)} of the selection)` : ""),
+        );
+      } catch (e) {
+        notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [source, layout, notice, tab.title],
+  );
+
+  /** Copies the view (shown columns, names, filters, search, sort) as runnable SQL. */
+  const readerSql = tab.info?.readerSql;
+  const copyViewSql = useCallback(async () => {
+    if (!baseId || !readerSql) return;
+    try {
+      const sql = await viewSql(
+        baseId,
+        { ...view, columns: visible(layout) },
+        readerSql,
+        layout.labels,
+      );
+      await navigator.clipboard.writeText(sql);
+      notice("Copied the view as SQL");
+    } catch (e) {
+      notice(`Couldn't copy the view: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [baseId, readerSql, view, layout, notice]);
+
+  const running = tab.viewState?.status === "running";
+  const sorting = !!tab.viewState?.sorting;
+  const importing = tab.import?.status === "running";
+  const commands = useMemo<Command[]>(() => {
+    if (tab.status !== "ready" || !source) return [];
+    const list: Command[] = [];
+    const add = (c: Command) => list.push(c);
+    if (onViewChange) {
+      // Command closures run when picked in the palette, never during render.
+      // eslint-disable-next-line react-hooks/refs
+      add({
+        id: "search",
+        title: "Search in data",
+        group: "View",
+        shortcut: `${modKey}+F`,
+        run: () => searchInput.current?.focus(),
+      });
+    }
+    add({
+      id: "go-to-row",
+      title: "Go to row…",
+      group: "View",
+      shortcut: `${modKey}+G`,
+      run: () => setGoToOpen(true),
+    });
+    if (onViewChange && filters.length > 0)
+      add({
+        id: "clear-filters",
+        title: "Clear filters",
+        group: "View",
+        run: () => setFilters([]),
+      });
+    if (onViewChange && sort.length > 0)
+      add({ id: "clear-sort", title: "Clear sort", group: "View", run: () => setSort([]) });
+    if (onViewChange && view.search)
+      add({
+        id: "clear-search",
+        title: "Clear search",
+        group: "View",
+        run: () => onViewChange({ ...view, search: undefined }),
+      });
+    if (onLayoutChange && layout.hidden.length > 0)
+      add({
+        id: "show-all-columns",
+        title: "Show all columns",
+        group: "Columns",
+        run: () => onLayoutChange(showAll(layout)),
+      });
+    if (running)
+      add({
+        id: "cancel-view",
+        title: "Cancel running query",
+        group: "View",
+        keywords: "stop",
+        run: () => cancelView(tab.id),
+      });
+    else if (sorting)
+      add({
+        id: "stop-sorting",
+        title: "Stop sorting (keep filters)",
+        group: "View",
+        keywords: "cancel",
+        run: () => cancelView(tab.id),
+      });
+    if (importing && onCancelImport)
+      add({ id: "cancel-import", title: "Cancel import", group: "File", run: onCancelImport });
+    for (const f of COPY_FORMATS) {
+      // eslint-disable-next-line react-hooks/refs -- runs when picked, not during render
+      add({
+        id: `copy-${f.format}`,
+        title: `Copy selection as ${f.label}`,
+        group: "Copy",
+        shortcut: f.format === "tsv" ? `${modKey}+C` : undefined,
+        run: () => void copySelection(f.format),
+      });
+    }
+    if (baseId && readerSql)
+      add({
+        id: "copy-view-sql",
+        title: "Copy view as SQL",
+        group: "Copy",
+        keywords: "query duckdb",
+        run: () => void copyViewSql(),
+      });
+    for (const name of visible(layout)) {
+      const column = columns.find((c) => c.name === name);
+      if (!column) continue;
+      const shown = label(layout, name);
+      if (onViewChange) {
+        add({
+          id: `filter:${name}`,
+          title: `Filter ${shown}…`,
+          group: "Columns",
+          run: () => filterColumn(column, gridAnchor()),
+        });
+        add({
+          id: `sort-asc:${name}`,
+          title: `Sort by ${shown} ascending`,
+          group: "Columns",
+          run: () => setSort([{ column: name, descending: false }]),
+        });
+        add({
+          id: `sort-desc:${name}`,
+          title: `Sort by ${shown} descending`,
+          group: "Columns",
+          run: () => setSort([{ column: name, descending: true }]),
+        });
+      }
+      if (baseId)
+        add({
+          id: `profile:${name}`,
+          title: `Column profile: ${shown}`,
+          group: "Columns",
+          keywords: "statistics stats",
+          run: () => setProfiled(name),
+        });
+    }
+    return list;
+    // setFilters, setSort and filterColumn are recreated each render; the
+    // state they read is listed, so the list only changes when it should.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    tab.status,
+    tab.id,
+    source,
+    onViewChange,
+    onLayoutChange,
+    onCancelImport,
+    filters,
+    sort,
+    view,
+    layout,
+    columns,
+    running,
+    sorting,
+    importing,
+    baseId,
+    readerSql,
+    copySelection,
+    copyViewSql,
+    cancelView,
+  ]);
+  useRegisterCommands("file", commands);
+
   const showSettings =
     isCsv(tab) || (tab.status === "error" && /\.(csv|tsv|txt|tab)/i.test(tab.path));
 
@@ -102,6 +423,11 @@ export function FileView({
       if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "g" && source) {
         e.preventDefault();
         setGoToOpen(true);
+      }
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f" && searchInput.current) {
+        e.preventDefault();
+        searchInput.current.focus();
+        searchInput.current.select();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -156,6 +482,15 @@ export function FileView({
           }}
           onRemove={(index) => setFilters(filters.filter((_, i) => i !== index))}
           onClear={() => setFilters([])}
+          sort={sort}
+          onSortChange={setSort}
+          end={
+            <SearchBox
+              ref={searchInput}
+              value={view.search ?? ""}
+              onChange={(search) => onViewChange?.({ ...view, search: search || undefined })}
+            />
+          }
         />
       )}
       {tab.viewState?.status === "error" && (
@@ -166,6 +501,36 @@ export function FileView({
           <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />
           <span className="text-fg-muted">Couldn't apply the filters: {tab.viewState.error}</span>
         </div>
+      )}
+      {menu && (
+        <ColumnMenu
+          column={menu.column.name}
+          anchor={menu.anchor}
+          sort={sort}
+          onOpenChange={(o) => !o && setMenu(null)}
+          onSort={setSort}
+          onFilter={() => filterColumn(menu.column, menu.anchor)}
+          {...(onLayoutChange && {
+            pinned: layout.pinned.includes(menu.column.name),
+            onPin: (p: boolean) => onLayoutChange(setPinned(layout, menu.column.name, p)),
+            onHide:
+              visible(layout).length > 1
+                ? () => onLayoutChange(setHidden(layout, menu.column.name, true))
+                : undefined,
+            onRename: () => setRenaming({ column: menu.column.name, anchor: menu.anchor }),
+            onAutoFit: () => grid.current?.autoFit(menu.column.name),
+          })}
+          onProfile={baseId ? () => setProfiled(menu.column.name) : undefined}
+        />
+      )}
+      {renaming && onLayoutChange && (
+        <RenameColumn
+          column={renaming.column}
+          current={label(layout, renaming.column)}
+          anchor={renaming.anchor}
+          onOpenChange={(o) => !o && setRenaming(null)}
+          onRename={(name) => onLayoutChange(rename(layout, renaming.column, name))}
+        />
       )}
       {editing && (
         <FilterEditor
@@ -202,12 +567,18 @@ export function FileView({
           </div>
         </div>
       ) : source ? (
-        <>
+        <div className="flex min-h-0 flex-1">
           <DataGrid
             ref={grid}
             source={source}
+            layout={layout}
+            onLayoutChange={onLayoutChange}
             onHeaderMenu={onViewChange ? onHeaderMenu : undefined}
+            onHeaderClick={onViewChange ? onHeaderClick : undefined}
             filteredColumns={filtered}
+            sort={sort}
+            highlight={tab.viewState?.dataset ? view.search : undefined}
+            histograms={chartsWanted ? charts : undefined}
           />
           <GoToRow
             open={goToOpen}
@@ -215,7 +586,20 @@ export function FileView({
             rowCount={source.rowCount}
             onGo={(row) => grid.current?.scrollToRow(row - 1)}
           />
-        </>
+          {profiled && (
+            <ProfilePanel
+              title={label(layout, profiled)}
+              // The previous result stays on screen while the new one loads.
+              profile={profile?.column === profiled ? profile.data : undefined}
+              loading={profile?.key !== profileKey}
+              error={profile?.key === profileKey ? profile.error : undefined}
+              onClose={() => {
+                setProfiled(null);
+                setProfile(null);
+              }}
+            />
+          )}
+        </div>
       ) : (
         <div className="flex flex-1 items-center justify-center gap-2 text-fg-muted">
           <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading {tab.title}…

@@ -344,11 +344,8 @@ impl Source {
                     r#type: t.sql().to_string(),
                 })
                 .collect();
-            let sql = format!(
-                "-- Excel sheet \"{}\" of {} (imported into a table)",
-                sheet.info.sheet,
-                self.path.display()
-            );
+            let sql =
+                excel::reader_sql(&self.path, self.detected.format == FileFormat::Xlsx, &sheet);
             (None, columns, Some(sheet.info), sql)
         } else {
             (
@@ -401,30 +398,7 @@ impl Source {
     }
 }
 
-/// Renders parameters as SQL literals for display. Never executed.
-pub fn inline_params(sql: &str, params: &[Param]) -> String {
-    let mut out = String::with_capacity(sql.len() + 64);
-    let mut it = params.iter();
-    for ch in sql.chars() {
-        if ch == '?' {
-            match it.next() {
-                Some(Param::Null) => out.push_str("NULL"),
-                Some(Param::Bool(b)) => out.push_str(if *b { "true" } else { "false" }),
-                Some(Param::Int(i)) => out.push_str(&i.to_string()),
-                Some(Param::Float(f)) => out.push_str(&f.to_string()),
-                Some(Param::Text(s)) => {
-                    out.push('\'');
-                    out.push_str(&s.replace('\'', "''"));
-                    out.push('\'');
-                }
-                None => out.push('?'),
-            }
-        } else {
-            out.push(ch);
-        }
-    }
-    out
-}
+pub use crate::engine::sql::inline_params;
 
 #[cfg(test)]
 mod tests {

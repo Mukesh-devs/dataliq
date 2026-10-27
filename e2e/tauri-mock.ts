@@ -18,9 +18,13 @@ export interface MockOptions {
   /** Builds Arrow IPC (base64) for `fetch_rows`; runs in Node. */
   fetchRows?: (start: number, count: number, datasetId: string) => string | Promise<string>;
   /** Row count of a view (`open_view`); runs in Node. Throw to fail it. */
-  views?: (spec: unknown) => number;
+  views?: (spec: unknown) => number | Promise<number>;
   /** Value list for `column_values`; runs in Node. */
   values?: (column: string, search: string | null) => { value: string | null; count: number }[];
+  /** Result of `column_profile`; runs in Node. */
+  profile?: (column: string, spec: unknown) => unknown;
+  /** Result of `column_histograms` (none by default); runs in Node. */
+  histograms?: (columns: string[], spec: unknown) => unknown[];
   /**
    * Simulated background imports by path: progress events to emit (one per
    * `stepMs`) and the final row count. Paths not listed never finish.
@@ -50,6 +54,18 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     const values = options.values;
     await page.exposeFunction("__values", (column: string, search: string | null) =>
       values(column, search),
+    );
+  }
+  if (options.profile) {
+    const profile = options.profile;
+    await page.exposeFunction("__profile", (column: string, spec: unknown) =>
+      profile(column, spec),
+    );
+  }
+  if (options.histograms) {
+    const histograms = options.histograms;
+    await page.exposeFunction("__histograms", (columns: string[], spec: unknown) =>
+      histograms(columns, spec),
     );
   }
   await page.addInitScript(
@@ -118,7 +134,10 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               };
             case "cancel_import":
             case "close_dataset":
+            case "cancel_query":
               return true;
+            case "view_sql":
+              return `-- the view as SQL\nSELECT * FROM ${String(args.reader)};`;
             case "import_file": {
               const plan = imports[String(args.path)];
               if (!plan) return new Promise(() => {}); // never finishes
@@ -147,12 +166,29 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const viewRows = w.__viewRows as (spec: unknown) => Promise<number>;
               const rowCount = await viewRows(args.spec);
               const id = `view-${nextView++}`;
-              return { dataset: { id, rowCount, cached: true }, totalRows: 1000, elapsedMs: 15 };
+              // Sorted views finish in the background (the test emits view-ready).
+              const sorted = ((args.spec as { sort?: unknown[] }).sort?.length ?? 0) > 0;
+              return {
+                dataset: { id, rowCount, cached: true },
+                totalRows: 1000,
+                elapsedMs: 15,
+                materializing: sorted,
+              };
             }
             case "column_values": {
               const values = w.__values as (c: string, s: string | null) => Promise<unknown[]>;
               const list = await values(String(args.column), (args.search as string) ?? null);
               return { values: list, truncated: false };
+            }
+            case "column_profile": {
+              const profile = w.__profile as (c: string, s: unknown) => Promise<unknown>;
+              if (!profile) throw { kind: "internal", message: "unmocked command column_profile" };
+              return profile(String(args.column), args.spec);
+            }
+            case "column_histograms": {
+              const histograms = w.__histograms as
+                ((c: string[], s: unknown) => Promise<unknown[]>) | undefined;
+              return histograms ? histograms(args.columns as string[], args.spec) : [];
             }
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };
