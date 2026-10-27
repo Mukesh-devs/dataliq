@@ -1,6 +1,7 @@
 //! BigView desktop app: Tauri entry point and module tree.
 
 pub mod cache;
+pub mod chart;
 pub mod cli;
 pub mod commands;
 pub mod engine;
@@ -124,7 +125,8 @@ pub fn run() {
             commands::sql::save_query,
             commands::sql::delete_saved_query,
             commands::export::export_view,
-            commands::export::cancel_export
+            commands::export::cancel_export,
+            commands::chart::chart_data
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

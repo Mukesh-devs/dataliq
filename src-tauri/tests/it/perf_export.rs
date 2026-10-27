@@ -246,3 +246,106 @@ fn perf_export_50m() {
         }
     }
 }
+
+/// Charts over the same 50M rows (budget: aggregation under 2 s).
+#[test]
+#[ignore = "needs generated fixtures; a minute or two"]
+fn perf_charts_50m() {
+    use bigview_lib::chart::{Agg, Bucket, ChartKind, ChartSpec, Measure};
+    let Some((engine, ds, _tmp)) = setup() else {
+        eprintln!("sales_50m.parquet not generated, skipping");
+        return;
+    };
+    let m = |agg, column: Option<&str>| Measure {
+        agg,
+        column: column.map(String::from),
+    };
+    let c = |kind, x: &str| ChartSpec {
+        kind,
+        x: x.into(),
+        bucket: None,
+        measures: vec![],
+        y: None,
+        bins: None,
+        limit: None,
+        sample: None,
+    };
+    let filtered = quantity(FilterOp::Lte {
+        value: Param::Int(5),
+    });
+    let cases: Vec<(&str, ViewSpec, ChartSpec)> = vec![
+        (
+            "bar country: count, sum",
+            ViewSpec::default(),
+            ChartSpec {
+                measures: vec![m(Agg::Count, None), m(Agg::Sum, Some("unit_price"))],
+                ..c(ChartKind::Bar, "country")
+            },
+        ),
+        (
+            "bar customer (100K groups), top 50",
+            ViewSpec::default(),
+            c(ChartKind::Bar, "customer"),
+        ),
+        (
+            "bar country: distinct customers",
+            ViewSpec::default(),
+            ChartSpec {
+                measures: vec![m(Agg::CountDistinct, Some("customer"))],
+                ..c(ChartKind::Bar, "country")
+            },
+        ),
+        (
+            "line order_date by month: avg",
+            ViewSpec::default(),
+            ChartSpec {
+                bucket: Some(Bucket::Month),
+                measures: vec![m(Agg::Avg, Some("unit_price"))],
+                ..c(ChartKind::Line, "order_date")
+            },
+        ),
+        (
+            "line order_ts by day: count",
+            ViewSpec::default(),
+            ChartSpec {
+                bucket: Some(Bucket::Day),
+                ..c(ChartKind::Line, "order_ts")
+            },
+        ),
+        (
+            "histogram unit_price",
+            ViewSpec::default(),
+            c(ChartKind::Histogram, "unit_price"),
+        ),
+        (
+            "histogram order_ts",
+            ViewSpec::default(),
+            c(ChartKind::Histogram, "order_ts"),
+        ),
+        (
+            "scatter unit_price x quantity",
+            ViewSpec::default(),
+            ChartSpec {
+                y: Some("quantity".into()),
+                ..c(ChartKind::Scatter, "unit_price")
+            },
+        ),
+        (
+            "bar country, quantity <= 5",
+            filtered,
+            c(ChartKind::Bar, "country"),
+        ),
+    ];
+    for (what, view, chart) in cases {
+        let t = Instant::now();
+        let data = engine
+            .chart_data(&ds.id, &view, &chart, &RequestKey::default())
+            .unwrap();
+        println!(
+            "chart {what:<38} {:>6.2} s  points {:>6} of {:>10}",
+            t.elapsed().as_secs_f64(),
+            data.x.len().max(data.bins.len()),
+            data.total
+        );
+    }
+}

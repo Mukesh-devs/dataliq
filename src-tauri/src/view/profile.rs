@@ -61,7 +61,7 @@ impl ProfileKind {
         }
     }
 
-    fn is_integer(duckdb_type: &str) -> bool {
+    pub(crate) fn is_integer(duckdb_type: &str) -> bool {
         let t = duckdb_type.to_ascii_uppercase();
         t.ends_with("INT") || t == "INTEGER" || t.ends_with("INTEGER")
     }
@@ -113,7 +113,7 @@ pub struct ColumnHistogram {
 }
 
 /// `col` as a DOUBLE for histograms: the number itself, or seconds since 1970.
-fn numeric_expr(col: &str, kind: ProfileKind, duckdb_type: &str) -> Option<String> {
+pub(crate) fn numeric_expr(col: &str, kind: ProfileKind, duckdb_type: &str) -> Option<String> {
     match kind {
         ProfileKind::Number => Some(format!("CAST({col} AS DOUBLE)")),
         ProfileKind::Temporal if duckdb_type.to_ascii_uppercase().contains("TIME ZONE") => {
@@ -142,7 +142,7 @@ fn text_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<Strin
 impl Engine {
     /// The view (filters and search of `spec`, no sort) over dataset `id`,
     /// and the column's metadata.
-    fn profile_view(
+    pub(crate) fn profile_view(
         &self,
         id: &str,
         spec: &ViewSpec,
@@ -166,20 +166,23 @@ impl Engine {
         ))
     }
 
-    /// Histogram of `x` (a DOUBLE expression over the view) between `lo` and `hi`.
-    fn histogram(
+    /// Histogram of `x` (a DOUBLE expression over the view) between `lo` and
+    /// `hi`, in about `bins` bars.
+    pub(crate) fn histogram(
         &self,
         view: &BuiltView,
         x: &str,
         (lo, hi): (f64, f64),
         integer: bool,
+        bins: usize,
         key: &RequestKey,
     ) -> Result<Vec<Bin>> {
-        // Small integer ranges get one bar per value; otherwise BINS bars.
-        let (n, width) = if integer && hi - lo < BINS as f64 {
+        // Small integer ranges get one bar per value; otherwise `bins` bars.
+        let bins = bins.max(1);
+        let (n, width) = if integer && hi - lo < bins as f64 {
             ((hi - lo) as usize + 1, 1.0)
         } else if hi > lo {
-            (BINS, (hi - lo) / BINS as f64)
+            (bins, (hi - lo) / bins as f64)
         } else {
             (1, 0.0)
         };
@@ -278,6 +281,7 @@ impl Engine {
                 x,
                 (lo, hi),
                 kind == ProfileKind::Number && ProfileKind::is_integer(&meta.r#type),
+                BINS,
                 key,
             )?),
             (Some(_), _, _) => Some(Vec::new()),
@@ -405,7 +409,9 @@ impl Engine {
                     })
                     .collect(),
                 Some(x) => match (f64_at(b, p.at), f64_at(b, p.at + 1)) {
-                    (Some(lo), Some(hi)) => self.histogram(&view, x, (lo, hi), p.integer, key)?,
+                    (Some(lo), Some(hi)) => {
+                        self.histogram(&view, x, (lo, hi), p.integer, BINS, key)?
+                    }
                     _ => Vec::new(),
                 },
             };

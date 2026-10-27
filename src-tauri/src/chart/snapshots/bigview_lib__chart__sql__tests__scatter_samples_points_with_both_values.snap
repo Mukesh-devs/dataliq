@@ -1,0 +1,7 @@
+---
+source: src-tauri/src/chart/sql.rs
+expression: "format!(\"{:?}\\n{}\\n{}\", q.x_kind, q.count, q.select)"
+---
+Number
+SELECT count(*)::BIGINT FROM (SELECT CAST("amount" AS DOUBLE) AS x, CAST(epoch_ms(CAST("joined" AS TIMESTAMP)) AS DOUBLE) AS y FROM (SELECT * FROM t WHERE "amount" > ?) WHERE "amount" IS NOT NULL AND "joined" IS NOT NULL)
+SELECT x, y FROM (SELECT CAST("amount" AS DOUBLE) AS x, CAST(epoch_ms(CAST("joined" AS TIMESTAMP)) AS DOUBLE) AS y FROM (SELECT * FROM t WHERE "amount" > ?) WHERE "amount" IS NOT NULL AND "joined" IS NOT NULL) USING SAMPLE reservoir(5000 ROWS) REPEATABLE (7)

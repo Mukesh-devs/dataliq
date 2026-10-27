@@ -1,0 +1,6 @@
+---
+source: src-tauri/src/chart/sql.rs
+expression: render(&q)
+---
+Category limit 50
+SELECT *, count(*) OVER ()::BIGINT AS groups FROM (SELECT CAST("quantity" AS VARCHAR) AS x, CAST(avg("amount") AS DOUBLE) AS m0 FROM (SELECT * FROM t WHERE "amount" > ?) GROUP BY 1) ORDER BY CAST(x AS DOUBLE) ASC NULLS LAST LIMIT 50

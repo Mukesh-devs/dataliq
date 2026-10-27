@@ -1,0 +1,6 @@
+---
+source: src-tauri/src/chart/sql.rs
+expression: render(&q)
+---
+Category limit 50
+SELECT *, count(*) OVER ()::BIGINT AS groups FROM (SELECT CAST("city" AS VARCHAR) AS x, CAST(count(*) AS DOUBLE) AS m0, CAST(sum("amount") AS DOUBLE) AS m1 FROM (SELECT * FROM t WHERE "amount" > ?) GROUP BY 1) ORDER BY m0 DESC NULLS LAST, x ASC NULLS LAST LIMIT 50
