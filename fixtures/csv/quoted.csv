@@ -1,0 +1,5 @@
+id,text,comment
+1,"Hello, world","She said ""hi"""
+2,"line one
+line two",plain
+3,"","trailing, comma,"

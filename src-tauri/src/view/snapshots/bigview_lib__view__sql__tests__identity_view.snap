@@ -1,0 +1,7 @@
+---
+source: src-tauri/src/view/sql.rs
+expression: sql_for(&spec)
+---
+SELECT * FROM "ds"."main"."data"
+SELECT count(*) FROM "ds"."main"."data"
+params: []

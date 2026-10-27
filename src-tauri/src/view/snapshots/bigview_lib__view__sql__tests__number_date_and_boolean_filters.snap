@@ -1,0 +1,43 @@
+---
+source: src-tauri/src/view/sql.rs
+expression: "out.join(\"\\n\\n\")"
+---
+SELECT * FROM "ds"."main"."data" WHERE "amount" = ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" = ?
+params: [2.5]
+
+SELECT * FROM "ds"."main"."data" WHERE ("amount" >= ? AND "amount" <= ?)
+SELECT count(*) FROM "ds"."main"."data" WHERE ("amount" >= ? AND "amount" <= ?)
+params: [10,20]
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" <= ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" <= ?
+params: [20]
+
+SELECT * FROM "ds"."main"."data" WHERE TRUE
+SELECT count(*) FROM "ds"."main"."data" WHERE TRUE
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" > ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" > ?
+params: [0]
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" <= ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" <= ?
+params: [9.75]
+
+SELECT * FROM "ds"."main"."data" WHERE "joined" < ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "joined" < ?
+params: ["2024-01-31"]
+
+SELECT * FROM "ds"."main"."data" WHERE "joined" >= ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "joined" >= ?
+params: ["2024-01-01"]
+
+SELECT * FROM "ds"."main"."data" WHERE CAST("joined" AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+SELECT count(*) FROM "ds"."main"."data" WHERE CAST("joined" AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+params: ["2024-02-14","2024-03-15"]
+
+SELECT * FROM "ds"."main"."data" WHERE "active" = ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "active" = ?
+params: [true]

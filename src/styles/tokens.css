@@ -1,0 +1,74 @@
+/* Design tokens. One accent colour, neutral greys for everything else.
+   The resolved theme is set as `data-theme` on <html> by ThemeController. */
+:root {
+  --font-ui: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data:
+    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --duration: 120ms;
+
+  /* Density: grid row height and chrome padding. */
+  --row-height: 28px;
+  --chrome-height: 36px;
+}
+
+:root[data-density="compact"] {
+  --row-height: 22px;
+  --chrome-height: 32px;
+}
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #f8f8f9;
+  --surface-2: #f1f1f3;
+  --hover: #ececef;
+  --active: #e4e4e8;
+  --border: #e6e6ea;
+  --border-strong: #d4d4da;
+  --fg: #18181b;
+  --fg-muted: #52525b;
+  --fg-subtle: #8b8b94;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-fg: #ffffff;
+  --accent-soft: rgb(79 70 229 / 0.12);
+  --focus-ring: rgb(79 70 229 / 0.6);
+  --danger: #dc2626;
+  --warning: #b45309;
+  --success: #15803d;
+  --null: #a1a1aa;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111113;
+  --surface: #17171a;
+  --surface-2: #1e1e22;
+  --hover: #232328;
+  --active: #2b2b31;
+  --border: #26262b;
+  --border-strong: #34343b;
+  --fg: #ececef;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #71717a;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-fg: #111113;
+  --accent-soft: rgb(129 140 248 / 0.16);
+  --focus-ring: rgb(129 140 248 / 0.7);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #4ade80;
+  --null: #5f5f68;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration: 0ms;
+  }
+}

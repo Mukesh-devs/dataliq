@@ -1,0 +1,6 @@
+id,maybe_number,flag
+1,10,true
+2,11.5,false
+3,n/a,TRUE
+4,,0
+5,1e3,yes

@@ -1,0 +1,43 @@
+---
+source: src-tauri/src/view/sql.rs
+expression: "out.join(\"\\n\\n\")"
+---
+SELECT * FROM "ds"."main"."data" WHERE ("name" IS NULL OR "name" = '')
+SELECT count(*) FROM "ds"."main"."data" WHERE ("name" IS NULL OR "name" = '')
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" IS NULL
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" IS NULL
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" IS NULL
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" IS NULL
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" IS NOT NULL
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" IS NOT NULL
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE "amount" IS NULL
+SELECT count(*) FROM "ds"."main"."data" WHERE "amount" IS NULL
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE "name" IN (?, ?)
+SELECT count(*) FROM "ds"."main"."data" WHERE "name" IN (?, ?)
+params: ["a","b"]
+
+SELECT * FROM "ds"."main"."data" WHERE ("name" IN (?) OR "name" IS NULL)
+SELECT count(*) FROM "ds"."main"."data" WHERE ("name" IN (?) OR "name" IS NULL)
+params: ["a"]
+
+SELECT * FROM "ds"."main"."data" WHERE "name" IS NULL
+SELECT count(*) FROM "ds"."main"."data" WHERE "name" IS NULL
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE FALSE
+SELECT count(*) FROM "ds"."main"."data" WHERE FALSE
+params: []
+
+SELECT * FROM "ds"."main"."data" WHERE NOT coalesce(contains(lower("name"), lower(?)), FALSE)
+SELECT count(*) FROM "ds"."main"."data" WHERE NOT coalesce(contains(lower("name"), lower(?)), FALSE)
+params: ["x"]

@@ -1,0 +1,5 @@
+[
+  {"id": 1, "user": {"name": "Alice", "address": {"city": "Berlin"}}, "tags": ["a", "b"], "scores": [1, 2, 3]},
+  {"id": 2, "user": {"name": "Bob", "address": {"city": null}}, "tags": [], "scores": [4]},
+  {"id": 3, "user": null, "tags": null, "scores": []}
+]

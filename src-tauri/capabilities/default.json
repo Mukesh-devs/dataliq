@@ -1,0 +1,27 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimum permissions for the main window.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "allow-run-query",
+    "allow-cancel-query",
+    "allow-fetch-rows",
+    "allow-open-file",
+    "allow-preview-file",
+    "allow-import-file",
+    "allow-cancel-import",
+    "allow-open-direct",
+    "allow-close-dataset",
+    "allow-cache-info",
+    "allow-clear-cache",
+    "allow-get-settings",
+    "allow-take-startup-files",
+    "allow-open-view",
+    "allow-column-values"
+  ]
+}

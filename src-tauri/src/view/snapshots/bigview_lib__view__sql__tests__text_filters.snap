@@ -1,0 +1,31 @@
+---
+source: src-tauri/src/view/sql.rs
+expression: "out.join(\"\\n\\n\")"
+---
+SELECT * FROM "ds"."main"."data" WHERE contains(lower("name"), lower(?))
+SELECT count(*) FROM "ds"."main"."data" WHERE contains(lower("name"), lower(?))
+params: ["ann"]
+
+SELECT * FROM "ds"."main"."data" WHERE contains("name", ?)
+SELECT count(*) FROM "ds"."main"."data" WHERE contains("name", ?)
+params: ["Ann"]
+
+SELECT * FROM "ds"."main"."data" WHERE starts_with(lower("name"), lower(?))
+SELECT count(*) FROM "ds"."main"."data" WHERE starts_with(lower("name"), lower(?))
+params: ["a"]
+
+SELECT * FROM "ds"."main"."data" WHERE ends_with(lower("name"), lower(?))
+SELECT count(*) FROM "ds"."main"."data" WHERE ends_with(lower("name"), lower(?))
+params: ["z"]
+
+SELECT * FROM "ds"."main"."data" WHERE regexp_matches("name", ?)
+SELECT count(*) FROM "ds"."main"."data" WHERE regexp_matches("name", ?)
+params: ["^a.*\\d$"]
+
+SELECT * FROM "ds"."main"."data" WHERE contains(lower(CAST("id" AS VARCHAR)), lower(?))
+SELECT count(*) FROM "ds"."main"."data" WHERE contains(lower(CAST("id" AS VARCHAR)), lower(?))
+params: ["42"]
+
+SELECT * FROM "ds"."main"."data" WHERE "name" = ?
+SELECT count(*) FROM "ds"."main"."data" WHERE "name" = ?
+params: ["Ann"]

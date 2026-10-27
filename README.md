@@ -1,0 +1,86 @@
+# BigView
+
+> Drag in a 5 GB file. See data in 1 second. Filter, query, and export without loading it into RAM.
+
+BigView is a free, open-source, cross-platform desktop app for exploring huge
+tabular files: CSV, TSV, Parquet, JSON/NDJSON and Excel, including `.gz`
+compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app),
+Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
+and no account.
+
+**Status:** v0.1.0 — the core viewer. Filters, sorting, search and column
+profiles come in v0.2; SQL and export in v0.3. See [CHANGELOG.md](CHANGELOG.md),
+[PROGRESS.md](PROGRESS.md) and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
+
+<!-- Screenshots: light and dark theme with a 50M-row file open. -->
+_Screenshots coming soon._
+
+## Features
+
+- Open CSV, TSV, JSON and NDJSON files, also compressed (`.gz`, `.zst`), with
+  the first 1,000 rows on screen in about a second, even for 5 GB `.gz` files.
+  Nested JSON values expand into pretty-printed JSON.
+- Parquet is queried in place: a 50M-row file opens in under 0.1 s.
+- Excel `.xlsx` and `.xls` with a sheet picker and header row choice.
+- Delimiter, header, quoting and types are detected automatically; override
+  them in **Import settings** (delimiter, header, quote, encoding, skip rows,
+  date format, ignore bad rows).
+- The full file is imported in the background into a local cache (with
+  progress and Cancel) while you browse the preview; reopening an unchanged
+  file is instant.
+- A fast canvas data grid: type icons, right-aligned numbers, `null` shown
+  distinctly from empty text, column resize, range selection and copy, and
+  **Go to row** (Ctrl+G).
+- Light and dark themes that follow your OS.
+- Tabs, recent files and drag and drop; open files from a terminal with
+  `bigview data.csv.gz other.parquet` (a second launch opens them in the
+  running app).
+
+## Keyboard shortcuts
+
+Use Cmd on macOS, Ctrl elsewhere.
+
+| Action | Shortcut |
+| --- | --- |
+| Open file | Ctrl+O |
+| Close tab | Ctrl+W |
+| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab |
+| Go to row | Ctrl+G |
+| Copy selection | Ctrl+C |
+
+More shortcuts (command palette, find, SQL panel, export) arrive in later versions.
+
+## Performance
+
+Measured on a 4-core Linux machine (details in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
+first rows of a 5 GB CSV in 0.3 s and of a 5 GB `.csv.gz` in about 1 s; full
+import of a 5 GB CSV in 32 s; reopening a cached file in a few milliseconds;
+random pages anywhere in 50M rows in under 25 ms.
+
+## Installing
+
+v0.1.0 has no published installers yet; build from source (below). The
+Linux build produces `.deb`, `.rpm` and `.AppImage` packages, which need
+WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`, preinstalled on most desktops).
+
+## Building from source
+
+Prerequisites:
+
+- Rust (stable) and Node.js 22 with pnpm 10
+- Linux: `libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+- macOS: Xcode command line tools
+- Windows: Microsoft C++ Build Tools and WebView2 (preinstalled on Windows 11)
+
+```sh
+pnpm install
+pnpm tauri dev          # run the app with hot reload
+pnpm tauri build        # build installers into target/release/bundle
+./scripts/check.sh      # run every check (fmt, clippy, tests, lint, build)
+pnpm fixtures all       # generate the large test files (16+ GB, git-ignored)
+pnpm bench              # small benchmark suite with the regression guard
+```
+
+## License
+
+[MIT](LICENSE)

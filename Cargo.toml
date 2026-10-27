@@ -1,0 +1,20 @@
+[workspace]
+members = ["src-tauri", "scripts/gen_fixtures"]
+resolver = "3"
+
+# DuckDB (bundled C++) is very slow to run unoptimized; optimize dependencies
+# even in debug builds so tests and `tauri build --debug` stay usable. Debug
+# info for dependencies is off: DuckDB's alone is ~6 GB per build.
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+strip = true
+
+# The fixture generator formats billions of bytes; keep it fast in dev builds.
+[profile.dev.package.gen_fixtures]
+opt-level = 3
