@@ -88,12 +88,19 @@ test("copy a selection as Markdown and JSON (Shift+Ctrl+C)", async ({ page, cont
   await page.keyboard.press("Control+k");
   await page.getByRole("combobox").fill("copy json");
   await page.keyboard.press("Enter");
-  await expect
-    .poll(async () => JSON.parse(await clipboard(page)) as unknown)
-    .toEqual([
-      { id: 1, name: "name | 1" },
-      { id: 2, name: "name | 2" },
-    ]);
+  // Until the copy lands the clipboard still holds the Markdown; poll gives
+  // up on a throw, so read it as null until it is JSON.
+  const json = async () => {
+    try {
+      return JSON.parse(await clipboard(page)) as unknown;
+    } catch {
+      return null;
+    }
+  };
+  await expect.poll(json).toEqual([
+    { id: 1, name: "name | 1" },
+    { id: 2, name: "name | 2" },
+  ]);
 });
 
 test("copy the view as SQL", async ({ page, context }) => {

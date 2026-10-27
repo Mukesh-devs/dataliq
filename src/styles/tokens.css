@@ -46,6 +46,12 @@
   --match: rgb(250 204 21 / 0.45);
   /* Bars of the small histograms in grid headers. */
   --chart-bar: rgb(79 70 229 / 0.4);
+  /* SQL editor syntax colours. */
+  --syntax-keyword: #6d28d9;
+  --syntax-string: #047857;
+  --syntax-number: #b45309;
+  --syntax-comment: #8b8b94;
+  --syntax-name: #1d4ed8;
 }
 
 :root[data-theme="dark"] {
@@ -71,6 +77,11 @@
   --null: #5f5f68;
   --match: rgb(250 204 21 / 0.3);
   --chart-bar: rgb(129 140 248 / 0.45);
+  --syntax-keyword: #c4b5fd;
+  --syntax-string: #6ee7b7;
+  --syntax-number: #fcd34d;
+  --syntax-comment: #71717a;
+  --syntax-name: #93c5fd;
 }
 
 @media (prefers-reduced-motion: reduce) {

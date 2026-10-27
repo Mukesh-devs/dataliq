@@ -52,6 +52,10 @@ pub async fn open_view(
                     elapsed_ms: started.elapsed().as_millis() as u64,
                 };
                 let _ = app.emit("view-ready", ready);
+                // Writing a big sort leaves its working memory cached.
+                if let Err(e) = engine.release_memory() {
+                    tracing::warn!("could not release memory after a view: {e}");
+                }
             }
             // Closed or replaced meanwhile.
             Ok(false) | Err(AppError::Cancelled) => {}

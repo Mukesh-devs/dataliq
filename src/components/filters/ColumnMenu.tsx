@@ -12,7 +12,8 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
+import { MenuItem as Item, MenuSeparator } from "../ui/Menu";
 import type { SortKey } from "../../lib/view";
 import type { Anchor } from "./FilterEditor";
 
@@ -90,7 +91,7 @@ export function ColumnMenu({
               Remove from sort
             </Item>
           )}
-          <div className="my-1 h-px bg-border" role="separator" />
+          <MenuSeparator />
           <Item icon={<ListFilter />} onSelect={choose(onFilter)}>
             Filter…
           </Item>
@@ -99,9 +100,7 @@ export function ColumnMenu({
               Column profile
             </Item>
           )}
-          {(onPin || onHide || onRename || onAutoFit) && (
-            <div className="my-1 h-px bg-border" role="separator" />
-          )}
+          {(onPin || onHide || onRename || onAutoFit) && <MenuSeparator />}
           {onPin && (
             <Item icon={pinned ? <PinOff /> : <Pin />} onSelect={choose(() => onPin(!pinned))}>
               {pinned ? "Unpin column" : "Pin to the left"}
@@ -125,42 +124,5 @@ export function ColumnMenu({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  );
-}
-
-function Item({
-  icon,
-  children,
-  onSelect,
-  autoFocus,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-  onSelect: () => void;
-  autoFocus?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      autoFocus={autoFocus}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        // Arrow keys move between items, like a native menu.
-        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-        e.preventDefault();
-        const items = [
-          ...(e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="menuitem"]') ??
-            []),
-        ];
-        const i = items.indexOf(e.currentTarget);
-        const next = items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length];
-        next?.focus();
-      }}
-      className="flex w-full items-center gap-2 rounded-[var(--radius)] px-2 py-1 text-left text-fg outline-none hover:bg-hover focus-visible:bg-hover [&_svg]:size-3.5 [&_svg]:text-fg-muted"
-    >
-      {icon}
-      {children}
-    </button>
   );
 }

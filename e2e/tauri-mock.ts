@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { tableFromIPC } from "apache-arrow";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -21,6 +22,11 @@ export interface MockOptions {
   views?: (spec: unknown) => number | Promise<number>;
   /** Value list for `column_values`; runs in Node. */
   values?: (column: string, search: string | null) => { value: string | null; count: number }[];
+  /**
+   * Result of `run_query` as Arrow IPC (base64), or an error to throw
+   * ({ kind, message }); runs in Node. Default: the recorded version query.
+   */
+  sql?: (sql: string) => string | { kind: string; message: string };
   /** Result of `column_profile`; runs in Node. */
   profile?: (column: string, spec: unknown) => unknown;
   /** Result of `column_histograms` (none by default); runs in Node. */
@@ -32,6 +38,10 @@ export interface MockOptions {
   imports?: Record<string, { progress: number[]; rows: number; stepMs?: number }>;
   /** Files the app "was started with" (`bigview <files>`). */
   startupFiles?: string[];
+  /** Paths returned by successive "Save" dialogs (null = cancelled). */
+  savePaths?: (string | null)[];
+  /** How long `export_view` runs, emitting 50% halfway (default 0). */
+  exportMs?: number;
 }
 
 /**
@@ -56,6 +66,16 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       values(column, search),
     );
   }
+  if (options.sql) {
+    const sql = options.sql;
+    // Rows are counted here, where Arrow is available.
+    await page.exposeFunction("__sql", (text: string) => {
+      const out = sql(text);
+      return typeof out === "string"
+        ? { ipc: out, rows: tableFromIPC(Buffer.from(out, "base64")).numRows }
+        : out;
+    });
+  }
   if (options.profile) {
     const profile = options.profile;
     await page.exposeFunction("__profile", (column: string, spec: unknown) =>
@@ -69,13 +89,24 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     );
   }
   await page.addInitScript(
-    ({ recordings, dialogPaths, datasets, imports, startupFiles }) => {
+    ({ recordings, dialogPaths, datasets, imports, startupFiles, savePaths, exportMs }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
       w.__invokes = log;
       let nextCallback = 1;
       let nextView = 1;
+      let nextResult = 1;
+      // The SQL panel's history and saved queries (kept for the page's life).
+      const history: { sql: string; ranAt: number }[] = [];
+      const saved: { name: string; sql: string; savedAt: number }[] = [];
+      // SQL results by dataset id (Arrow IPC, base64).
+      const sqlResults: Record<string, string> = {};
+      // Running exports by job id: cancel_export ends them.
+      const exportJobs: Record<string, () => void> = {};
+      type SqlAnswer = (
+        s: string,
+      ) => Promise<{ ipc: string; rows: number } | { kind: string; message: string }>;
       const listeners: Record<string, number[]> = {};
       const emit = (event: string, payload: unknown) => {
         for (const id of listeners[event] ?? []) {
@@ -99,8 +130,79 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
           log.push({ cmd, args });
           const file = recordings.files[String(args.path)];
           switch (cmd) {
-            case "run_query":
-              return toBuffer(recordings.version);
+            case "run_query": {
+              const sql = w.__sql as SqlAnswer | undefined;
+              if (!sql) return toBuffer(recordings.version);
+              const out = await sql(String(args.sql));
+              if (!("ipc" in out)) throw out;
+              return toBuffer(out.ipc);
+            }
+            case "sql_result": {
+              const out = await (w.__sql as SqlAnswer)(String(args.sql));
+              if (!("ipc" in out)) throw out;
+              const id = `sql-${nextResult++}`;
+              sqlResults[id] = out.ipc;
+              return { id, rowCount: out.rows, cached: true };
+            }
+            case "register_table":
+            case "unregister_table":
+              return null;
+            case "add_sql_history": {
+              const entry = args.entry as { sql: string };
+              const i = history.findIndex((h) => h.sql === entry.sql);
+              if (i >= 0) history.splice(i, 1);
+              history.unshift({ ...entry, ranAt: Date.now() });
+              return history[0];
+            }
+            case "sql_history": {
+              const q = String(args.search ?? "").toLowerCase();
+              return history.filter((h) => h.sql.toLowerCase().includes(q));
+            }
+            case "clear_sql_history":
+              history.length = 0;
+              return null;
+            case "saved_queries":
+              return [...saved].sort((a, b) => a.name.localeCompare(b.name));
+            case "save_query": {
+              const name = String(args.name).trim();
+              const i = saved.findIndex((q) => q.name.toLowerCase() === name.toLowerCase());
+              if (i >= 0) saved.splice(i, 1);
+              const q = { name, sql: String(args.sql), savedAt: Date.now() };
+              saved.push(q);
+              return q;
+            }
+            case "delete_saved_query": {
+              const i = saved.findIndex((q) => q.name === args.name);
+              if (i >= 0) saved.splice(i, 1);
+              return i >= 0;
+            }
+            case "plugin:dialog|save":
+              return savePaths.length > 0 ? savePaths.shift() : null;
+            case "export_view": {
+              const request = args.request as { path: string; totalRows?: number };
+              const jobId = String(args.jobId);
+              const cancelled = await new Promise<boolean>((done) => {
+                exportJobs[jobId] = () => done(true);
+                setTimeout(() => {
+                  emit("export-progress", { jobId, percent: 50, elapsedMs: exportMs / 2 });
+                }, exportMs / 2);
+                setTimeout(() => done(false), exportMs);
+              });
+              delete exportJobs[jobId];
+              if (cancelled) throw { kind: "cancelled", message: "Cancelled" };
+              return {
+                path: request.path,
+                rows: request.totalRows ?? 0,
+                sheets: 0,
+                rowsLeftOut: 0,
+                elapsedMs: exportMs,
+              };
+            }
+            case "cancel_export": {
+              const end = exportJobs[String(args.jobId)];
+              end?.();
+              return !!end;
+            }
             case "plugin:dialog|open": {
               // The app asks for multiple files; a test may queue a list.
               const next = dialogPaths.shift();
@@ -153,6 +255,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               };
             }
             case "fetch_rows": {
+              const stored = sqlResults[String(args.datasetId)];
+              if (stored) return toBuffer(stored);
               const fetchRows = w.__fetchRows as (
                 s: number,
                 c: number,
@@ -205,6 +309,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       datasets: options.datasets ?? {},
       imports: options.imports ?? {},
       startupFiles: options.startupFiles ?? [],
+      savePaths: options.savePaths ?? [],
+      exportMs: options.exportMs ?? 0,
     },
   );
 }

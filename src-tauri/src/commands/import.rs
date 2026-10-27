@@ -46,7 +46,13 @@ pub async fn import_file(
         let emit = |p| {
             let _ = app.emit("import-progress", p);
         };
-        import::import(&engine, &state.imports, &target, &source, &job_id, &emit)
+        let out = import::import(&engine, &state.imports, &target, &source, &job_id, &emit);
+        // An import leaves DuckDB holding the file's pages; give them back
+        // (the grid reads them again from the cache file as needed).
+        if let Err(e) = engine.release_memory() {
+            tracing::warn!("could not release memory after import: {e}");
+        }
+        out
     })
     .await
 }

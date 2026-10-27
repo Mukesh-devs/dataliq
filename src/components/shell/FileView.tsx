@@ -1,9 +1,11 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { CircleAlert, Download, LoaderCircle, SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
-import { formatBytes, formatCount } from "../../lib/format";
-import { COPY_FORMATS, formatRows, tableName, type CopyFormat } from "../../lib/copyAs";
+import { formatBytes, formatCount, formatValue } from "../../lib/format";
+import { COPY_FORMATS, formatRows, quoteIdent, tableName, type CopyFormat } from "../../lib/copyAs";
+import { formatSql } from "../../lib/sqlFormat";
+import { useSql } from "../../stores/sql";
 import { isMac, modKey } from "../../lib/platform";
 import { useRegisterCommands, type Command } from "../../stores/commands";
 import { useNotice } from "../../stores/notice";
@@ -12,7 +14,7 @@ import type { Tab } from "../../stores/tabs";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
-import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
+import { NOT_LOADED, PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
 import { useSettings } from "../../stores/settings";
 import {
@@ -28,7 +30,12 @@ import {
   type SortKey,
   type ViewSpec,
 } from "../../lib/view";
-import { ProfilePanel } from "../profile/ProfilePanel";
+import { ProfilePanel, ProfilePicker } from "../profile/ProfilePanel";
+import { CellMenu, type CellMenuActions } from "../grid/CellMenu";
+import { filterForValue } from "../../lib/cellFilter";
+import { useLayout } from "../../stores/layout";
+import { useExport } from "../../stores/export";
+import { Button } from "../ui/Button";
 import { ColumnMenu } from "../filters/ColumnMenu";
 import { RenameColumn } from "../filters/RenameColumn";
 import {
@@ -55,6 +62,8 @@ interface FileViewProps {
   onReadDirect?: () => void;
   onViewChange?: (view: ViewSpec) => void;
   onLayoutChange?: (layout: ColumnLayout) => void;
+  /** Reads the file again, keeping filters and layout. */
+  onReload?: () => void;
 }
 
 /** The filter editor being shown: a new filter on `column`, or filter `index`. */
@@ -110,6 +119,7 @@ export function FileView({
   onReadDirect,
   onViewChange,
   onLayoutChange,
+  onReload,
 }: FileViewProps) {
   const source = useRowSource(tab);
   const columns = useMemo(() => (tab.preview ? describeColumns(tab.preview) : []), [tab.preview]);
@@ -120,6 +130,21 @@ export function FileView({
   const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
   const [renaming, setRenaming] = useState<{ column: string; anchor: Anchor } | null>(null);
   const [profiled, setProfiled] = useState<string | null>(null);
+  // The right panel; shared by all tabs (each tab keeps its own column).
+  const profileOpen = useLayout((s) => s.profile);
+  const setProfileOpen = useLayout((s) => s.setProfile);
+  const showProfile = useCallback(
+    (column: string) => {
+      setProfiled(column);
+      setProfileOpen(true);
+    },
+    [setProfileOpen],
+  );
+  const [cellMenu, setCellMenu] = useState<{
+    column: string;
+    row: number;
+    anchor: Anchor;
+  } | null>(null);
   // The last profile result and what it was computed for (column + view).
   const [profile, setProfile] = useState<{
     key: string;
@@ -152,7 +177,7 @@ export function FileView({
   const statsKey = JSON.stringify(statsSpec(view));
   const profileKey = `${profiled}\u0000${baseId}\u0000${statsKey}`;
   useEffect(() => {
-    if (!profiled || !baseId) return;
+    if (!profileOpen || !profiled || !baseId) return;
     let alive = true;
     const key = `${profiled}\u0000${baseId}\u0000${statsKey}`;
     columnProfile(baseId, JSON.parse(statsKey) as ViewSpec, profiled, `profile:${tab.id}`)
@@ -164,7 +189,7 @@ export function FileView({
     return () => {
       alive = false;
     };
-  }, [profiled, baseId, statsKey, tab.id]);
+  }, [profileOpen, profiled, baseId, statsKey, tab.id]);
 
   // Header histograms for every number, date and boolean column, following
   // the view's filters and search. The previous ones stay up while new ones load.
@@ -214,7 +239,7 @@ export function FileView({
 
   /** Copies the selected cells (shown columns, display names) as `format`. */
   const copySelection = useCallback(
-    async (format: CopyFormat) => {
+    async (format: CopyFormat, opts: { headers?: boolean } = {}) => {
       const sel = source && grid.current?.selected(MAX_COPY_ROWS);
       if (!source || !sel || sel.rows.length === 0 || sel.columns.length === 0) {
         notice("Select some cells, rows or columns to copy first");
@@ -239,7 +264,7 @@ export function FileView({
             format: source.columns[index.get(n)!]!,
           })),
           values,
-          { table: tableName(tab.title) },
+          { table: tableName(tab.title), headers: opts.headers },
         );
         await navigator.clipboard.writeText(text);
         notice(
@@ -271,9 +296,85 @@ export function FileView({
     }
   }, [baseId, readerSql, view, layout, notice]);
 
+  /** Opens the export dialog for the view (and the grid's selection). */
+  const showExport = useExport((s) => s.show);
+  const viewRows = tab.viewState?.dataset?.rowCount ?? tab.info?.dataset?.rowCount;
+  const openExport = useCallback(() => {
+    if (!baseId || viewRows === undefined) return;
+    showExport({
+      datasetId: baseId,
+      spec: { ...view, columns: visible(layout) },
+      labels: layout.labels,
+      title: tab.title,
+      rowCount: viewRows,
+      selection: grid.current?.selection() ?? null,
+    });
+  }, [baseId, viewRows, showExport, view, layout, tab.title]);
+  /**
+   * Puts the view in the SQL panel as a query over the file's table (fast:
+   * no re-reading of the file), ready to edit and run.
+   */
+  const sqlTable = useSql((s) => s.tables.find((t) => t.tabId === tab.id && !t.current)?.name);
+  const loadSql = useSql((s) => s.load);
+  const openViewInSql = useCallback(async () => {
+    if (!baseId || !sqlTable) return;
+    try {
+      const sql = await viewSql(
+        baseId,
+        { ...view, columns: visible(layout) },
+        quoteIdent(sqlTable),
+        layout.labels,
+      );
+      let text = sql;
+      try {
+        text = formatSql(sql);
+      } catch {
+        // Unformatted SQL runs just as well.
+      }
+      loadSql(text);
+    } catch (e) {
+      notice(`Couldn't open the view: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [baseId, sqlTable, view, layout, loadSql, notice]);
+
+  /** A cell's value as shown (null for NULL), from the loaded rows. */
+  const cellText = (column: string, row: number): string | null => {
+    const i = source?.columns.findIndex((c) => c.name === column) ?? -1;
+    const info = source?.columns[i];
+    if (!source || !info) return null;
+    const v = source.getValue(row, i);
+    return v === NOT_LOADED ? null : formatValue(v, info);
+  };
+  const cellActions = (column: string, row: number): CellMenuActions => {
+    const i = source?.columns.findIndex((c) => c.name === column) ?? -1;
+    const info = source?.columns[i];
+    const raw = source && i >= 0 ? source.getValue(row, i) : NOT_LOADED;
+    const write = (text: string, what: string) =>
+      void navigator.clipboard.writeText(text).then(
+        () => notice(`Copied ${what}`),
+        (e: unknown) => notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`),
+      );
+    const byValue = (exclude: boolean) =>
+      info && raw !== NOT_LOADED && onViewChange ? filterForValue(info, raw, exclude) : null;
+    const equals = byValue(false);
+    const notEquals = byValue(true);
+    return {
+      copy: (headers) => void copySelection("tsv", { headers }),
+      copyAs: (format) => void copySelection(format),
+      copyValue: () => write(cellText(column, row) ?? "", "the cell value"),
+      copyColumnName: () => write(column, `the column name "${column}"`),
+      filterEquals: equals ? () => setFilters([...filters, equals]) : undefined,
+      filterNotEquals: notEquals ? () => setFilters([...filters, notEquals]) : undefined,
+      sort: onViewChange ? (descending) => setSort([{ column, descending }]) : undefined,
+      profile: baseId ? () => showProfile(column) : undefined,
+      reload: onReload,
+    };
+  };
+
   const running = tab.viewState?.status === "running";
   const sorting = !!tab.viewState?.sorting;
   const importing = tab.import?.status === "running";
+  const canExport = tab.status === "ready" && !!baseId && viewRows !== undefined && !running;
   const commands = useMemo<Command[]>(() => {
     if (tab.status !== "ready" || !source) return [];
     const list: Command[] = [];
@@ -347,6 +448,24 @@ export function FileView({
         run: () => void copySelection(f.format),
       });
     }
+    if (canExport)
+      // eslint-disable-next-line react-hooks/refs -- reads the grid's selection when picked
+      add({
+        id: "export",
+        title: "Export view…",
+        group: "File",
+        shortcut: `${modKey}+E`,
+        keywords: "save csv parquet excel xlsx json download",
+        run: openExport,
+      });
+    if (baseId && sqlTable)
+      add({
+        id: "open-view-sql",
+        title: "Open view in SQL panel",
+        group: "SQL",
+        keywords: "query edit",
+        run: () => void openViewInSql(),
+      });
     if (baseId && readerSql)
       add({
         id: "copy-view-sql",
@@ -385,7 +504,7 @@ export function FileView({
           title: `Column profile: ${shown}`,
           group: "Columns",
           keywords: "statistics stats",
-          run: () => setProfiled(name),
+          run: () => showProfile(name),
         });
     }
     return list;
@@ -412,6 +531,10 @@ export function FileView({
     copySelection,
     copyViewSql,
     cancelView,
+    canExport,
+    openExport,
+    sqlTable,
+    openViewInSql,
   ]);
   useRegisterCommands("file", commands);
 
@@ -420,19 +543,25 @@ export function FileView({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "g" && source) {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      const key = e.key.toLowerCase();
+      // A click on the grid focuses it on the next frame; after it, or it
+      // takes the focus back from what the shortcut opens.
+      const afterGrid = (fn: () => void) => {
         e.preventDefault();
-        setGoToOpen(true);
-      }
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f" && searchInput.current) {
-        e.preventDefault();
-        searchInput.current.focus();
-        searchInput.current.select();
-      }
+        requestAnimationFrame(fn);
+      };
+      if (mod && key === "g" && source) afterGrid(() => setGoToOpen(true));
+      if (mod && key === "e" && canExport) afterGrid(openExport);
+      if (mod && key === "f" && searchInput.current)
+        afterGrid(() => {
+          searchInput.current?.focus();
+          searchInput.current?.select();
+        });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [source]);
+  }, [source, canExport, openExport]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -442,12 +571,33 @@ export function FileView({
         </span>
         {tab.info && (
           <span className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase">
-            {tab.info.format}
-            {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
-            {formatBytes(tab.info.sizeBytes)}
+            {tab.info.format === "sql" ? (
+              "SQL result"
+            ) : (
+              <>
+                {tab.info.format}
+                {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
+                {formatBytes(tab.info.sizeBytes)}
+              </>
+            )}
           </span>
         )}
         <div className="flex-1" />
+        {tab.status === "ready" && baseId && sqlTable && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void openViewInSql()}
+            title={`The view as a query over ${sqlTable}, to edit and run`}
+          >
+            <SquareTerminal className="size-3.5" aria-hidden /> Open in SQL
+          </Button>
+        )}
+        {canExport && (
+          <Button size="sm" variant="ghost" onClick={openExport} title={`Export (${modKey}+E)`}>
+            <Download className="size-3.5" aria-hidden /> Export
+          </Button>
+        )}
         {tab.info?.excel && (
           <ExcelSettings
             info={tab.info.excel}
@@ -520,7 +670,7 @@ export function FileView({
             onRename: () => setRenaming({ column: menu.column.name, anchor: menu.anchor }),
             onAutoFit: () => grid.current?.autoFit(menu.column.name),
           })}
-          onProfile={baseId ? () => setProfiled(menu.column.name) : undefined}
+          onProfile={baseId ? () => showProfile(menu.column.name) : undefined}
         />
       )}
       {renaming && onLayoutChange && (
@@ -579,24 +729,44 @@ export function FileView({
             sort={sort}
             highlight={tab.viewState?.dataset ? view.search : undefined}
             histograms={chartsWanted ? charts : undefined}
+            onCellMenu={(column, row, p) =>
+              setCellMenu({
+                column,
+                row,
+                anchor: rectAnchor({ x: p.x, y: p.y, width: 1, height: 1 }),
+              })
+            }
           />
+          {cellMenu && (
+            <CellMenu
+              anchor={cellMenu.anchor}
+              column={label(layout, cellMenu.column)}
+              valueText={cellText(cellMenu.column, cellMenu.row) ?? "null"}
+              onOpenChange={(o) => !o && setCellMenu(null)}
+              {...cellActions(cellMenu.column, cellMenu.row)}
+            />
+          )}
           <GoToRow
             open={goToOpen}
             onOpenChange={setGoToOpen}
             rowCount={source.rowCount}
             onGo={(row) => grid.current?.scrollToRow(row - 1)}
           />
-          {profiled && (
+          {profileOpen && !profiled && (
+            <ProfilePicker
+              columns={visible(layout).map((c) => ({ name: c, label: label(layout, c) }))}
+              onPick={showProfile}
+              onClose={() => setProfileOpen(false)}
+            />
+          )}
+          {profileOpen && profiled && (
             <ProfilePanel
               title={label(layout, profiled)}
               // The previous result stays on screen while the new one loads.
               profile={profile?.column === profiled ? profile.data : undefined}
               loading={profile?.key !== profileKey}
               error={profile?.key === profileKey ? profile.error : undefined}
-              onClose={() => {
-                setProfiled(null);
-                setProfile(null);
-              }}
+              onClose={() => setProfileOpen(false)}
             />
           )}
         </div>

@@ -38,8 +38,13 @@ fn app_rows(fx: &Fx, spec: &ViewSpec) -> Rows {
             &RequestKey::default(),
         )
         .unwrap();
+    text_rows(&out.batches)
+}
+
+/// Rows of all-text batches.
+fn text_rows(batches: &[arrow::record_batch::RecordBatch]) -> Rows {
     let mut rows = Vec::new();
-    for b in &out.batches {
+    for b in batches {
         for r in 0..b.num_rows() {
             rows.push(
                 (0..b.num_columns())
@@ -100,10 +105,9 @@ fn filter(column: &str, op: FilterOp, not: bool) -> Filter {
     }
 }
 
-#[test]
-fn copied_sql_reproduces_the_view() {
-    let fx = fx();
-    let specs = [
+/// Views with filters of every kind, search, sorts with ties, and columns.
+fn specs() -> Vec<ViewSpec> {
+    vec![
         ViewSpec::default(),
         ViewSpec {
             filters: vec![filter(
@@ -161,8 +165,13 @@ fn copied_sql_reproduces_the_view() {
             sort: vec![sort("joined", false)],
             ..ViewSpec::default()
         },
-    ];
-    for spec in &specs {
+    ]
+}
+
+#[test]
+fn copied_sql_reproduces_the_view() {
+    let fx = fx();
+    for spec in &specs() {
         let sql = standalone(&fx, spec, &HashMap::new());
         let (_, plain) = plain_rows(&sql);
         let app = app_rows(&fx, spec);
@@ -208,4 +217,42 @@ fn copied_sql_uses_display_names_and_reads_like_sql() {
     let (names, rows) = plain_rows(&sql);
     assert_eq!(names, ["Full \"name\"", "id"]);
     assert_eq!(rows.len(), 10);
+}
+
+#[test]
+fn view_sql_over_the_files_table_gives_the_view_in_the_sql_panel() {
+    let fx = fx();
+    fx.engine.register_table(&fx.dataset.id, "people").unwrap();
+    let key = RequestKey {
+        id: None,
+        group: Some("sql".into()),
+    };
+    for spec in &specs() {
+        // "Open view in SQL panel" reads the file's table, not the file.
+        let sql = fx
+            .engine
+            .view_sql(&fx.dataset.id, spec, "\"people\"", &HashMap::new())
+            .unwrap();
+        assert!(!sql.contains("read_csv"), "{sql}");
+        let ds = fx.engine.sql_result(&as_text(&sql), &key).unwrap();
+        let mut batches = Vec::new();
+        let mut start = 0;
+        while start < ds.row_count {
+            let bytes = fx
+                .engine
+                .fetch_rows(&ds.id, start, 500, &RequestKey::default())
+                .unwrap();
+            batches.extend(
+                arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(bytes), None)
+                    .unwrap()
+                    .map(|b| b.unwrap()),
+            );
+            start += 500;
+        }
+        assert_eq!(
+            text_rows(&batches),
+            app_rows(&fx, spec),
+            "rows differ for\n{sql}"
+        );
+    }
 }

@@ -315,3 +315,105 @@ Cancel (status bar or palette) abandons a view still being computed: the
 tab goes back to the rows on screen and the filters they were computed for.
 For a sort finishing in the background (D29) it drops the sort and keeps
 filters and search, since a half-written sort can't page its middle rows.
+
+## D32 — SQL panel: tables from step 1, one session connection, capped results
+
+The plan names tables for open files in step 2, but a SQL panel with nothing
+to query can't be used or tested, so step 1 already registers every tab with
+full data as a view in the in-memory main schema, named from its file
+("Sales 2024.csv.gz" → `sales_2024`, then `sales_2024_2`, …); step 2 adds
+renaming and `current_view`. A view over the dataset costs nothing and
+follows re-imports (`CREATE OR REPLACE`).
+
+The panel runs on one session connection of its own, so `CREATE TEMP TABLE`,
+`SET` and variables carry over between statements as in any SQL client; the
+grid and views keep their own connections. A newer panel query interrupts
+the running one before taking the session. Scripts are split into
+statements in the frontend (`;` outside strings, quoted names, `$$` and
+comments), run in order, and the last statement's rows are shown; DuckDB's
+`LINE n` + caret gives the error position, mapped back into the editor
+(selections included). Until results become pageable datasets (step 3) the
+panel shows the first 10,000 rows and says so.
+
+The dialect for highlighting and completion is CodeMirror's PostgreSQL,
+the closest it ships to DuckDB; formatting uses sql-formatter's DuckDB
+dialect.
+
+## D33 — Give DuckDB's cached pages back after imports and big views
+
+While a file imports (or a big sort is written), DuckDB uses memory up to
+its limit (50 % of RAM by default) and then keeps the pages cached; the
+process stayed at 1–1.5 GB after a large import on Windows. Once an import
+or a view write finishes, the engine lowers the memory limit for a moment
+and restores it, which makes DuckDB evict its unpinned pages (166 → 61 MiB
+after a 100 MB CSV here). The grid reads them back from the cache files on
+demand (operating-system file cache), at no visible cost. It only happens
+when nothing runs: every query, statement and import holds a shared "busy"
+guard, and the release only proceeds if it can take it exclusively without
+waiting. The limit itself stays configurable (`memoryLimitMb` in
+`settings.json`); memory use during an import is expected.
+
+## D34 — Layout toggles and the cell menu
+
+The left sidebar (Ctrl+B), the SQL panel (Ctrl+J) and the column-profile
+panel (Ctrl+Alt+B) have show/hide buttons at the top right of the window,
+like editors have; the choice is kept. The right panel asks for a column
+when none was profiled yet. Right-clicking a cell selects it (unless it is
+part of the selection) and opens a menu: copy (TSV like Ctrl+C), copy with
+headers, copy the cell value or the column name, copy as CSV/TSV/JSON/
+Markdown/SQL INSERT, keep or exclude rows with this value, sort, profile and
+reload the file (filters kept). The webview's own menu (reload, print,
+inspect) is turned off everywhere except in text fields, which keep
+cut/copy/paste.
+
+## D35 — SQL results are written once, on the session, into the scratch database
+
+A query in the SQL panel can read temp tables and variables of the panel's
+session (D32), which other connections can't see, so its rows can't be
+paged by re-running it elsewhere. The panel's last statement, when it is a
+query (SELECT, WITH, FROM, VALUES, TABLE, DESCRIBE, SHOW, SUMMARIZE, PIVOT),
+is written once on the session connection as
+`CREATE TABLE bv_scratch.main.r_<n> AS SELECT * FROM (<query>)` (DuckDB
+keeps the query's order) and becomes a dataset like a written-out view: the
+grid pages all of its rows, a tab can own it (filters, sort, profiles, copy,
+"Copy view as SQL" over the query), and it is a SQL table itself
+(`result_1`). Error positions are moved back one line to the user's text.
+Writing costs a little more than showing the first rows of a huge
+`SELECT *`, but every result behaves the same; other statements (EXPLAIN,
+PRAGMA, CREATE …) still show their rows as they come, up to 10,000. The
+panel drops its previous result when a new one replaces it, unless that
+result was opened in a tab.
+
+## D36 — Exports: DuckDB `COPY` for text and Parquet, rust_xlsxwriter for Excel
+
+CSV, CSV.gz, TSV, Parquet (zstd), JSON (one array) and NDJSON are written
+by DuckDB's own `COPY (<view>) TO …` on a raw connection: it streams in
+parallel, reports progress through the same progress bar as imports and
+stops on `duckdb_interrupt`. The view is the same SQL the grid pages (built
+from the ViewSpec with values inlined, since COPY takes no parameters),
+projected to the shown columns in display order under their display names
+(made unique: "total", "total (2)"). Excel files are written with
+rust_xlsxwriter in constant-memory mode from DuckDB's streamed Arrow
+batches (`stream_arrow`, read with `Statement::step` so an interrupt is an
+error, not a panic): numbers, booleans, dates and timestamps as typed
+cells (date serials with a date format), integers past 15 digits, values
+outside Excel's dates and NaN/infinity as text, text cut to Excel's 32,767
+characters. Past 1,048,575 data rows the user chooses more sheets (each
+with the header) or the first sheet only; the outcome says how many rows
+were left out. Every export goes to `<file>.partial` and is renamed when
+complete, so a cancel or an error never leaves half a file or replaces a
+good one. "Selected rows" are view positions (`row_number() OVER ()` over
+the view query, which keeps the order the grid pages; tested against the
+grid on a 300,000-row multi-threaded view, sorted and unsorted). The
+suggested name is `<file>-export.<ext>`, never the open file's own name.
+
+## D37 — "Open view in SQL panel" queries the file's table, not the file
+
+"Copy view as SQL" must run anywhere, so it reads the file itself
+(`read_csv('…')`). Inside the app the same SQL is rendered over the tab's
+SQL table instead (`FROM "sales"`, D32), so editing and running it
+reads the imported data, not a 5 GB file again; it is formatted and put in
+the editor as one undoable change (Ctrl+Z brings the old text back). It is
+not run by itself: a big view written as a result costs time the user
+didn't ask for yet. Tested to give exactly the view's rows through the
+panel's own path (`sql_result`).

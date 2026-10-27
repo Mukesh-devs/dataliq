@@ -5,9 +5,11 @@ pub mod cli;
 pub mod commands;
 pub mod engine;
 pub mod error;
+pub mod export;
 pub mod import;
 pub mod settings;
 pub mod sources;
+pub mod sql;
 pub mod view;
 
 mod logging;
@@ -86,6 +88,10 @@ pub fn run() {
                 imports: import::Imports::default(),
                 temp_dir,
             }));
+            app.manage(Arc::new(sql::library::SqlLibrary::new(
+                paths.app_data_dir()?,
+            )));
+            app.manage(Arc::new(export::Exports::default()));
             app.manage(settings);
             Ok(())
         })
@@ -107,7 +113,18 @@ pub fn run() {
             commands::view::column_values,
             commands::view::column_profile,
             commands::view::column_histograms,
-            commands::view::view_sql
+            commands::view::view_sql,
+            commands::sql::register_table,
+            commands::sql::unregister_table,
+            commands::sql::sql_result,
+            commands::sql::sql_history,
+            commands::sql::add_sql_history,
+            commands::sql::clear_sql_history,
+            commands::sql::saved_queries,
+            commands::sql::save_query,
+            commands::sql::delete_saved_query,
+            commands::export::export_view,
+            commands::export::cancel_export
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

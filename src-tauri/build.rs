@@ -21,6 +21,17 @@ fn main() {
             "column_profile",
             "column_histograms",
             "view_sql",
+            "register_table",
+            "unregister_table",
+            "sql_result",
+            "sql_history",
+            "add_sql_history",
+            "clear_sql_history",
+            "saved_queries",
+            "save_query",
+            "delete_saved_query",
+            "export_view",
+            "cancel_export",
         ]),
     ))
     .expect("failed to run tauri-build");

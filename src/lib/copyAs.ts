@@ -27,8 +27,13 @@ function field(s: string, delimiter: string): string {
   return s.includes(delimiter) || /["\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-function delimited(columns: CopyColumn[], rows: unknown[][], delimiter: string): string {
-  const lines = [columns.map((c) => field(c.label, delimiter)).join(delimiter)];
+function delimited(
+  columns: CopyColumn[],
+  rows: unknown[][],
+  delimiter: string,
+  headers: boolean,
+): string {
+  const lines = headers ? [columns.map((c) => field(c.label, delimiter)).join(delimiter)] : [];
   for (const row of rows) {
     lines.push(columns.map((c, i) => field(text(row[i], c) ?? "", delimiter)).join(delimiter));
   }
@@ -133,19 +138,22 @@ function sqlInsert(columns: CopyColumn[], rows: unknown[][], table: string): str
 
 /**
  * Formats rows (raw values, one per column) for the clipboard. CSV, TSV and
- * Markdown include a header row of display names.
+ * Markdown include a header row of display names (`headers: false` leaves
+ * it out of CSV and TSV, like Ctrl+C).
  */
 export function formatRows(
   format: CopyFormat,
   columns: CopyColumn[],
   rows: unknown[][],
-  opts: { table?: string } = {},
+  opts: { table?: string; headers?: boolean } = {},
 ): string {
+  // Markdown needs its header row; JSON and SQL name columns anyway.
+  const headers = opts.headers ?? true;
   switch (format) {
     case "csv":
-      return delimited(columns, rows, ",");
+      return delimited(columns, rows, ",", headers);
     case "tsv":
-      return delimited(columns, rows, "\t");
+      return delimited(columns, rows, "\t", headers);
     case "markdown":
       return markdown(columns, rows);
     case "json":

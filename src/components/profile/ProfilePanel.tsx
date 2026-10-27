@@ -142,3 +142,42 @@ export function ProfilePanel({ title, profile, loading, error, onClose }: Profil
     </aside>
   );
 }
+
+/** The right panel before a column is chosen: pick one to profile. */
+export function ProfilePicker({
+  columns,
+  onPick,
+  onClose,
+}: {
+  columns: { name: string; label: string }[];
+  onPick: (column: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <aside
+      aria-label="Column profile"
+      className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border bg-surface text-[12px]"
+    >
+      <header className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <h2 className="flex-1 text-[13px] font-semibold text-fg">Column profile</h2>
+        <IconButton label="Close profile" onClick={onClose} className="size-6">
+          <X className="size-3.5" aria-hidden />
+        </IconButton>
+      </header>
+      <p className="px-3 pt-2 text-fg-muted">Choose a column:</p>
+      <ul className="flex flex-col p-1">
+        {columns.map((c) => (
+          <li key={c.name}>
+            <button
+              type="button"
+              onClick={() => onPick(c.name)}
+              className="w-full truncate rounded-[var(--radius)] px-2 py-1 text-left text-fg hover:bg-hover"
+            >
+              {c.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}

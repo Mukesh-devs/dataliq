@@ -14,6 +14,7 @@ import {
   type SourceInfo,
 } from "../lib/files";
 import { cancelQuery } from "../lib/ipc";
+import { describeColumns } from "../lib/arrow";
 import type { ColumnLayout } from "../lib/layout";
 import { isIdentity, openView, type ViewReady, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
@@ -75,6 +76,8 @@ export interface Tab {
   viewState?: ViewState;
   /** Column order, hidden and pinned columns, names and widths. */
   layout?: ColumnLayout;
+  /** Table name chosen for the SQL panel (else one made from the file name). */
+  sqlName?: string;
 }
 
 interface TabsState {
@@ -89,6 +92,11 @@ interface TabsState {
   cycle: (step: 1 | -1) => void;
   /** Re-opens a tab's file with new import settings. */
   reopen: (id: string, options: OpenOptions) => Promise<void>;
+  /**
+   * Reads the file again (e.g. it changed on disk), keeping the tab's
+   * filters, sort and column layout. An unchanged file reopens from the cache.
+   */
+  reload: (id: string) => Promise<void>;
   cancelImport: (id: string) => Promise<void>;
   /** Reads the file directly instead of importing (e.g. low disk space). */
   readDirect: (id: string) => Promise<void>;
@@ -106,11 +114,19 @@ interface TabsState {
   /** Applies a `view-ready` event (subscribed once by the App). */
   applyViewReady: (ready: ViewReady) => void;
   setLayout: (id: string, layout: ColumnLayout) => void;
+  /**
+   * Opens a SQL result in a new tab (filters, sort, profiles, export as for
+   * a file). The tab owns the dataset from then on. Returns the tab id.
+   */
+  openResult: (result: { dataset: DatasetInfo; preview: Table; sql: string }) => string;
+  /** Renames the tab's SQL table; undefined goes back to the file's name. */
+  setSqlName: (id: string, name: string | undefined) => void;
 }
 
 let nextId = 1;
 let nextJob = 1;
 let nextView = 1;
+let nextResult = 1;
 
 export const useTabs = create<TabsState>()((set, get) => {
   const patch = (id: string, changes: Partial<Tab>) =>
@@ -227,6 +243,8 @@ export const useTabs = create<TabsState>()((set, get) => {
       if (!current || current.options !== options) return; // superseded or closed
       patch(id, { status: "ready", info, preview, previewMs: performance.now() - started });
       if (!info.dataset) void startImport(id, path, options);
+      // Data available at once (Parquet in place): a kept view applies now.
+      else if (find(id)?.view) void applyView(id);
     } catch (err) {
       const current = find(id);
       if (!current || current.options !== options) return;
@@ -290,6 +308,17 @@ export const useTabs = create<TabsState>()((set, get) => {
       });
       await load(id, tab.path, options);
     },
+    reload: async (id) => {
+      const tab = find(id);
+      if (!tab) return;
+      release(tab);
+      patch(id, {
+        info: tab.info ? { ...tab.info, dataset: null } : tab.info,
+        viewState: tab.view ? { status: "waiting", requestId: "" } : undefined,
+      });
+      // A new options object: `load` tells a newer load by identity.
+      await load(id, tab.path, { ...tab.options });
+    },
     cancelImport: async (id) => {
       const job = find(id)?.import;
       if (job?.status === "running") await cancelImport(job.jobId);
@@ -335,6 +364,29 @@ export const useTabs = create<TabsState>()((set, get) => {
         ),
       })),
     setLayout: (id, layout) => patch(id, { layout }),
+    setSqlName: (id, sqlName) => patch(id, { sqlName }),
+    openResult: ({ dataset, preview, sql }) => {
+      const id = `tab-${nextId++}`;
+      const title = `Result ${nextResult++}`;
+      const info: SourceInfo = {
+        path: "",
+        fileName: title,
+        sizeBytes: 0,
+        format: "sql",
+        compression: "none",
+        sniffed: null,
+        excel: null,
+        columns: describeColumns(preview).map((c) => ({ name: c.name, type: c.type })),
+        // "Copy view as SQL" reads from the query itself.
+        readerSql: `(\n${sql}\n)`,
+        dataset,
+      };
+      set((s) => ({
+        tabs: [...s.tabs, { id, title, path: "", options: {}, status: "ready", info, preview }],
+        activeId: id,
+      }));
+      return id;
+    },
     setView: async (id, view) => {
       if (!find(id)) return;
       patch(id, { view: isIdentity(view) ? undefined : view });

@@ -376,3 +376,179 @@ tested, and anything left over.
   fresh DuckDB and compare every value, order of ties included.
 - Left over: the full 50M-row sort stays over 10 s on 4 cores (D29) and goes to the v1.0
   performance pass with the per-OS budgets.
+
+## v0.3 — SQL and Export
+
+### Step 1 — SQL panel ✅
+
+- Bottom panel (Ctrl+J, palette "Show SQL panel"), resizable by its top edge, kept open/closed,
+  height and text across restarts. CodeMirror 6: SQL highlighting with theme colours, line
+  numbers, bracket matching, history, completion of keywords, table names and their columns.
+- Every tab with full data is a table named from its file (`people.csv` → `people`, duplicates
+  `_2`, …), registered as a view and dropped when the tab closes (D32).
+- Run (Ctrl+Enter or the Run button) runs the selection, or everything; scripts are split into
+  statements and run in order on the panel's own session connection (temp tables, `SET` and
+  variables last), the last statement's rows shown in the grid (first 10,000 until step 3),
+  with row count and time. Cancel while running. Format (sql-formatter, DuckDB dialect).
+- Errors in plain words without DuckDB's `LINE` block; the position is underlined in the editor.
+- Tested: Rust — tables by name (quoting, re-registering, joins, Parquet in place with a quote in
+  the path), the session keeping temp tables/variables but not leaking them, a newer query
+  cancelling the running one; Vitest — statement splitting, error positions (also shortened long
+  lines), table names, the store's run/cancel rules, table sync; Playwright — autocomplete and
+  Ctrl+Enter, format, error marking across statements, running a selection from the palette.
+- Smoke (real app, people.csv): `SELECT city, count(*) AS n, round(avg(amount), 2) … GROUP BY 1`
+  → 7 rows in 17 ms; `SELECT nope FROM people` → the binder error with "nope" underlined;
+  `CREATE TEMP TABLE hi AS … WHERE amount > 900; SELECT count(*), min(amount) FROM hi` → 104,
+  900.05 ("2 statements").
+- Fixed on the way (CI-style run caught it): a request that runs several statements under one id
+  (`open_view`) could, with its later statements, cancel a newer request of the same group. The
+  registry now remembers each group's newest request and the ones it replaced; a replaced
+  request's later statements start out cancelled. Unit test reproduces the old behaviour.
+- Left over: none.
+
+### Fixes from testing on Windows (after step 1)
+
+- Grid empty after switching back to a tab until a sort/filter: a page could arrive before the
+  grid reported what is on screen, and was never drawn. Now the grid redraws once it knows.
+- Changing the theme recoloured everything but the grid until a tab switch: the canvas read the
+  CSS colours before the new theme was applied. It now waits for the applied theme (also for
+  density). Playwright reads a grid pixel before and after switching to dark.
+- Panel toggles at the top right: sidebar (Ctrl+B), SQL panel (Ctrl+J), column profile
+  (Ctrl+Alt+B), kept across restarts; the profile panel offers a column list when empty (D34).
+- Right-click a cell: copy, copy with headers, copy value / column name, copy as …, only rows
+  with this value / exclude it, sort, column profile, reload file (keeps filters). The webview's
+  default menu is off outside text fields (D34).
+- Memory: after an import or a big view is written, DuckDB's cached pages are handed back
+  (D33); 166 → 61 MiB after a 100 MB CSV (`perf_memory_after_import`). Memory use while an
+  import runs is DuckDB working within its limit (50 % of RAM, `memoryLimitMb` to change).
+- Tested: Playwright for the toggles, the cell menu (copy with headers, filter by value, reload
+  keeping the filter), the context-menu suppression and the theme pixel check (fails on the old
+  code); Rust for releasing memory (limit restored, skipped while busy); Vitest for value filters.
+
+### Step 2 — Tables for every file ✅
+
+- Each tab with full data is a table named from its file; a chosen name wins and file names
+  move out of its way (`people`, `people_2`, …, compared ignoring case as SQL does).
+- `current_view` is the active tab's rows on screen: its view dataset (filters, search, sort)
+  or the whole file; re-pointed when the view or the active tab changes, dropped with no tab.
+- The SQL panel lists the tables as chips above the editor: a click types the name at the
+  cursor, the pencil renames a file's table (letters, digits, `_`; unique; not `current_view`;
+  Reset goes back to the file's name). The old name is dropped, the new one registered.
+- Tested: Rust — `current_view` over a filtered + sorted view before and after it is written out
+  (same rows, sorted top row); Vitest — chosen names and collisions, name checks, `current_view`
+  following the view and the active tab, renames re-registering; Playwright — rename with
+  invalid names rejected, `current_view` re-pointed after a sort, chips typing names.
+- Smoke (real app, people.csv): palette "sort by amount desc", then `SELECT name, amount FROM
+  current_view LIMIT 3` → 998.5, 998.18, 996.77 (the grid's top rows), 15 ms.
+- Left over: names are kept for the session (workspaces in v0.6 will save them).
+
+### Step 3 — Results ✅
+
+- `sql_result`: the panel's last statement, when it is a query, is written once on the session
+  into the scratch database and becomes a pageable dataset (D35); the grid pages all its rows
+  (no more 10,000 cap for queries) and the status shows the full row count.
+- "Open in tab": the result becomes a tab ("Result 1", "SQL result") with everything a file tab
+  has — filters, sort, search, column profiles, copy as …, copy view as SQL over the query — and
+  is a SQL table (`result_1`) for further queries. The panel's next run keeps it.
+- Error positions of wrapped queries point at the user's text (line moved back, caret kept).
+- Tested: Rust — SQL over CSV (people), Excel (orders sheet), JSON (accounts) and Parquet
+  (in place), a CSV × Parquet join (count and sum checked against the parsed file), results
+  paging in the query's order (ties broken by id), closing dropping the rows, session temp tables
+  visible to results, error lines; Vitest — query detection, store runs (dataset for the final
+  query, earlier statements fetch one row, previous result closed unless owned); Playwright —
+  open in tab, status, result as a table, next run keeping the tab's rows, sorting the result.
+- Smoke (real app, people.csv): `SELECT city, count(*) AS n FROM people GROUP BY 1 ORDER BY n
+  DESC` → 7 rows in 22 ms; "Open in tab" → "Result 1" tab with its own columns, header
+  histograms and "7 rows · SQL result".
+- Left over: none.
+
+### Step 4 — History and saved queries ✅
+
+- Every finished run of the SQL panel is remembered (newest first, the same SQL moved to the
+  top instead of copied, at most 500): when, how long, how many rows or that it failed.
+  "History" in the panel (or the palette "SQL history…") lists and searches them; a click puts
+  the query back in the editor (undoable); Clear empties the list. Cancelled runs are not kept.
+- "Saved" (palette "Saved queries…"): name the current query (or the selection) to keep it;
+  the same name in any case replaces it; a click loads it; the bin deletes it.
+- Both are JSON files in the app data directory (`sql-history.json`, `sql-saved.json`), written
+  whole (temporary file + rename); a broken file is set aside as `.broken`, never overwritten.
+- Tested: Rust — order, de-duplication, search, limit, the 500 cap, persistence across a new
+  library over the same files, saved names (case, empty name or SQL rejected, delete), broken
+  files kept aside; Vitest — time-ago and first-line helpers, the store recording successes and
+  errors but not cancels; Playwright — history with outcomes, search, load; save, load from the
+  palette, delete.
+- Smoke (real app): ran `SELECT count(*) AS adults FROM people WHERE amount > 100`, quit, started
+  again; the palette's "SQL history…" listed it ("just now · 1 row · 29 ms") from
+  `sql-history.json` in the app data directory.
+- Left over: none.
+
+### Step 5 — Export everything ✅
+
+- Export the current view (filters, search, sort, shown columns in display order under their
+  display names) or a SQL result to CSV, CSV.gz, TSV, Parquet (zstd), JSON (one array), NDJSON
+  and Excel (D36). Open it with Ctrl+E, the palette ("Export view…"), the Export button in the
+  file toolbar, or Export in the SQL panel.
+- Options: header row, delimiter, quote every value, date and timestamp formats (strftime), the
+  whole view or only the grid's selection (rows and columns); the format and options are
+  remembered. Excel past 1,048,575 rows warns and offers more sheets or the first sheet only.
+- Progress ("Exporting x.parquet… 42%") and "Cancel export" in the status bar; the outcome as a
+  notice ("Exported 1,000 rows to people-export.xlsx in 14 ms"). Files are written as
+  `.partial` and renamed when complete; a cancel or an error leaves nothing behind.
+- Excel cells are typed: numbers, booleans, dates and timestamps (with date formats); integers
+  past 15 digits, dates Excel can't hold and NaN as text; text cut at 32,767 characters; rows
+  streamed from DuckDB into constant-memory sheets.
+- Tested: Rust — every format round-trips a filtered, sorted view with a hidden, a reordered and
+  a renamed column (re-opened as the app opens files, compared row by row with rows computed
+  from the parsed CSV); selected rows and CSV options (no header, `;`, quote all, `%d/%m/%Y`);
+  selected rows equal the grid's pages on a 300,000-row view, sorted and unsorted; cancel of a
+  30M-row CSV and Excel export stops in ~1 ms and leaves no file; missing folder in words;
+  Excel sheet splitting, typed cells and edge values (read back with calamine). Vitest — range
+  merging, suggested names, the dialog (options, selection, save dialog cancelled, Excel
+  warning, failures and cancels in words). Playwright — sorted view without a hidden column to
+  Parquet with progress; a selection to CSV from the toolbar, then cancelled.
+- Smoke (real app, people.csv): sorted by amount ↓, hid `city`, Export → Excel → GTK save
+  dialog → "Exported 1,000 rows to people-export.xlsx in 14 ms"; openpyxl read 1,000 rows plus a
+  bold header in view order, five columns, real dates, NULL as empty. SQL panel
+  `SELECT count(*) AS adults …` → Export → JSON → `[{"adults":797}]`.
+- Left over: none.
+
+### Step 6 — Copy view as SQL / Open view in SQL panel ✅
+
+- "Copy view as SQL" (v0.2, D31) stays as it was: standalone SQL over the file that runs in
+  plain DuckDB.
+- New: "Open in SQL" in the file toolbar and "Open view in SQL panel" in the palette put the view
+  (filters, search, sort, shown columns under their display names) in the SQL panel as formatted
+  SQL over the tab's SQL table (`FROM "people"`), so running it reads the imported data, not the
+  file again (D37). It replaces the editor's text as one undoable change and opens the panel if
+  it was closed; it doesn't run by itself.
+- Fixed on the way: the SQL editor is created before its handle is given out, so text can go in
+  the moment the panel opens (it was silently dropped before).
+- Tested: Rust — for five views (filters of every kind, search, sorts with ties, chosen columns)
+  the SQL over the registered table, run as the panel runs it (`sql_result`, paged), gives
+  exactly the view's rows; Vitest — loading text with the panel open and closed (once, when the
+  editor mounts); Playwright — sort, Open in SQL with the panel closed, formatted query over
+  `"comma"`, the spec sent, undo restoring the old text, the palette command; "view as sql" in
+  the palette still finds Copy view as SQL first.
+- Smoke (real app, people.csv): sorted by amount ↓ and searched "Paris" (167 of 1,000 rows);
+  Open in SQL → formatted query; Ctrl+Enter → "167 rows in 22 ms", same rows in the same order
+  as the grid; Ctrl+Z brought back the earlier query.
+- Left over: none.
+
+### v0.3.0 release ✅
+
+- Version test list: all Rust unit + integration tests (incl. the export round trips for every
+  format, selected rows against the grid's pages, cancel, and the view's SQL over its table),
+  Vitest (196), Playwright flows (SQL panel, tables, results, history, export, open in SQL),
+  Tauri debug build; on demand: `perf_export_50m`, `bench_small`.
+- Measured (docs/BENCHMARKS.md): on 50M rows Parquet export 7.6 s, CSV 23.9 s, sorted Parquet
+  12.7 s; Excel 1M rows 14.7 s with flat memory; SQL `GROUP BY` 0.19 s (8 groups) / 1.44 s
+  (100K groups); a 50M-row result 11.5 s to write, then pages in 12 ms. The small suite is
+  unchanged from v0.2.0 on the same machine.
+- Done criteria: every format can be queried with SQL (tests over CSV, Excel, JSON, Parquet and
+  a CSV × Parquet join); every view or result exports correctly in every format (round trips).
+- Fixed while getting CI green: a shortcut pressed right after a click on the grid (Ctrl+F,
+  Ctrl+G, Ctrl+E) lost its focus to the grid, which focuses itself on the next frame; the
+  shortcuts now act after that frame (a test slows every frame to make the race certain). A
+  copy test read the clipboard before the copy landed.
+- Left over: CSV.gz export is bound by DuckDB's single-threaded gzip (~14 MB/s of CSV); a
+  parallel gzip goes to the v1.0 performance pass.

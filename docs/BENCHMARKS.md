@@ -52,6 +52,9 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Simple filter on 50M rows (first rows + count) | < 2 s | 0.06–0.79 s | v0.2 step 3 |
 | Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
 | Column stats on 50M rows | < 3 s | 0.44–2.78 s per column | v0.2 step 6 |
+| Export 50M rows to Parquet / CSV | — (report) | 7.6 s / 23.9 s | v0.3.0 |
+| Export 1M rows to Excel | — (report) | 14.7 s, peak memory +2 MiB | v0.3.0 |
+| SQL aggregate over 50M rows | — (report) | 0.19 s (8 groups), 1.44 s (100K groups) | v0.3.0 |
 
 Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
@@ -210,3 +213,68 @@ typed column and casting only the kept rows to text took `order_ts` from 7.5 s t
 near-unique column builds a 39M-entry hash table either way, but of 8-byte keys instead of
 strings). The header histograms read every column's range in one scan, then one scan per number
 or date column; they load behind the grid and are cancelled by the next view change.
+
+## v0.3 — exports and SQL on 50M cached rows (linux-dev)
+
+`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_export -- --ignored --nocapture
+--test-threads=1` (dev profile, warm cache): the same 50M rows (9 columns) as v0.2, exported
+through `export::export` exactly as the app does (view query, `.partial` file and rename).
+"Peak" is the growth of the process's peak memory during that export.
+
+| Export | Rows | Time | Rows/s | File | Peak |
+| --- | --- | --- | --- | --- | --- |
+| Parquet (zstd), all rows | 50,000,000 | 7.6 s | 6.6M | 833 MB | +2.5 GiB |
+| CSV, all rows | 50,000,000 | 23.9 s | 2.1M | 4,158 MB | +0.9 GiB |
+| Parquet, sorted by `unit_price`, 4 columns | 50,000,000 | 12.7 s | 3.9M | 391 MB | +2.7 GiB |
+| TSV, `quantity <= 2` | 4,998,023 | 1.2 s | 4.3M | 419 MB | +185 MiB |
+| NDJSON, `quantity <= 2` | 4,998,023 | 1.8 s | 2.8M | 979 MB | +258 MiB |
+| CSV.gz, `quantity <= 2` | 4,998,023 | 30.5 s | 0.16M | 111 MB | +810 MiB |
+| JSON (array), `quantity = 1` | 2,500,387 | 1.0 s | 2.5M | 498 MB | +8 MiB |
+| Excel, one full sheet | 1,048,575 | 14.7 s | 71K | 58 MB | +2 MiB |
+| Excel, split into 3 sheets | 2,500,387 | 32.6 s | 77K | 138 MB | +64 MiB |
+
+- **Excel** is written in constant-memory mode: memory stays flat however many rows (the
+  rows stream from DuckDB batch by batch). It is the slowest format (one thread writing XML
+  cells, ~75K rows/s); 1M rows take about 15 s.
+- **CSV.gz** is bound by DuckDB's gzip writer, which runs on one thread (~14 MB/s of CSV). For
+  big compressed exports Parquet is ~40× faster and smaller; a parallel gzip is a candidate
+  for the v1.0 performance pass.
+- **Parquet and sorted exports** use most memory (DuckDB buffers row groups and the sort), all
+  within DuckDB's memory limit (50 % of RAM by default), spilling to disk past it.
+- **Cold cache**: the first export after the 815 MB cache file had not been read for a day took
+  79 s instead of 7.6 s — reading it from this container's virtual disk at ~12 MB/s. On a
+  local SSD the first run costs about the time to read the file once.
+
+SQL on the same rows, through the SQL panel's path (`sql_result`: the query is written once
+into the scratch database, then paged):
+
+| Query | Result rows | Time | First page |
+| --- | --- | --- | --- |
+| `GROUP BY country` with count and sum (8 groups) | 8 | 0.19 s | 2 ms |
+| `GROUP BY customer` with count and avg (100K groups) | 100,000 | 1.44 s | 2 ms |
+| filter + `ORDER BY unit_price DESC LIMIT 100` | 100 | 0.31 s | 6 ms |
+| `SELECT * FROM sales` (every row as a result) | 50,000,000 | 11.5 s | 12 ms |
+
+A query returning all 50M rows is written out before it shows (11.5 s here), so every row then
+pages in milliseconds; queries that aggregate or limit, the usual case, are fast (D35).
+
+### Small suite at v0.3.0 (linux-dev)
+
+`pnpm bench`, best of 5 runs, next to the v0.2.0 numbers recorded on the same machine. The
+local guard compares against the CI runner's baseline (`bench/baseline/linux.json`) and flags
+the Excel flows (+34–40 %), but against this machine's own v0.2.0 run they are unchanged; the
+CI guard on the tag is the one that counts (D26).
+
+| Flow | v0.2.0 | v0.3.0 |
+| --- | --- | --- |
+| first_rows_100mb_csv | 297 ms | 257 ms |
+| first_rows_100mb_csv_gz | 1,255 ms | 1,245 ms |
+| first_rows_100mb_ndjson_gz | 366 ms | 368 ms |
+| first_rows_100k_xlsx | 72 ms | 69 ms |
+| import_100mb_csv | 1,581 ms | 1,614 ms |
+| import_100mb_csv_gz | 3,292 ms | 3,489 ms |
+| import_100mb_ndjson_gz | 2,756 ms | 2,744 ms |
+| import_100k_xlsx | 1,981 ms | 1,957 ms |
+| reopen_cached_100mb_csv | 1.3 ms | 1.5 ms |
+| page_1m_parquet | 12.9 ms | 11.9 ms |
+

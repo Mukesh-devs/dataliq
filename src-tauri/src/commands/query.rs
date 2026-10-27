@@ -18,6 +18,9 @@ pub struct QueryOptions {
     pub max_rows: Option<usize>,
     pub request_id: Option<String>,
     pub group: Option<String>,
+    /// Run on the SQL panel's session connection (temp tables and `SET`
+    /// carry over between statements). No parameters.
+    pub session: bool,
 }
 
 /// Runs SQL and returns the result as raw Arrow IPC stream bytes.
@@ -35,7 +38,11 @@ pub async fn run_query(
         group: opts.group,
     };
     let bytes = tauri::async_runtime::spawn_blocking(move || {
-        engine.query_ipc(&sql, &opts.params, max_rows, &key)
+        if opts.session {
+            engine.query_ipc_session(&sql, max_rows, &key)
+        } else {
+            engine.query_ipc(&sql, &opts.params, max_rows, &key)
+        }
     })
     .await
     .map_err(|e| AppError::Internal(format!("query task failed: {e}")))??;

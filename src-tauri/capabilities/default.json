@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "allow-run-query",
     "allow-cancel-query",
     "allow-fetch-rows",
@@ -25,6 +26,17 @@
     "allow-column-values",
     "allow-column-profile",
     "allow-column-histograms",
-    "allow-view-sql"
+    "allow-view-sql",
+    "allow-register-table",
+    "allow-unregister-table",
+    "allow-sql-result",
+    "allow-sql-history",
+    "allow-add-sql-history",
+    "allow-clear-sql-history",
+    "allow-saved-queries",
+    "allow-save-query",
+    "allow-delete-saved-query",
+    "allow-export-view",
+    "allow-cancel-export"
   ]
 }

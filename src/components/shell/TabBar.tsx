@@ -1,4 +1,14 @@
-import { Command, LoaderCircle, Plus, Search, Table2, X } from "lucide-react";
+import {
+  Command,
+  LoaderCircle,
+  PanelBottom,
+  PanelLeft,
+  PanelRight,
+  Plus,
+  Search,
+  Table2,
+  X,
+} from "lucide-react";
 import { cn } from "../../lib/cn";
 import { modKey } from "../../lib/platform";
 import type { Tab } from "../../stores/tabs";
@@ -11,9 +21,27 @@ interface TabBarProps {
   onClose: (id: string) => void;
   onOpen: () => void;
   onCommands?: () => void;
+  /** Which panels are shown, and toggling them (top right of the window). */
+  panels?: { left: boolean; right: boolean; bottom: boolean };
+  onTogglePanel?: (panel: "left" | "right" | "bottom") => void;
 }
 
-export function TabBar({ tabs, activeId, onSelect, onClose, onOpen, onCommands }: TabBarProps) {
+const PANELS = [
+  { id: "left", icon: PanelLeft, name: "sidebar", key: "Ctrl+B" },
+  { id: "bottom", icon: PanelBottom, name: "SQL panel", key: "Ctrl+J" },
+  { id: "right", icon: PanelRight, name: "column profile", key: "Ctrl+Alt+B" },
+] as const;
+
+export function TabBar({
+  tabs,
+  activeId,
+  onSelect,
+  onClose,
+  onOpen,
+  onCommands,
+  panels,
+  onTogglePanel,
+}: TabBarProps) {
   return (
     <header className="flex h-[var(--chrome-height)] shrink-0 items-center gap-1 border-b border-border bg-surface pr-2 pl-2">
       <div role="tablist" aria-label="Open files" className="flex min-w-0 items-center gap-0.5">
@@ -76,6 +104,24 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onOpen, onCommands }
           {modKey === "⌘" ? <Command className="size-3" aria-hidden /> : "Ctrl+"}K
         </span>
       </button>
+      {panels && onTogglePanel && (
+        <div className="ml-1 flex items-center" role="group" aria-label="Panels">
+          {PANELS.map(({ id, icon: Icon, name, key }) => {
+            const on = panels[id];
+            return (
+              <IconButton
+                key={id}
+                label={`${on ? "Hide" : "Show"} ${name} (${key.replace("Ctrl", modKey)})`}
+                aria-pressed={on}
+                onClick={() => onTogglePanel(id)}
+                className={on ? "text-fg" : "text-fg-subtle"}
+              >
+                <Icon className="size-4" aria-hidden />
+              </IconButton>
+            );
+          })}
+        </div>
+      )}
     </header>
   );
 }
