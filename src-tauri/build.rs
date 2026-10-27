@@ -21,6 +21,8 @@ fn main() {
             "column_profile",
             "column_histograms",
             "view_sql",
+            "register_table",
+            "unregister_table",
         ]),
     ))
     .expect("failed to run tauri-build");

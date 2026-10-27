@@ -315,3 +315,26 @@ Cancel (status bar or palette) abandons a view still being computed: the
 tab goes back to the rows on screen and the filters they were computed for.
 For a sort finishing in the background (D29) it drops the sort and keeps
 filters and search, since a half-written sort can't page its middle rows.
+
+## D32 — SQL panel: tables from step 1, one session connection, capped results
+
+The plan names tables for open files in step 2, but a SQL panel with nothing
+to query can't be used or tested, so step 1 already registers every tab with
+full data as a view in the in-memory main schema, named from its file
+("Sales 2024.csv.gz" → `sales_2024`, then `sales_2024_2`, …); step 2 adds
+renaming and `current_view`. A view over the dataset costs nothing and
+follows re-imports (`CREATE OR REPLACE`).
+
+The panel runs on one session connection of its own, so `CREATE TEMP TABLE`,
+`SET` and variables carry over between statements as in any SQL client; the
+grid and views keep their own connections. A newer panel query interrupts
+the running one before taking the session. Scripts are split into
+statements in the frontend (`;` outside strings, quoted names, `$$` and
+comments), run in order, and the last statement's rows are shown; DuckDB's
+`LINE n` + caret gives the error position, mapped back into the editor
+(selections included). Until results become pageable datasets (step 3) the
+panel shows the first 10,000 rows and says so.
+
+The dialect for highlighting and completion is CodeMirror's PostgreSQL,
+the closest it ships to DuckDB; formatting uses sql-formatter's DuckDB
+dialect.

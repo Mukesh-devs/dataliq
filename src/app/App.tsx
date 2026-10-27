@@ -1,6 +1,7 @@
 import { FileUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CommandPalette } from "../components/palette/CommandPalette";
+import { SqlPanel } from "../components/sql/SqlPanel";
 import { EmptyState } from "../components/shell/EmptyState";
 import { FileView } from "../components/shell/FileView";
 import { Sidebar } from "../components/shell/Sidebar";
@@ -19,12 +20,15 @@ import { modKey } from "../lib/platform";
 import { onViewReady } from "../lib/view";
 import { useApp } from "../stores/app";
 import { useRegisterCommands, type Command } from "../stores/commands";
+import { useNotice } from "../stores/notice";
 import { useSettings, type ThemePreference } from "../stores/settings";
+import { useSql } from "../stores/sql";
 import { useEngine } from "../stores/engine";
 import { useRecent } from "../stores/recent";
 import { useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
+import { useSqlTables } from "./useSqlTables";
 
 /** "filtered", "sorted" or "filtered and sorted", for the status bar. */
 function viewVerb(tab: Tab): { ed: string; ing: string } {
@@ -97,6 +101,12 @@ export function App() {
   const setTheme = useSettings((s) => s.setTheme);
   const headerCharts = useSettings((s) => s.headerCharts);
   const setHeaderCharts = useSettings((s) => s.setHeaderCharts);
+  const sqlOpen = useSql((s) => s.open);
+  const setSqlOpen = useSql((s) => s.setOpen);
+  const runEditor = useSql((s) => s.runEditor);
+  const formatEditor = useSql((s) => s.formatEditor);
+  const notice = useNotice((s) => s.show);
+  useSqlTables(tabs);
   // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
   const [palette, setPalette] = useState<{ query: string } | null>(null);
   const engineVersion = useEngine((s) => s.version);
@@ -137,8 +147,13 @@ export function App() {
       previousTab: () => cycle(-1),
       commandPalette: () => setPalette({ query: "" }),
       copyAs: () => setPalette({ query: "Copy " }),
+      toggleSql: () => {
+        const open = !useSql.getState().open;
+        setSqlOpen(open);
+        if (open) setTimeout(() => useSql.getState().editor?.focus(), 0);
+      },
     }),
-    [openFile, close, cycle],
+    [openFile, close, cycle, setSqlOpen],
   );
   useShortcuts(shortcuts);
 
@@ -187,6 +202,34 @@ export function App() {
         run: () => void openPaths([file.path]),
       });
     }
+    list.push({
+      id: "toggle-sql",
+      title: sqlOpen ? "Hide SQL panel" : "Show SQL panel",
+      group: "SQL",
+      shortcut: `${modKey}+J`,
+      keywords: "query toggle",
+      run: shortcuts.toggleSql,
+    });
+    if (sqlOpen) {
+      list.push(
+        {
+          id: "run-sql",
+          title: "Run SQL (or the selection)",
+          group: "SQL",
+          shortcut: `${modKey}+Enter`,
+          run: runEditor,
+        },
+        {
+          id: "format-sql",
+          title: "Format SQL",
+          group: "SQL",
+          run: () => {
+            const problem = formatEditor();
+            if (problem) notice(`Couldn't format: ${problem}`);
+          },
+        },
+      );
+    }
     const themes: [ThemePreference, string][] = [
       ["light", "Light"],
       ["dark", "Dark"],
@@ -216,7 +259,20 @@ export function App() {
       },
     );
     return list;
-  }, [shortcuts, activeId, recent, openPaths, setTheme, headerCharts, setHeaderCharts, clearCache]);
+  }, [
+    shortcuts,
+    activeId,
+    recent,
+    openPaths,
+    setTheme,
+    headerCharts,
+    setHeaderCharts,
+    clearCache,
+    sqlOpen,
+    runEditor,
+    formatEditor,
+    notice,
+  ]);
   useRegisterCommands("app", commands);
 
   useSubscription(useMemo(() => () => onImportProgress(applyProgress), [applyProgress]));
@@ -293,6 +349,7 @@ export function App() {
               dragging={dragging}
             />
           )}
+          {sqlOpen && <SqlPanel />}
           {active && dragging && (
             <div
               data-testid="drop-overlay"

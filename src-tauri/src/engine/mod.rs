@@ -93,6 +93,9 @@ pub struct Engine {
     requests: RequestRegistry,
     /// Tables the grid can page through.
     pub datasets: Datasets,
+    /// The SQL panel's own connection, so temp tables and `SET` last from
+    /// one statement to the next. Created on first use.
+    session: Mutex<Option<Connection>>,
     /// The database handle; declared last so it is closed after `root`.
     raw: raw::RawDb,
 }
@@ -122,6 +125,7 @@ impl Engine {
         Ok(Engine {
             root: Mutex::new(conn),
             scratch: Mutex::new(None),
+            session: Mutex::new(None),
             temp_dir: cfg.temp_dir.clone(),
             requests: RequestRegistry::default(),
             datasets: Datasets::default(),
@@ -186,6 +190,40 @@ impl Engine {
         key: &RequestKey,
     ) -> Result<QueryBatches> {
         let conn = self.connection()?;
+        self.query_with(&conn, sql, params, max_rows, key)
+    }
+
+    /// Like [`Engine::query`], on the SQL panel's session connection.
+    /// Statements run one at a time; a newer one in the same group cancels
+    /// the running one first.
+    pub fn query_session(
+        &self,
+        sql: &str,
+        params: &[Param],
+        max_rows: usize,
+        key: &RequestKey,
+    ) -> Result<QueryBatches> {
+        // Interrupt an older statement of the group so the lock frees up,
+        // unless a newer statement replaced this one already.
+        if self.requests.claim(key) {
+            return Err(AppError::Cancelled);
+        }
+        let mut session = self.session.lock();
+        if session.is_none() {
+            *session = Some(self.connection()?);
+        }
+        let conn = session.as_ref().expect("session connection just created");
+        self.query_with(conn, sql, params, max_rows, key)
+    }
+
+    fn query_with(
+        &self,
+        conn: &Connection,
+        sql: &str,
+        params: &[Param],
+        max_rows: usize,
+        key: &RequestKey,
+    ) -> Result<QueryBatches> {
         let guard = self.requests.register(key, conn.interrupt_handle());
         if guard.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -218,6 +256,17 @@ impl Engine {
             rows,
             truncated,
         })
+    }
+
+    /// Like [`Engine::query_session`] but encodes the result as Arrow IPC.
+    pub fn query_ipc_session(
+        &self,
+        sql: &str,
+        max_rows: usize,
+        key: &RequestKey,
+    ) -> Result<Vec<u8>> {
+        let result = self.query_session(sql, &[], max_rows, key)?;
+        batches_to_ipc(&result.schema, &result.batches)
     }
 
     /// Like [`Engine::query`] but encodes the result as Arrow IPC stream bytes.

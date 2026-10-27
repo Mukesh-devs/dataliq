@@ -8,6 +8,7 @@ pub mod error;
 pub mod import;
 pub mod settings;
 pub mod sources;
+pub mod sql;
 pub mod view;
 
 mod logging;
@@ -107,7 +108,9 @@ pub fn run() {
             commands::view::column_values,
             commands::view::column_profile,
             commands::view::column_histograms,
-            commands::view::view_sql
+            commands::view::view_sql,
+            commands::sql::register_table,
+            commands::sql::unregister_table
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

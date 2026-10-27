@@ -21,6 +21,11 @@ export interface MockOptions {
   views?: (spec: unknown) => number | Promise<number>;
   /** Value list for `column_values`; runs in Node. */
   values?: (column: string, search: string | null) => { value: string | null; count: number }[];
+  /**
+   * Result of `run_query` as Arrow IPC (base64), or an error to throw
+   * ({ kind, message }); runs in Node. Default: the recorded version query.
+   */
+  sql?: (sql: string) => string | { kind: string; message: string };
   /** Result of `column_profile`; runs in Node. */
   profile?: (column: string, spec: unknown) => unknown;
   /** Result of `column_histograms` (none by default); runs in Node. */
@@ -55,6 +60,10 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     await page.exposeFunction("__values", (column: string, search: string | null) =>
       values(column, search),
     );
+  }
+  if (options.sql) {
+    const sql = options.sql;
+    await page.exposeFunction("__sql", (text: string) => sql(text));
   }
   if (options.profile) {
     const profile = options.profile;
@@ -99,8 +108,17 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
           log.push({ cmd, args });
           const file = recordings.files[String(args.path)];
           switch (cmd) {
-            case "run_query":
-              return toBuffer(recordings.version);
+            case "run_query": {
+              const sql = w.__sql as
+                ((s: string) => Promise<string | { kind: string; message: string }>) | undefined;
+              if (!sql) return toBuffer(recordings.version);
+              const out = await sql(String(args.sql));
+              if (typeof out !== "string") throw out;
+              return toBuffer(out);
+            }
+            case "register_table":
+            case "unregister_table":
+              return null;
             case "plugin:dialog|open": {
               // The app asks for multiple files; a test may queue a list.
               const next = dialogPaths.shift();

@@ -376,3 +376,32 @@ tested, and anything left over.
   fresh DuckDB and compare every value, order of ties included.
 - Left over: the full 50M-row sort stays over 10 s on 4 cores (D29) and goes to the v1.0
   performance pass with the per-OS budgets.
+
+## v0.3 — SQL and Export
+
+### Step 1 — SQL panel ✅
+
+- Bottom panel (Ctrl+J, palette "Show SQL panel"), resizable by its top edge, kept open/closed,
+  height and text across restarts. CodeMirror 6: SQL highlighting with theme colours, line
+  numbers, bracket matching, history, completion of keywords, table names and their columns.
+- Every tab with full data is a table named from its file (`people.csv` → `people`, duplicates
+  `_2`, …), registered as a view and dropped when the tab closes (D32).
+- Run (Ctrl+Enter or the Run button) runs the selection, or everything; scripts are split into
+  statements and run in order on the panel's own session connection (temp tables, `SET` and
+  variables last), the last statement's rows shown in the grid (first 10,000 until step 3),
+  with row count and time. Cancel while running. Format (sql-formatter, DuckDB dialect).
+- Errors in plain words without DuckDB's `LINE` block; the position is underlined in the editor.
+- Tested: Rust — tables by name (quoting, re-registering, joins, Parquet in place with a quote in
+  the path), the session keeping temp tables/variables but not leaking them, a newer query
+  cancelling the running one; Vitest — statement splitting, error positions (also shortened long
+  lines), table names, the store's run/cancel rules, table sync; Playwright — autocomplete and
+  Ctrl+Enter, format, error marking across statements, running a selection from the palette.
+- Smoke (real app, people.csv): `SELECT city, count(*) AS n, round(avg(amount), 2) … GROUP BY 1`
+  → 7 rows in 17 ms; `SELECT nope FROM people` → the binder error with "nope" underlined;
+  `CREATE TEMP TABLE hi AS … WHERE amount > 900; SELECT count(*), min(amount) FROM hi` → 104,
+  900.05 ("2 statements").
+- Fixed on the way (CI-style run caught it): a request that runs several statements under one id
+  (`open_view`) could, with its later statements, cancel a newer request of the same group. The
+  registry now remembers each group's newest request and the ones it replaced; a replaced
+  request's later statements start out cancelled. Unit test reproduces the old behaviour.
+- Left over: none.

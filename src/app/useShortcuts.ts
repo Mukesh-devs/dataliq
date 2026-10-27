@@ -10,6 +10,8 @@ export interface ShortcutHandlers {
   commandPalette: () => void;
   /** Shift+Ctrl+C: the "copy as" choices. */
   copyAs: () => void;
+  /** Ctrl+J. */
+  toggleSql: () => void;
 }
 
 /**
@@ -34,6 +36,9 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       } else if (mod && e.shiftKey && key === "c") {
         e.preventDefault();
         handlers.copyAs();
+      } else if (mod && !e.shiftKey && key === "j") {
+        e.preventDefault();
+        handlers.toggleSql();
       } else if (mod && !e.shiftKey && key === "k") {
         e.preventDefault();
         handlers.commandPalette();

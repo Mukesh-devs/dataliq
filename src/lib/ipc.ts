@@ -13,6 +13,8 @@ export interface QueryOptions {
   requestId?: string;
   /** Starting a request in a group cancels older requests in that group. */
   group?: string;
+  /** Run on the SQL panel's session connection (temp tables and SET persist). */
+  session?: boolean;
 }
 
 export type ErrorKind = "query" | "cancelled" | "io" | "settings" | "internal";

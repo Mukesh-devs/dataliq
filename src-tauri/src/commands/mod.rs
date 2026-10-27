@@ -4,4 +4,5 @@ pub mod app;
 pub mod files;
 pub mod import;
 pub mod query;
+pub mod sql;
 pub mod view;

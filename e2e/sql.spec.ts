@@ -1,0 +1,125 @@
+import { expect, test, type Page } from "@playwright/test";
+import { tableFromArrays, tableToIPC } from "apache-arrow";
+import { mockTauri } from "./tauri-mock";
+
+const ipc = (cols: Parameters<typeof tableFromArrays>[0]) =>
+  Buffer.from(tableToIPC(tableFromArrays(cols), "stream")).toString("base64");
+
+function buildPage(start: number, count: number): string {
+  return ipc({
+    id: BigInt64Array.from({ length: count }, (_, i) => BigInt(start + i + 1)),
+    name: Array.from({ length: count }, (_, i) => `name ${start + i + 1}`),
+    amount: Float64Array.from({ length: count }, (_, i) => (start + i) * 0.5),
+    joined: Array.from({ length: count }, () => new Date(Date.UTC(2024, 0, 31))),
+  });
+}
+
+type Invoke = { cmd: string; args: Record<string, unknown> };
+const invokes = (page: Page, cmd: string) =>
+  page.evaluate(
+    (c) =>
+      (window as unknown as { __invokes: Invoke[] }).__invokes
+        .filter((i) => i.cmd === c)
+        .map((i) => i.args),
+    cmd,
+  );
+
+async function open(page: Page) {
+  await mockTauri(page, {
+    dialogPaths: ["/data/comma.csv"],
+    datasets: { "/data/comma.csv": 1000 },
+    fetchRows: buildPage,
+    sql: (sql) => {
+      if (sql.includes("nope")) {
+        return {
+          kind: "query",
+          message:
+            'Binder Error: Referenced column "nope" not found in FROM clause!\n\nLINE 1: SELECT nope FROM comma\n               ^',
+        };
+      }
+      if (sql.startsWith("SELECT DISTINCT")) return ipc({ n: Int32Array.from([1, 2]) });
+      // The engine probe at startup and everything else.
+      return ipc({ version: ["v1.5.6"], city: ["Paris"] });
+    },
+  });
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  await expect(page.getByRole("status").first()).toContainText("1,000 rows");
+}
+
+const editor = (page: Page) => page.getByRole("textbox", { name: "SQL query" });
+const panel = (page: Page) => page.getByRole("region", { name: "SQL panel" });
+
+test("query open files as tables with autocomplete, run with Ctrl+Enter", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+j");
+  await expect(panel(page)).toBeVisible();
+  await expect(panel(page)).toContainText("Tables: comma");
+  await expect
+    .poll(() => invokes(page, "register_table"))
+    .toEqual([{ datasetId: "ds-1", name: "comma" }]);
+
+  await expect(editor(page)).toBeFocused();
+  await page.keyboard.type("SELECT DISTINCT n FROM co");
+  // Table names complete.
+  await expect(page.locator(".cm-tooltip-autocomplete li[aria-selected='true']")).toContainText(
+    "comma",
+  );
+  // CodeMirror ignores Enter for 75 ms after the list opens (interactionDelay).
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Enter");
+  await expect(editor(page)).toHaveText("SELECT DISTINCT n FROM comma");
+  await page.keyboard.press("Control+Enter");
+  await expect(panel(page)).toContainText(/2 rows in/);
+  const runs = await invokes(page, "run_query");
+  expect(runs.at(-1)).toMatchObject({
+    sql: "SELECT DISTINCT n FROM comma",
+    options: { maxRows: 10_001, group: "sql", session: true },
+  });
+
+  // Format SQL, from the panel's button.
+  await panel(page).getByRole("button", { name: "Format" }).click();
+  await expect(editor(page)).toHaveText(/SELECT DISTINCT\s+nFROM\s+comma/);
+
+  // Ctrl+J closes it again; the text is kept.
+  await page.keyboard.press("Control+j");
+  await expect(panel(page)).toBeHidden();
+  await page.keyboard.press("Control+j");
+  await expect(editor(page)).toContainText("comma");
+});
+
+test("errors are shown in words and marked in the editor", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+j");
+  await editor(page).click();
+  await page.keyboard.type("SELECT 1;\nSELECT nope FROM comma");
+  await panel(page).getByRole("button", { name: "Run" }).click();
+  const alert = panel(page).getByRole("alert");
+  await expect(alert).toContainText('Referenced column "nope" not found');
+  await expect(alert).not.toContainText("LINE 1");
+  await expect(panel(page).getByRole("status")).toHaveText("The query failed");
+  // Marked at "nope" on the second line (the second statement).
+  await expect(page.locator(".cm-lintRange-error")).toHaveText("nope");
+  // Both statements ran, in order.
+  expect((await invokes(page, "run_query")).slice(-2).map((r) => r.sql)).toEqual([
+    "SELECT 1",
+    "SELECT nope FROM comma",
+  ]);
+});
+
+test("run just the selection, from the command palette", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+j");
+  await editor(page).click();
+  await page.keyboard.type("SELECT nope FROM comma\nSELECT 42");
+  // Select the second line.
+  await page.keyboard.press("Shift+Home");
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox").fill("run sql");
+  await page.keyboard.press("Enter");
+  await expect(panel(page)).toContainText(/1 row in/);
+  expect((await invokes(page, "run_query")).at(-1)?.sql).toBe("SELECT 42");
+});

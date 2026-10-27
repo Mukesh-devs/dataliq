@@ -25,6 +25,8 @@
     "allow-column-values",
     "allow-column-profile",
     "allow-column-histograms",
-    "allow-view-sql"
+    "allow-view-sql",
+    "allow-register-table",
+    "allow-unregister-table"
   ]
 }
