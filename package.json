@@ -1,7 +1,7 @@
 {
   "name": "bigview",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Open huge tabular files instantly. Filter, query with SQL, chart and export without loading them into RAM.",
   "license": "MIT",
   "type": "module",
@@ -38,6 +38,7 @@
     "@tauri-apps/plugin-dialog": "2.8.2",
     "apache-arrow": "21.2.0",
     "clsx": "2.1.1",
+    "echarts": "6.1.0",
     "lodash": "4.18.1",
     "lucide-react": "1.55.0",
     "marked": "4.3.0",

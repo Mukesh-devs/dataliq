@@ -81,15 +81,20 @@ export function formatInfo(format: ExportFormat) {
   return EXPORT_FORMATS.find((f) => f.format === format) ?? EXPORT_FORMATS[0]!;
 }
 
-/** "sales.csv.gz" → "sales-export.parquet": never the open file's own name. */
-export function defaultExportName(title: string, format: ExportFormat): string {
-  const base =
+/** A file's name without its extensions, safe for a new file name. */
+export function fileBase(title: string, fallback: string): string {
+  return (
     title
       .replace(/\.(gz|gzip|zst|zstd)$/i, "")
       .replace(/\.[a-z0-9]{1,8}$/i, "")
       .replace(/[\\/:*?"<>|]+/g, "_")
-      .trim() || "export";
-  return `${base}-export.${formatInfo(format).extension}`;
+      .trim() || fallback
+  );
+}
+
+/** "sales.csv.gz" → "sales-export.parquet": never the open file's own name. */
+export function defaultExportName(title: string, format: ExportFormat): string {
+  return `${fileBase(title, "export")}-export.${formatInfo(format).extension}`;
 }
 
 /** The native save dialog. Resolves to null when cancelled. */

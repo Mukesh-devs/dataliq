@@ -55,6 +55,7 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Export 50M rows to Parquet / CSV | — (report) | 7.6 s / 23.9 s | v0.3.0 |
 | Export 1M rows to Excel | — (report) | 14.7 s, peak memory +2 MiB | v0.3.0 |
 | SQL aggregate over 50M rows | — (report) | 0.19 s (8 groups), 1.44 s (100K groups) | v0.3.0 |
+| Chart aggregation over 50M rows | < 2 s | 0.09–1.68 s for every chart type | v0.4 step 1 |
 
 Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
@@ -277,4 +278,26 @@ CI guard on the tag is the one that counts (D26).
 | import_100k_xlsx | 1,981 ms | 1,957 ms |
 | reopen_cached_100mb_csv | 1.3 ms | 1.5 ms |
 | page_1m_parquet | 12.9 ms | 11.9 ms |
+
+## v0.4 — charts on 50M cached rows (linux-dev)
+
+`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_charts_50m -- --ignored --nocapture`
+(dev profile, warm cache), through `Engine::chart_data` exactly as the chart panel asks.
+
+| Chart | Points | Time |
+| --- | --- | --- |
+| Bar by `country`: count and sum | 8 | 0.26 s |
+| Bar by `customer` (100,000 groups), top 50 | 50 of 100,000 | 1.55 s |
+| Bar by `country`: distinct customers | 8 | 1.68 s |
+| Line by `order_date` per month: average | 60 | 0.83 s |
+| Line by `order_ts` per day: count | 1,826 | 0.58 s |
+| Histogram of `unit_price` | 30 bars | 0.70 s |
+| Histogram of `order_ts` | 30 bars | 0.55 s |
+| Scatter `unit_price` × `quantity` (sampled) | 5,000 of 50,000,000 | 0.42 s |
+| Bar by `country` with `quantity <= 5` | 8 | 0.09 s |
+
+**Budget: chart aggregation over 50M rows < 2 s — met** for every chart type. Distinct counts
+over many values are the slowest (exact `count(DISTINCT …)`). As with exports, the first chart
+after the cache file had not been read for a day waited for this container's disk (57 s cold,
+0.26 s warm).
 

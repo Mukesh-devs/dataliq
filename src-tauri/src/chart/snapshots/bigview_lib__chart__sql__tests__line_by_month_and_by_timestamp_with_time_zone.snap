@@ -1,0 +1,9 @@
+---
+source: src-tauri/src/chart/sql.rs
+expression: "format!(\"{}\\n\\n{}\", render(&month), render(&week))"
+---
+Time limit 10000
+SELECT *, count(*) OVER ()::BIGINT AS groups FROM (SELECT CAST(epoch_ms(date_trunc('month', CAST("joined" AS TIMESTAMP))) AS DOUBLE) AS x, CAST(max("amount") AS DOUBLE) AS m0 FROM (SELECT * FROM t WHERE "amount" > ?) GROUP BY 1) ORDER BY x ASC NULLS LAST LIMIT 10000
+
+Time limit 10000
+SELECT *, count(*) OVER ()::BIGINT AS groups FROM (SELECT CAST(epoch_ms(date_trunc('week', make_timestamp(epoch_us("seen")))) AS DOUBLE) AS x, CAST(count(DISTINCT "city") AS DOUBLE) AS m0 FROM (SELECT * FROM t WHERE "amount" > ?) GROUP BY 1) ORDER BY x ASC NULLS LAST LIMIT 10000

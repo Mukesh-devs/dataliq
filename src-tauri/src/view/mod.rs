@@ -16,6 +16,8 @@ pub use profile::{
 };
 pub use sql::{BuiltView, Relation, build, build_at, standalone_sql};
 
+pub(crate) use profile::numeric_expr;
+
 use crate::engine::Param;
 
 /// What the user asked to see. Filters are combined with AND.

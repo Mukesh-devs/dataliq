@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
+Charts: chart any view of a huge file in about a second.
+
+### Added
+
+- A Grid | Chart switch on every tab: bar, horizontal bar, line, histogram and scatter charts of
+  the current view, following its filters and search. Group by any column (dates by day, week,
+  month or year) with up to four measures: count, sum, average, min, max, distinct count.
+- All aggregation runs in DuckDB and only the small result is drawn: on 50M rows every chart
+  takes 0.1–1.7 s. Categories show the largest 50 groups and say how many there are; scatter
+  plots sample 5,000 points and say so.
+- A table view of every chart's values; tooltips on hover; colours that follow the light and dark
+  themes.
+- Export a chart as PNG or SVG; copy a chart as SQL that runs in plain DuckDB over the file.
+
 ## [0.3.0] - 2026-10-27
 
 SQL and export: query every open file with SQL, export any view or result.
@@ -110,7 +126,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mukesh-dsnl/dataliq/releases/tag/v0.1.0
