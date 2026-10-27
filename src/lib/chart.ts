@@ -1,4 +1,5 @@
 import type { ColumnInfo, ColumnKind } from "./arrow";
+import { fileBase } from "./exporting";
 import { formatCount } from "./format";
 import { call } from "./ipc";
 import type { ViewSpec } from "./view";
@@ -75,6 +76,35 @@ export function chartData(
   group: string,
 ): Promise<ChartData> {
   return call<ChartData>("chart_data", { datasetId, spec, chart, requestId, group });
+}
+
+/** The chart as standalone DuckDB SQL over `reader` (the file's reader call). */
+export function chartSql(
+  datasetId: string,
+  spec: ViewSpec,
+  chart: ChartSpec,
+  reader: string,
+): Promise<string> {
+  return call<string>("chart_sql", { datasetId, spec, chart, reader });
+}
+
+/** Saves an exported chart: an SVG document or a PNG data URL. */
+export function saveChartImage(path: string, data: string): Promise<void> {
+  return call<void>("save_chart_image", { path, data });
+}
+
+/** "sales.csv.gz" → "sales-chart.png". */
+export function chartFileName(title: string, ext: "png" | "svg"): string {
+  return `${fileBase(title, "chart")}-chart.${ext}`;
+}
+
+/** The native save dialog for a chart image. Null when cancelled. */
+export async function pickChartPath(name: string, ext: "png" | "svg"): Promise<string | null> {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  return save({
+    defaultPath: name,
+    filters: [{ name: ext === "png" ? "PNG image" : "SVG image", extensions: [ext] }],
+  });
 }
 
 const NUMBER_KINDS = new Set<ColumnKind>(["integer", "number"]);

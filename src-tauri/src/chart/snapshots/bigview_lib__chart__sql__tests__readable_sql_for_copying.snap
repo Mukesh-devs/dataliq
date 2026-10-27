@@ -1,0 +1,33 @@
+---
+source: src-tauri/src/chart/sql.rs
+expression: all
+---
+SELECT "city" AS "city", count(*) AS "Count", avg("amount") AS "Average amount"
+FROM (SELECT * FROM read_csv('/data/a.csv') WHERE "amount" > 5)
+GROUP BY 1
+ORDER BY 2 DESC NULLS LAST, 1 ASC NULLS LAST
+LIMIT 50;
+
+SELECT date_trunc('month', CAST("joined" AS TIMESTAMP)) AS "joined", count(*) AS "Count"
+FROM (SELECT * FROM read_csv('/data/a.csv') WHERE "amount" > 5)
+GROUP BY 1
+ORDER BY 1 ASC NULLS LAST
+LIMIT 10000;
+
+WITH v AS (SELECT CAST("quantity" AS DOUBLE) AS x FROM (SELECT * FROM read_csv('/data/a.csv') WHERE "amount" > 5) WHERE "quantity" IS NOT NULL),
+r AS (SELECT min(x) AS lo, max(x) AS hi FROM v),
+w AS (SELECT lo, hi,
+CASE WHEN true AND hi - lo < 10 THEN hi - lo + 1 WHEN hi > lo THEN 10 ELSE 1 END AS n,
+CASE WHEN true AND hi - lo < 10 THEN 1 WHEN hi > lo THEN (hi - lo) / 10 ELSE 0 END AS width
+FROM r)
+SELECT lo + b * width AS bin_start, CASE WHEN b = n - 1 AND width <> 1 THEN hi ELSE lo + (b + 1) * width END AS bin_end, count(*) AS "rows"
+FROM (SELECT CASE WHEN width = 0 THEN 0
+ELSE least(greatest(CAST(floor((x - lo) / width) AS BIGINT), 0), n - 1) END AS b,
+lo, hi, n, width FROM v, w)
+GROUP BY b, lo, hi, n, width
+ORDER BY b;
+
+SELECT * FROM (
+  SELECT "amount", "quantity" FROM (SELECT * FROM read_csv('/data/a.csv') WHERE "amount" > 5)
+  WHERE "amount" IS NOT NULL AND "quantity" IS NOT NULL
+) USING SAMPLE reservoir(100 ROWS) REPEATABLE (7);

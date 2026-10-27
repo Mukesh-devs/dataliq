@@ -37,6 +37,7 @@ flate2 = "1.1.10"
 tauri-plugin-dialog = "=2.8.2"
 tauri-plugin-single-instance = "=2.5.3"
 calamine = { version = "=0.36.1", default-features = false }
+base64 = "=0.22.1"
 rust_xlsxwriter = { version = "=0.99.1", features = ["constant_memory"] }
 
 [dev-dependencies]

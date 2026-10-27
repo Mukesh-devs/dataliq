@@ -38,6 +38,8 @@
     "allow-delete-saved-query",
     "allow-export-view",
     "allow-cancel-export",
-    "allow-chart-data"
+    "allow-chart-data",
+    "allow-chart-sql",
+    "allow-save-chart-image"
   ]
 }

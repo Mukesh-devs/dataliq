@@ -199,6 +199,10 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 elapsedMs: 5,
               };
             }
+            case "chart_sql":
+              return `SELECT city, count(*) AS "Count" FROM ${String(args.reader)} GROUP BY 1`;
+            case "save_chart_image":
+              return null;
             case "plugin:dialog|save":
               return savePaths.length > 0 ? savePaths.shift() : null;
             case "export_view": {

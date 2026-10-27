@@ -126,7 +126,9 @@ pub fn run() {
             commands::sql::delete_saved_query,
             commands::export::export_view,
             commands::export::cancel_export,
-            commands::chart::chart_data
+            commands::chart::chart_data,
+            commands::chart::chart_sql,
+            commands::chart::save_chart_image
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

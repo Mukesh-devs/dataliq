@@ -14,7 +14,7 @@ use crate::engine::{Engine, RequestKey};
 use crate::error::{AppError, Result};
 use crate::view::{Bin, ProfileKind, ViewSpec};
 
-pub use sql::{grouped_sql, scatter_sql};
+pub use sql::{grouped_sql, readable_sql, scatter_sql};
 
 /// Categories shown by default (the largest by the first measure).
 pub const DEFAULT_CATEGORIES: u32 = 50;
@@ -164,6 +164,32 @@ fn values_f64(a: &dyn Array) -> Vec<Option<f64>> {
 }
 
 impl Engine {
+    /// "Copy chart SQL": the chart as one query over `reader` (the file's
+    /// reader call, as for "Copy view as SQL") with the view's filters and
+    /// search inlined; it runs as-is in plain DuckDB.
+    pub fn chart_sql(
+        &self,
+        id: &str,
+        view: &ViewSpec,
+        chart: &ChartSpec,
+        reader: &str,
+    ) -> Result<String> {
+        let schema = self.dataset_columns(id)?;
+        let unsorted = ViewSpec {
+            sort: Vec::new(),
+            columns: None,
+            ..view.clone()
+        };
+        let rows = crate::view::standalone_sql(
+            &unsorted,
+            reader,
+            &schema,
+            &std::collections::HashMap::new(),
+            chrono::Local::now().date_naive(),
+        )?;
+        readable_sql(chart, rows.trim_end_matches(';'), &schema)
+    }
+
     /// The chart `chart` of the view `view` on dataset `id`.
     pub fn chart_data(
         &self,

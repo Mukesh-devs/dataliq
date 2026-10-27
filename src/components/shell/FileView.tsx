@@ -793,6 +793,8 @@ export function FileView({
           labelOf={labelOf}
           chart={chart}
           onChange={(c) => setChart(tab.id, c)}
+          title={tab.title}
+          readerSql={readerSql}
         />
       ) : source ? (
         <div className="flex min-h-0 flex-1">

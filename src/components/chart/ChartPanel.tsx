@@ -1,5 +1,9 @@
+import * as Popover from "@radix-ui/react-popover";
 import {
   ChartBar,
+  Code,
+  Download,
+  FileImage,
   ChartColumn,
   ChartColumnBig,
   ChartLine,
@@ -11,6 +15,11 @@ import {
   X,
 } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { baseName } from "../../lib/files";
+import { formatSql } from "../../lib/sqlFormat";
+import { useRegisterCommands, type Command } from "../../stores/commands";
+import { useNotice } from "../../stores/notice";
+import { MenuItem } from "../ui/Menu";
 import type { ColumnInfo } from "../../lib/arrow";
 import {
   AGGS,
@@ -20,11 +29,15 @@ import {
   allowed,
   chartColors,
   chartData,
+  chartFileName,
   chartNote,
+  chartSql,
   chartOption,
   chartTable,
   fitChart,
   isTimeKind,
+  pickChartPath,
+  saveChartImage,
   type Agg,
   type ChartData,
   type ChartKind,
@@ -64,13 +77,19 @@ interface ChartPanelProps {
   labelOf: (column: string) => string;
   chart: ChartSpec;
   onChange: (chart: ChartSpec) => void;
+  /** For file names. */
+  title: string;
+  /** The file's reader call, for "Copy chart SQL" (none: no copy). */
+  readerSql?: string;
 }
 
 /** The current view as a chart, aggregated in DuckDB. */
 export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function ChartPanel(
-  { tabId, datasetId, view, columns, labelOf, chart, onChange },
+  { tabId, datasetId, view, columns, labelOf, chart, onChange, title, readerSql },
   ref,
 ) {
+  const notice = useNotice((s) => s.show);
+  const [exportOpen, setExportOpen] = useState(false);
   const [state, setState] = useState<{
     key: string;
     data?: ChartData;
@@ -122,6 +141,76 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
   useImperativeHandle(ref, () => ({ chart: () => echart.current, data: () => data ?? null }), [
     data,
   ]);
+
+  /** Copies the chart as SQL that runs in plain DuckDB over the file. */
+  const copySql = async () => {
+    if (!readerSql) return;
+    try {
+      const sql = await chartSql(datasetId, statsSpec(view), chart, readerSql);
+      let text = sql;
+      try {
+        text = formatSql(sql);
+      } catch {
+        // Unformatted SQL runs just as well.
+      }
+      await navigator.clipboard.writeText(text);
+      notice("Copied the chart as SQL");
+    } catch (e) {
+      notice(`Couldn't copy the chart: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  /** Saves the chart as it looks now, on the theme's background. */
+  const exportImage = async (ext: "png" | "svg") => {
+    setExportOpen(false);
+    const handle = echart.current;
+    const image = handle && (ext === "png" ? handle.png(colors.bg) : handle.svg(colors.bg));
+    if (!image) {
+      notice("Show the chart first, then export it");
+      return;
+    }
+    try {
+      const path = await pickChartPath(chartFileName(title, ext), ext);
+      if (!path) return;
+      await saveChartImage(path, image);
+      notice(`Saved the chart to ${baseName(path)}`);
+    } catch (e) {
+      notice(`Couldn't save the chart: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  const canExport = !!option && !table && !error;
+  const commands = useMemo<Command[]>(() => {
+    const list: Command[] = [];
+    if (canExport) {
+      list.push(
+        {
+          id: "chart-png",
+          title: "Export chart as PNG",
+          group: "Chart",
+          keywords: "image picture save",
+          run: () => void exportImage("png"),
+        },
+        {
+          id: "chart-svg",
+          title: "Export chart as SVG",
+          group: "Chart",
+          keywords: "image vector save",
+          run: () => void exportImage("svg"),
+        },
+      );
+    }
+    if (readerSql)
+      list.push({
+        id: "chart-sql",
+        title: "Copy chart as SQL",
+        group: "Chart",
+        keywords: "query duckdb",
+        run: () => void copySql(),
+      });
+    return list;
+    // The actions read the latest chart when picked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canExport, readerSql, chart, view, datasetId, colors, title]);
+  useRegisterCommands("chart", commands);
 
   const ok = allowed(chart.kind, columns);
   const set = (changes: Partial<ChartSpec>) =>
@@ -326,6 +415,34 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
           {loading && <LoaderCircle className="mr-1 inline size-3 animate-spin" aria-hidden />}
           {data && !error && `${chartNote(data)} · ${formatDuration(data.elapsedMs)}`}
         </span>
+        {readerSql && (
+          <IconButton label="Copy chart as SQL" onClick={() => void copySql()}>
+            <Code className="size-3.5" aria-hidden />
+          </IconButton>
+        )}
+        <Popover.Root open={exportOpen} onOpenChange={setExportOpen}>
+          <Popover.Trigger asChild>
+            <IconButton label="Export chart" disabled={!canExport} className="disabled:opacity-40">
+              <Download className="size-3.5" aria-hidden />
+            </IconButton>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              role="menu"
+              aria-label="Export chart"
+              align="end"
+              sideOffset={4}
+              className="z-50 w-44 rounded-[var(--radius-lg)] border border-border bg-bg p-1 text-[13px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
+            >
+              <MenuItem autoFocus icon={<FileImage />} onSelect={() => void exportImage("png")}>
+                PNG image
+              </MenuItem>
+              <MenuItem icon={<FileImage />} onSelect={() => void exportImage("svg")}>
+                SVG image
+              </MenuItem>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
         <IconButton
           label={table ? "Show the chart" : "Show the chart's values as a table"}
           aria-pressed={table}

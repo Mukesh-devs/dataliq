@@ -257,3 +257,113 @@ fn scatter_samples_repeatably_from_the_view() {
     assert!(!all.truncated);
     assert_eq!(all.x.len() as u64, all.total);
 }
+
+/// Runs copied SQL in a new plain DuckDB, as a user would; every value as
+/// a DOUBLE or text.
+fn plain(sql: &str, cols: &str) -> Vec<Vec<Option<String>>> {
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let q = format!("SELECT {cols} FROM ({}) q", sql.trim_end_matches(';'));
+    let mut stmt = conn.prepare(&q).unwrap();
+    let mut out = Vec::new();
+    let mut rows = stmt.query([]).unwrap();
+    while let Some(r) = rows.next().unwrap() {
+        let n = r.as_ref().column_count();
+        out.push(
+            (0..n)
+                .map(|i| r.get::<_, Option<String>>(i).unwrap())
+                .collect(),
+        );
+    }
+    out
+}
+
+fn reader(fx: &Fx) -> String {
+    let path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/csv/people.csv");
+    bigview_lib::sources::Source::new(&path, bigview_lib::sources::OpenOptions::default())
+        .unwrap()
+        .resolve_dialect(&fx.engine)
+        .unwrap()
+        .reader_display_sql()
+        .unwrap()
+}
+
+fn num(v: &Option<String>) -> Option<f64> {
+    v.as_ref().map(|s| s.parse().unwrap())
+}
+
+#[test]
+fn copied_chart_sql_gives_the_charts_numbers_in_plain_duckdb() {
+    let fx = fx();
+    let view = active_only();
+    let reader = reader(&fx);
+    let sql = |c: &ChartSpec| {
+        fx.engine
+            .chart_sql(&fx.dataset.id, &view, c, &reader)
+            .unwrap()
+    };
+
+    // Bars: groups, counts and averages.
+    let mut bar = spec(ChartKind::Bar, "city");
+    bar.measures = vec![measure(Agg::Count, None), measure(Agg::Avg, Some("amount"))];
+    let data = chart(&fx, &view, &bar);
+    let rows = plain(
+        &sql(&bar),
+        "CAST(city AS VARCHAR), CAST(\"Count\" AS VARCHAR), CAST(\"Average amount\" AS VARCHAR)",
+    );
+    assert_eq!(rows.len(), data.x.len());
+    for (i, r) in rows.iter().enumerate() {
+        assert_eq!(r[0], label(&data.x[i]), "row {i}");
+        assert_eq!(num(&r[1]), data.series[0].values[i]);
+        assert!(close(
+            num(&r[2]).unwrap(),
+            data.series[1].values[i].unwrap()
+        ));
+    }
+
+    // A line by month: the same months (as dates) and values.
+    let mut line = spec(ChartKind::Line, "joined");
+    line.bucket = Some(Bucket::Month);
+    line.measures = vec![measure(Agg::Sum, Some("amount"))];
+    let data = chart(&fx, &view, &line);
+    let rows = plain(
+        &sql(&line),
+        "CAST(epoch_ms(joined) AS VARCHAR), CAST(\"Sum of amount\" AS VARCHAR)",
+    );
+    assert_eq!(rows.len(), data.x.len());
+    for (i, r) in rows.iter().enumerate() {
+        assert_eq!(num(&r[0]), data.x[i].as_f64(), "row {i}");
+        match (num(&r[1]), data.series[0].values[i]) {
+            (Some(a), Some(b)) => assert!(close(a, b), "row {i}: {a} {b}"),
+            (a, b) => assert_eq!(a, b),
+        }
+    }
+
+    // A histogram: every bar with rows, the same edges and counts.
+    for (x, bins) in [("amount", 10), ("id", 30), ("joined", 12)] {
+        let mut hist = spec(ChartKind::Histogram, x);
+        hist.bins = Some(bins);
+        let data = chart(&fx, &view, &hist);
+        let edge = if x == "joined" { "epoch_ms" } else { "" };
+        let rows = plain(
+            &sql(&hist),
+            &format!(
+                "CAST({edge}(bin_start) AS VARCHAR), CAST({edge}(bin_end) AS VARCHAR), CAST(\"rows\" AS VARCHAR)"
+            ),
+        );
+        let want: Vec<_> = data.bins.iter().filter(|b| b.count > 0).collect();
+        assert_eq!(rows.len(), want.len(), "{x}");
+        for (r, b) in rows.iter().zip(want) {
+            assert!(close(num(&r[0]).unwrap(), b.lo), "{x}: {r:?} {b:?}");
+            assert!(close(num(&r[1]).unwrap(), b.hi), "{x}: {r:?} {b:?}");
+            assert_eq!(num(&r[2]), Some(b.count as f64), "{x}");
+        }
+    }
+
+    // Scatter: as many sampled points as the chart.
+    let mut scatter = spec(ChartKind::Scatter, "amount");
+    scatter.y = Some("id".into());
+    scatter.sample = Some(50);
+    let rows = plain(&sql(&scatter), "CAST(count(*) AS VARCHAR)");
+    assert_eq!(num(&rows[0][0]), Some(50.0));
+}

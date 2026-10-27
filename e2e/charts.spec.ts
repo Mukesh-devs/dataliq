@@ -64,8 +64,9 @@ function charts(chart: Record<string, unknown>) {
   };
 }
 
-async function open(page: Page) {
+async function open(page: Page, savePaths: string[] = []) {
   await mockTauri(page, {
+    savePaths,
     dialogPaths: ["/data/comma.csv"],
     datasets: { "/data/comma.csv": 1000 },
     fetchRows: buildPage,
@@ -181,4 +182,53 @@ test("charts follow the theme", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect.poll(() => countColor(page, [0x39, 0x87, 0xe5])).toBeGreaterThan(500);
   expect(await countColor(page, [0x2a, 0x78, 0xd6])).toBeLessThan(50);
+});
+
+test("export the chart as PNG and SVG, copy its SQL", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await open(page, ["/out/comma-chart.png", "/out/comma-chart.svg"]);
+  await page
+    .getByRole("radiogroup", { name: "Show" })
+    .getByRole("radio", { name: "Chart" })
+    .click();
+  await panel(page).getByRole("radio", { name: "Bar", exact: true }).click();
+  await expect(status(page)).toContainText("Top 3 of 12 groups");
+
+  await panel(page).getByRole("button", { name: "Copy chart as SQL" }).click();
+  await expect(page.getByRole("contentinfo").getByRole("status")).toHaveText(
+    "Copied the chart as SQL",
+  );
+  const sql = await page.evaluate(() => navigator.clipboard.readText());
+  // Formatted, over the file's reader.
+  expect(sql).toMatch(/^SELECT\s+city,\s+count\(\*\) AS "Count"\s+FROM\s+read_csv/);
+  expect((await invokes(page, "chart_sql")).at(-1)).toMatchObject({
+    datasetId: "ds-1",
+    chart: { kind: "bar" },
+  });
+
+  await panel(page).getByRole("button", { name: "Export chart" }).click();
+  await page.getByRole("menuitem", { name: "PNG image" }).click();
+  await expect(page.getByRole("contentinfo").getByRole("status")).toHaveText(
+    "Saved the chart to comma-chart.png",
+  );
+  // The suggested name, then the image itself.
+  expect((await invokes(page, "plugin:dialog|save")).at(-1)).toMatchObject({
+    options: { defaultPath: "comma-chart.png" },
+  });
+  const png = (await invokes(page, "save_chart_image")).at(-1)!;
+  expect(png.path).toBe("/out/comma-chart.png");
+  expect(String(png.data)).toMatch(/^data:image\/png;base64,.{1000,}/);
+
+  // From the palette this time.
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox", { name: "Search commands" }).fill("export chart as svg");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("contentinfo").getByRole("status")).toHaveText(
+    "Saved the chart to comma-chart.svg",
+  );
+  const svg = String((await invokes(page, "save_chart_image")).at(-1)!.data);
+  expect(svg).toMatch(/^<svg[^>]*xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+  // The bars and their labels are in it.
+  expect(svg).toContain("Paris");
+  expect(svg.match(/<path/g)?.length ?? 0).toBeGreaterThan(3);
 });
