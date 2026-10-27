@@ -91,6 +91,11 @@ interface SqlState {
   runEditor: () => void;
   /** Formats the editor's text; returns an error message if it can't. */
   formatEditor: () => string | null;
+  /**
+   * Opens the panel and puts `text` in the editor, replacing what is there
+   * (undoable: Ctrl+Z brings the old text back).
+   */
+  load: (text: string) => void;
 }
 
 let nextRun = 1;
@@ -106,7 +111,7 @@ function remember(script: string, started: number, outcome: { rows?: number; err
 
 export const useSql = create<SqlState>()(
   persist(
-    (set, get) => ({
+    (set, get, api) => ({
       open: false,
       height: 320,
       text: "",
@@ -127,6 +132,21 @@ export const useSql = create<SqlState>()(
         } catch (e) {
           return e instanceof Error ? (e.message.split("\n")[0] ?? e.message) : String(e);
         }
+      },
+      load: (text) => {
+        const put = (editor: EditorHandle) => {
+          editor.replace(text);
+          setTimeout(() => editor.focus(), 0);
+        };
+        set({ open: true, library: null });
+        const editor = get().editor;
+        if (editor) return put(editor);
+        // The panel was closed: wait for its editor to mount.
+        const stop = api.subscribe((s) => {
+          if (!s.editor) return;
+          stop();
+          put(s.editor);
+        });
       },
       setOpen: (open) => set({ open }),
       setHeight: (height) => set({ height: Math.max(MIN_PANEL_HEIGHT, Math.round(height)) }),

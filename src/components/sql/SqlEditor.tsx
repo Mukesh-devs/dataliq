@@ -18,7 +18,7 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import type { SqlTable } from "../../stores/sql";
 
 export interface SqlEditorHandle {
@@ -105,7 +105,9 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
     handlers.current = { onChange, onRun };
   }, [onChange, onRun]);
 
-  useEffect(() => {
+  // A layout effect, before the handle below is given out: whoever gets the
+  // handle (the store, as soon as the panel opens) can use it at once.
+  useLayoutEffect(() => {
     if (!host.current) return;
     const v = new EditorView({
       parent: host.current,

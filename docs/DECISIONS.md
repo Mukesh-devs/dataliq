@@ -406,3 +406,14 @@ good one. "Selected rows" are view positions (`row_number() OVER ()` over
 the view query, which keeps the order the grid pages; tested against the
 grid on a 300,000-row multi-threaded view, sorted and unsorted). The
 suggested name is `<file>-export.<ext>`, never the open file's own name.
+
+## D37 — "Open view in SQL panel" queries the file's table, not the file
+
+"Copy view as SQL" must run anywhere, so it reads the file itself
+(`read_csv('…')`). Inside the app the same SQL is rendered over the tab's
+SQL table instead (`FROM "sales"`, D32), so editing and running it
+reads the imported data, not a 5 GB file again; it is formatted and put in
+the editor as one undoable change (Ctrl+Z brings the old text back). It is
+not run by itself: a big view written as a result costs time the user
+didn't ask for yet. Tested to give exactly the view's rows through the
+panel's own path (`sql_result`).

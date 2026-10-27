@@ -1,5 +1,5 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ipcBytes } from "../test/ipc";
 import { MAX_RESULT_ROWS, useSql } from "./sql";
 
@@ -139,5 +139,31 @@ describe("sql store", () => {
     answer(ipcBytes({ n: [1] }));
     await done;
     expect(history()).toHaveLength(2);
+  });
+
+  it("load opens the panel and replaces the editor's text, once the editor is there", () => {
+    const editor = () => ({
+      runnable: () => ({ script: "", base: 0 }),
+      replace: vi.fn(),
+      insert: vi.fn(),
+      focus: vi.fn(),
+    });
+    // Panel open: straight into the editor.
+    const open = editor();
+    useSql.setState({ open: true, editor: open, library: "history" });
+    useSql.getState().load("SELECT 1");
+    expect(open.replace).toHaveBeenCalledWith("SELECT 1");
+    expect(useSql.getState().library).toBeNull();
+
+    // Panel closed: it opens, and the text goes in when its editor mounts.
+    useSql.setState({ open: false, editor: null });
+    useSql.getState().load("SELECT 2");
+    expect(useSql.getState().open).toBe(true);
+    const mounted = editor();
+    useSql.getState().setEditor(mounted);
+    expect(mounted.replace).toHaveBeenCalledWith("SELECT 2");
+    // Only once.
+    useSql.getState().setEditor(editor());
+    expect(mounted.replace).toHaveBeenCalledTimes(1);
   });
 });

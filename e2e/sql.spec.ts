@@ -236,3 +236,40 @@ test("history of runs and saved queries", async ({ page }) => {
   await saved.getByRole("button", { name: "Delete Distinct n" }).click();
   await expect(saved).toContainText("Name a query above");
 });
+
+test("open the view in the SQL panel as a query over the file's table", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox").fill("sort by id desc");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("contentinfo").getByRole("status")).toContainText("500 of 1,000");
+  // Something already in the editor; the panel closed.
+  await page.keyboard.press("Control+j");
+  await editor(page).click();
+  await page.keyboard.type("SELECT 42");
+  await page.keyboard.press("Control+j");
+  await expect(panel(page)).toBeHidden();
+
+  await page.getByRole("main").getByRole("button", { name: "Open in SQL" }).click();
+  await expect(panel(page)).toBeVisible();
+  // Formatted, over the table (not the file's reader).
+  await expect(editor(page)).toHaveText(/-- the view as SQL\s*SELECT\s*\*\s*FROM\s*"comma";/);
+  expect((await invokes(page, "view_sql")).at(-1)).toMatchObject({
+    datasetId: "ds-1",
+    reader: '"comma"',
+    spec: {
+      sort: [{ column: "id", descending: true }],
+      columns: ["id", "name", "amount", "joined"],
+    },
+  });
+  await expect(editor(page)).toBeFocused();
+  // Undo brings the old text back.
+  await page.keyboard.press("Control+z");
+  await expect(editor(page)).toHaveText("SELECT 42");
+
+  // From the palette too, with the panel open.
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox").fill("open view in sql");
+  await page.keyboard.press("Enter");
+  await expect(editor(page)).toHaveText(/FROM\s*"comma";/);
+});

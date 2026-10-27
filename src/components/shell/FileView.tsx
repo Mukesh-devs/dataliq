@@ -1,9 +1,11 @@
-import { CircleAlert, Download, LoaderCircle } from "lucide-react";
+import { CircleAlert, Download, LoaderCircle, SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
 import { formatBytes, formatCount, formatValue } from "../../lib/format";
-import { COPY_FORMATS, formatRows, tableName, type CopyFormat } from "../../lib/copyAs";
+import { COPY_FORMATS, formatRows, quoteIdent, tableName, type CopyFormat } from "../../lib/copyAs";
+import { formatSql } from "../../lib/sqlFormat";
+import { useSql } from "../../stores/sql";
 import { isMac, modKey } from "../../lib/platform";
 import { useRegisterCommands, type Command } from "../../stores/commands";
 import { useNotice } from "../../stores/notice";
@@ -308,6 +310,33 @@ export function FileView({
       selection: grid.current?.selection() ?? null,
     });
   }, [baseId, viewRows, showExport, view, layout, tab.title]);
+  /**
+   * Puts the view in the SQL panel as a query over the file's table (fast:
+   * no re-reading of the file), ready to edit and run.
+   */
+  const sqlTable = useSql((s) => s.tables.find((t) => t.tabId === tab.id && !t.current)?.name);
+  const loadSql = useSql((s) => s.load);
+  const openViewInSql = useCallback(async () => {
+    if (!baseId || !sqlTable) return;
+    try {
+      const sql = await viewSql(
+        baseId,
+        { ...view, columns: visible(layout) },
+        quoteIdent(sqlTable),
+        layout.labels,
+      );
+      let text = sql;
+      try {
+        text = formatSql(sql);
+      } catch {
+        // Unformatted SQL runs just as well.
+      }
+      loadSql(text);
+    } catch (e) {
+      notice(`Couldn't open the view: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [baseId, sqlTable, view, layout, loadSql, notice]);
+
   /** A cell's value as shown (null for NULL), from the loaded rows. */
   const cellText = (column: string, row: number): string | null => {
     const i = source?.columns.findIndex((c) => c.name === column) ?? -1;
@@ -429,6 +458,14 @@ export function FileView({
         keywords: "save csv parquet excel xlsx json download",
         run: openExport,
       });
+    if (baseId && sqlTable)
+      add({
+        id: "open-view-sql",
+        title: "Open view in SQL panel",
+        group: "SQL",
+        keywords: "query edit view as sql",
+        run: () => void openViewInSql(),
+      });
     if (baseId && readerSql)
       add({
         id: "copy-view-sql",
@@ -496,6 +533,8 @@ export function FileView({
     cancelView,
     canExport,
     openExport,
+    sqlTable,
+    openViewInSql,
   ]);
   useRegisterCommands("file", commands);
 
@@ -542,6 +581,16 @@ export function FileView({
           </span>
         )}
         <div className="flex-1" />
+        {tab.status === "ready" && baseId && sqlTable && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void openViewInSql()}
+            title={`The view as a query over ${sqlTable}, to edit and run`}
+          >
+            <SquareTerminal className="size-3.5" aria-hidden /> Open in SQL
+          </Button>
+        )}
         {canExport && (
           <Button size="sm" variant="ghost" onClick={openExport} title={`Export (${modKey}+E)`}>
             <Download className="size-3.5" aria-hidden /> Export
