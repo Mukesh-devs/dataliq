@@ -108,6 +108,9 @@ describe("chart helpers", () => {
       chartNote({ ...bars, kind: "scatter", xKind: "number", x: [1, 2], total: 1_000_000 }),
     ).toBe("2 of 1,000,000 points (random sample)");
     expect(chartNote({ ...bars, kind: "histogram", total: 42 })).toBe("42 values");
+    // A time axis can't place a group of rows without a date.
+    const line: ChartData = { ...bars, kind: "line", xKind: "time", x: [1, 2, null], total: 3 };
+    expect(chartNote({ ...line, truncated: false })).toBe("2 points · empty dates not drawn");
   });
 
   it("formats times as precisely as the bucket", () => {

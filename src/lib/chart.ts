@@ -140,10 +140,18 @@ export function chartNote(data: ChartData): string {
       ? `${formatCount(data.x.length)} of ${formatCount(data.total)} points (random sample)`
       : `${formatCount(data.total)} points`;
   }
-  const what = data.xKind === "category" ? "groups" : "points";
+  if (data.xKind === "category") {
+    return data.truncated
+      ? `Top ${formatCount(data.x.length)} of ${formatCount(data.total)} groups`
+      : `${formatCount(data.total)} groups`;
+  }
+  // An axis of numbers or dates has no place for rows without a value.
+  const drawn = data.x.filter((v) => v != null).length;
+  const empty =
+    drawn < data.x.length ? ` · empty ${data.xKind === "time" ? "dates" : "values"} not drawn` : "";
   return data.truncated
-    ? `${data.xKind === "category" ? "Top " : "First "}${formatCount(data.x.length)} of ${formatCount(data.total)} ${what}`
-    : `${formatCount(data.total)} ${what}`;
+    ? `First ${formatCount(drawn)} of ${formatCount(data.total)} points${empty}`
+    : `${formatCount(drawn)} points${empty}`;
 }
 
 /** Colours and fonts read from the design tokens. */
@@ -242,10 +250,14 @@ export function chartOption(
   const text = { color: c.muted, fontFamily: c.font, fontSize: 11 };
   const axisLine = { lineStyle: { color: c.border } };
   const splitLine = { lineStyle: { color: c.border } };
-  const valueAxis = (name?: string, time = false) => ({
+  // Axis names under the x axis and above the y axis, where they aren't
+  // clipped; bars and lines leave them out (the toolbar names the column).
+  const valueAxis = (name?: string, time = false, vertical = false) => ({
     type: time ? "time" : "value",
     name,
-    nameTextStyle: text,
+    nameLocation: vertical ? "end" : "middle",
+    nameGap: vertical ? 12 : 26,
+    nameTextStyle: { ...text, align: vertical ? "left" : "center" },
     axisLabel: {
       ...text,
       formatter: time ? (v: number) => formatTime(v, chart.bucket) : (v: number) => formatTick(v),
@@ -284,8 +296,9 @@ export function chartOption(
           return `${formatX(data, b.lo)} – ${formatX(data, b.hi)}<br/><b>${formatCount(b.count)}</b> rows`;
         },
       },
+      grid: { ...(base.grid as object), top: 28, bottom: 24 },
       xAxis: { ...valueAxis(labels.x, time), scale: true, splitLine: { show: false } },
-      yAxis: valueAxis("Count"),
+      yAxis: valueAxis("Count", false, true),
       series: [
         {
           type: "custom",
@@ -329,8 +342,9 @@ export function chartOption(
         formatter: (p: { value: [number, number] }) =>
           `${labels.x}: <b>${formatX(data, p.value[0])}</b><br/>${labels.y ?? ""}: <b>${formatNumber(p.value[1])}</b>`,
       },
+      grid: { ...(base.grid as object), top: 28, bottom: 24 },
       xAxis: valueAxis(labels.x, time),
-      yAxis: valueAxis(labels.y),
+      yAxis: valueAxis(labels.y, false, true),
       series: [
         {
           type: "scatter",
@@ -354,7 +368,7 @@ export function chartOption(
     axisTick: { show: false },
     inverse: horizontal,
   };
-  const xAxis = category ? categoryAxis : valueAxis(labels.x, data.xKind === "time");
+  const xAxis = category ? categoryAxis : valueAxis(undefined, data.xKind === "time");
   const series = data.series.map((s) => ({
     name: s.name,
     type: line ? "line" : "bar",
