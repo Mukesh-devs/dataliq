@@ -543,19 +543,21 @@ export function FileView({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "g" && source) {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      const key = e.key.toLowerCase();
+      // A click on the grid focuses it on the next frame; after it, or it
+      // takes the focus back from what the shortcut opens.
+      const afterGrid = (fn: () => void) => {
         e.preventDefault();
-        setGoToOpen(true);
-      }
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "e" && canExport) {
-        e.preventDefault();
-        openExport();
-      }
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f" && searchInput.current) {
-        e.preventDefault();
-        searchInput.current.focus();
-        searchInput.current.select();
-      }
+        requestAnimationFrame(fn);
+      };
+      if (mod && key === "g" && source) afterGrid(() => setGoToOpen(true));
+      if (mod && key === "e" && canExport) afterGrid(openExport);
+      if (mod && key === "f" && searchInput.current)
+        afterGrid(() => {
+          searchInput.current?.focus();
+          searchInput.current?.select();
+        });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

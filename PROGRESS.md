@@ -533,3 +533,22 @@ tested, and anything left over.
   Open in SQL → formatted query; Ctrl+Enter → "167 rows in 22 ms", same rows in the same order
   as the grid; Ctrl+Z brought back the earlier query.
 - Left over: none.
+
+### v0.3.0 release ✅
+
+- Version test list: all Rust unit + integration tests (incl. the export round trips for every
+  format, selected rows against the grid's pages, cancel, and the view's SQL over its table),
+  Vitest (196), Playwright flows (SQL panel, tables, results, history, export, open in SQL),
+  Tauri debug build; on demand: `perf_export_50m`, `bench_small`.
+- Measured (docs/BENCHMARKS.md): on 50M rows Parquet export 7.6 s, CSV 23.9 s, sorted Parquet
+  12.7 s; Excel 1M rows 14.7 s with flat memory; SQL `GROUP BY` 0.19 s (8 groups) / 1.44 s
+  (100K groups); a 50M-row result 11.5 s to write, then pages in 12 ms. The small suite is
+  unchanged from v0.2.0 on the same machine.
+- Done criteria: every format can be queried with SQL (tests over CSV, Excel, JSON, Parquet and
+  a CSV × Parquet join); every view or result exports correctly in every format (round trips).
+- Fixed while getting CI green: a shortcut pressed right after a click on the grid (Ctrl+F,
+  Ctrl+G, Ctrl+E) lost its focus to the grid, which focuses itself on the next frame; the
+  shortcuts now act after that frame (a test slows every frame to make the race certain). A
+  copy test read the clipboard before the copy landed.
+- Left over: CSV.gz export is bound by DuckDB's single-threaded gzip (~14 MB/s of CSV); a
+  parallel gzip goes to the v1.0 performance pass.

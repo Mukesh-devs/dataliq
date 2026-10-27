@@ -67,3 +67,44 @@ test("Ctrl+F searches text columns; Escape clears", async ({ page }) => {
     .poll(() => views.at(-1))
     .toEqual({ filters: [{ column: "amount", op: "equals", value: 1 }] });
 });
+
+test("shortcuts right after a click on the grid keep their focus on slow frames", async ({
+  page,
+}) => {
+  // The grid takes focus on the frame after a click; make frames slow so a
+  // shortcut pressed right after the click always comes first.
+  await page.addInitScript(() => {
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb) => {
+      setTimeout(() => raf(cb), 150);
+      return 0;
+    };
+  });
+  await mockTauri(page, {
+    dialogPaths: ["/data/comma.csv"],
+    datasets: { "/data/comma.csv": 1000 },
+    fetchRows: buildPage,
+    views: () => 42,
+  });
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  await expect(page.getByRole("status")).toContainText("1,000 rows");
+  const grid = page.getByTestId("data-grid");
+
+  await grid.click({ position: { x: 300, y: 80 } });
+  await page.keyboard.press("Control+f");
+  const box = page.getByLabel("Search text columns");
+  await expect(box).toBeFocused();
+  // Still there once the grid's frame has passed.
+  await page.waitForTimeout(400);
+  await expect(box).toBeFocused();
+
+  await grid.click({ position: { x: 300, y: 110 } });
+  await page.keyboard.press("Control+g");
+  await page.waitForTimeout(400);
+  await expect(page.getByRole("dialog", { name: "Go to row" })).toBeVisible();
+  await expect(page.getByLabel("Row number")).toBeFocused();
+});

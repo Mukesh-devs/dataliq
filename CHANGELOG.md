@@ -46,6 +46,8 @@ SQL and export: query every open file with SQL, export any view or result.
 - The grid could stay empty after switching back to a tab until the next sort or filter.
 - Changing the theme left the grid in the old colours until a tab switch.
 - A request running several statements could cancel a newer request of the same kind.
+- A shortcut pressed right after clicking a cell (Ctrl+F, Ctrl+G, Ctrl+E) could lose its focus to
+  the grid, closing Go to row or leaving the search box unfocused.
 
 ## [0.2.0] - 2026-10-27
 
