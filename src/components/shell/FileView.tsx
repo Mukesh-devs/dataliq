@@ -463,7 +463,7 @@ export function FileView({
         id: "open-view-sql",
         title: "Open view in SQL panel",
         group: "SQL",
-        keywords: "query edit view as sql",
+        keywords: "query edit",
         run: () => void openViewInSql(),
       });
     if (baseId && readerSql)
