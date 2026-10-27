@@ -157,6 +157,12 @@ fn empty_fields_are_null_and_null_text_is_text() {
         "literal NULL text is kept"
     );
     assert_eq!(text(&batch, 1, 2).as_deref(), Some("value"));
+    assert_eq!(text(&batch, 2, 0).as_deref(), Some("x"));
+    assert_eq!(
+        text(&batch, 2, 1).as_deref(),
+        Some(""),
+        "a quoted empty field is an empty string"
+    );
     assert_eq!(text(&batch, 2, 2), None);
 }
 

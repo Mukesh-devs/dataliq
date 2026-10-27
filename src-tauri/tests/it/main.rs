@@ -10,6 +10,7 @@ mod bench_small;
 mod csv_sources;
 mod engine_query;
 mod excel_sources;
+mod filters;
 mod import_cache;
 mod json_parquet_sources;
 mod paging;

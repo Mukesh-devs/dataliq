@@ -26,7 +26,18 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
   if (!tab) parts.push("Ready");
   else if (tab.status === "loading") parts.push(`Opening ${tab.title}…`);
   else if (tab.status === "error") parts.push("Could not open file");
-  else if (tab.info?.dataset) {
+  else if (tab.viewState?.status === "waiting") {
+    parts.push("Filters apply when the import finishes");
+    if (tab.import?.status === "running") parts.push("importing…");
+  } else if (tab.viewState?.dataset && tab.info?.dataset) {
+    const v = tab.viewState;
+    const rows = v.dataset ? formatCount(v.dataset.rowCount) : "";
+    parts.push(`${rows} of ${formatCount(v.totalRows ?? tab.info.dataset.rowCount)} rows`);
+    if (v.status === "running") parts.push("filtering…");
+    else parts.push(`filtered in ${formatDuration(v.elapsedMs ?? 0)}`);
+  } else if (tab.viewState?.status === "running") {
+    parts.push("Filtering…");
+  } else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
     if (tab.import?.fromCache) parts.push("from cache");
     else if (tab.info.dataset.cached === false)
@@ -60,6 +71,7 @@ export function App() {
   const { tabs, activeId, setActive, openPaths, reopen, cancelImport, readDirect, close, cycle } =
     useTabs();
   const applyProgress = useTabs((s) => s.applyProgress);
+  const setView = useTabs((s) => s.setView);
   const engineVersion = useEngine((s) => s.version);
   const probeEngine = useEngine((s) => s.probe);
   const loadApp = useApp((s) => s.load);
@@ -151,6 +163,7 @@ export function App() {
               onReopen={(o) => void reopen(active.id, o)}
               onCancelImport={() => void cancelImport(active.id)}
               onReadDirect={() => void readDirect(active.id)}
+              onViewChange={(v) => void setView(active.id, v)}
             />
           ) : (
             <EmptyState

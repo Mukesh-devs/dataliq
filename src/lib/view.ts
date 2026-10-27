@@ -1,0 +1,171 @@
+import type { ColumnKind } from "./arrow";
+import type { DatasetInfo } from "./files";
+import { call, type Param } from "./ipc";
+
+/** One test on a column; mirrors `FilterOp` in src-tauri/src/view/mod.rs. */
+export type FilterOp =
+  | { op: "contains" | "startsWith" | "endsWith"; value: string; caseSensitive?: boolean }
+  | { op: "regex"; pattern: string }
+  | { op: "empty" | "isNull" | "notNull" }
+  | { op: "equals" | "gt" | "gte" | "lt" | "lte"; value: Param }
+  | { op: "range"; min?: Param; max?: Param }
+  | { op: "lastDays"; days: number }
+  | { op: "in"; values: Param[] };
+
+export type Filter = FilterOp & {
+  column: string;
+  /** Keep the rows that do not match (cells where the test is NULL too). */
+  not?: boolean;
+};
+
+export interface SortKey {
+  column: string;
+  descending?: boolean;
+}
+
+/** What the user asked to see; mirrors `ViewSpec` in Rust. */
+export interface ViewSpec {
+  filters?: Filter[];
+  sort?: SortKey[];
+  search?: string;
+  columns?: string[];
+}
+
+export interface OpenedView {
+  dataset: DatasetInfo;
+  totalRows: number;
+  elapsedMs: number;
+}
+
+export interface ValueCount {
+  /** The value as text; null = NULL. */
+  value: string | null;
+  count: number;
+}
+
+export interface ValueList {
+  values: ValueCount[];
+  truncated: boolean;
+}
+
+export function isIdentity(spec: ViewSpec): boolean {
+  return !spec.filters?.length && !spec.sort?.length && !spec.search && !spec.columns;
+}
+
+/** Opens a view of a dataset as a new pageable dataset (close it when replaced). */
+export function openView(
+  datasetId: string,
+  spec: ViewSpec,
+  requestId?: string,
+  group?: string,
+): Promise<OpenedView> {
+  return call("open_view", { datasetId, spec, requestId, group });
+}
+
+/** Most frequent values of a column under the view's other filters. */
+export function columnValues(
+  datasetId: string,
+  spec: ViewSpec,
+  column: string,
+  search?: string,
+  limit?: number,
+  group?: string,
+): Promise<ValueList> {
+  return call("column_values", { datasetId, spec, column, search, limit, group });
+}
+
+/** Which family of filters fits a column. */
+export type FilterFamily = "text" | "number" | "date" | "boolean";
+
+export function filterFamily(kind: ColumnKind): FilterFamily {
+  switch (kind) {
+    case "integer":
+    case "number":
+      return "number";
+    case "date":
+    case "timestamp":
+    case "time":
+      return "date";
+    case "boolean":
+      return "boolean";
+    default:
+      return "text";
+  }
+}
+
+const OP_LABELS: Record<FilterOp["op"], string> = {
+  contains: "contains",
+  startsWith: "starts with",
+  endsWith: "ends with",
+  regex: "matches",
+  empty: "is empty",
+  isNull: "is null",
+  notNull: "is not null",
+  equals: "=",
+  gt: ">",
+  gte: "≥",
+  lt: "<",
+  lte: "≤",
+  range: "between",
+  lastDays: "in the last",
+  in: "is one of",
+};
+
+const NOT_LABELS: Partial<Record<FilterOp["op"], string>> = {
+  contains: "doesn't contain",
+  startsWith: "doesn't start with",
+  endsWith: "doesn't end with",
+  regex: "doesn't match",
+  empty: "is not empty",
+  isNull: "is not null",
+  notNull: "is null",
+  equals: "≠",
+  in: "is not one of",
+};
+
+function show(v: Param | undefined): string {
+  if (v === null || v === undefined) return "null";
+  if (typeof v === "string") return `"${v}"`;
+  return String(v);
+}
+
+/** Short text for a filter chip, e.g. `name contains "ann"`. */
+export function describeFilter(f: Filter, kind?: ColumnKind): string {
+  const label = (f.not && NOT_LABELS[f.op]) || OP_LABELS[f.op];
+  const prefix = f.not && !NOT_LABELS[f.op] ? "not " : "";
+  const date = kind && filterFamily(kind) === "date";
+  const lit = (v: Param | undefined) => (date && typeof v === "string" ? v : show(v));
+  let rest = "";
+  switch (f.op) {
+    case "contains":
+    case "startsWith":
+    case "endsWith":
+      rest = ` ${show(f.value)}${f.caseSensitive ? " (match case)" : ""}`;
+      break;
+    case "regex":
+      rest = ` /${f.pattern}/`;
+      break;
+    case "equals":
+    case "gt":
+    case "gte":
+    case "lt":
+    case "lte":
+      rest = ` ${lit(f.value)}`;
+      break;
+    case "range":
+      if (f.min !== undefined && f.max !== undefined) rest = ` ${lit(f.min)} and ${lit(f.max)}`;
+      else if (f.min !== undefined) return `${prefix}${f.column} ≥ ${lit(f.min)}`;
+      else if (f.max !== undefined) return `${prefix}${f.column} ≤ ${lit(f.max)}`;
+      break;
+    case "lastDays":
+      rest = ` ${f.days} ${f.days === 1 ? "day" : "days"}`;
+      break;
+    case "in": {
+      const shown = f.values.slice(0, 3).map(lit).join(", ");
+      const more = f.values.length > 3 ? ` +${f.values.length - 3}` : "";
+      rest = ` ${shown}${more}`;
+      break;
+    }
+  }
+  return `${prefix}${f.column} ${label}${rest}`;
+}

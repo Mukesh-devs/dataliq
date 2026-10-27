@@ -4,10 +4,12 @@
 //! names only ever reach SQL through `quote_ident`, after being checked
 //! against the dataset's schema, and every user value is a bound parameter.
 
+mod open;
 mod sql;
 
 use serde::{Deserialize, Serialize};
 
+pub use open::{MAX_VALUES, OpenedView, ValueCount, ValueList};
 pub use sql::{BuiltView, Relation, build, build_at};
 
 use crate::engine::Param;

@@ -124,9 +124,64 @@ pub fn write_all(root: &Path) -> io::Result<()> {
     }
     write(root, "csv/wide_500.csv", wide.as_bytes())?;
 
+    write(root, "csv/people.csv", people_csv().as_bytes())?;
     write_parquet_types(&root.join("parquet/types.parquet"))?;
     write_multi_sheet_xlsx(&root.join("excel/multi_sheet.xlsx"))?;
     Ok(())
+}
+
+/// 1,000 rows for filter tests: text with case and unicode variants, numbers,
+/// dates, booleans, NULLs (empty field) and empty strings (`""`). Tests
+/// compute expected counts by parsing this file themselves.
+fn people_csv() -> String {
+    const FIRST: &[&str] = &[
+        "Ann", "anna", "Bob", "Zoë", "Émile", "Li", "O'Neil", "Søren",
+    ];
+    const LAST: &[&str] = &["Smith", "smith", "Müller", "Nakamura", "Diaz", "Ng"];
+    const CITY: &[&str] = &[
+        "Berlin",
+        "München",
+        "Paris",
+        "São Paulo",
+        "New York",
+        "東京",
+    ];
+    let mut rng = crate::rng::Rng::new(0x5EED_F17E);
+    // 2022-01-01 as days since 1970-01-01.
+    let start = 18_993;
+    let mut out = String::from("id,name,city,amount,joined,active\n");
+    for id in 1..=1000u64 {
+        let name = if id % 97 == 0 {
+            "\"\"".to_string()
+        } else if id % 89 == 0 {
+            String::new()
+        } else {
+            format!("{} {}", rng.pick(FIRST), rng.pick(LAST))
+        };
+        let city = if id % 31 == 0 { "" } else { rng.pick(CITY) };
+        let cents = rng.below(110_000) as i64 - 10_000;
+        let amount = if id % 50 == 0 {
+            String::new()
+        } else {
+            let sign = if cents < 0 { "-" } else { "" };
+            format!("{sign}{}.{:02}", cents.abs() / 100, cents.abs() % 100)
+        };
+        let (y, m, d) = crate::rng::civil_from_days(start + rng.below(1095) as i64);
+        let joined = if id % 40 == 0 {
+            String::new()
+        } else {
+            format!("{y:04}-{m:02}-{d:02}")
+        };
+        let active = if id % 25 == 0 {
+            ""
+        } else if rng.chance(40) {
+            "true"
+        } else {
+            "false"
+        };
+        out.push_str(&format!("{id},{name},{city},{amount},{joined},{active}\n"));
+    }
+    out
 }
 
 /// Parquet with many DuckDB types, nulls included.

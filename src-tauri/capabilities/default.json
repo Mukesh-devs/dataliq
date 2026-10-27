@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Minimum permissions for the main window.",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "dialog:allow-open",
@@ -18,6 +20,8 @@
     "allow-cache-info",
     "allow-clear-cache",
     "allow-get-settings",
-    "allow-take-startup-files"
+    "allow-take-startup-files",
+    "allow-open-view",
+    "allow-column-values"
   ]
 }

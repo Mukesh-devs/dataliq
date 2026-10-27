@@ -48,6 +48,10 @@ interface DataGridProps {
   source: RowSource;
   /** Called with the first visible row and the number of visible rows. */
   onVisibleRowsChange?: (first: number, count: number) => void;
+  /** Header menu (or right-click) on column `col`; `bounds` is in client coordinates. */
+  onHeaderMenu?: (col: number, bounds: Rectangle) => void;
+  /** Columns with an active filter, marked in the header. */
+  filteredColumns?: ReadonlySet<string>;
 }
 
 const HEADER_HEIGHT = 32;
@@ -62,7 +66,7 @@ const emptySelection: GridSelection = {
  * arrive asynchronously and only the affected cells are redrawn.
  */
 export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataGrid(
-  { source, onVisibleRowsChange },
+  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns },
   ref,
 ) {
   const editor = useRef<DataEditorRef>(null);
@@ -99,8 +103,12 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         title: c.name,
         icon: ICONS[c.kind] ?? GridColumnIcon.HeaderString,
         width: widths[c.name] ?? initialWidth(c.name, c.kind),
+        hasMenu: onHeaderMenu !== undefined,
+        ...(filteredColumns?.has(c.name) && {
+          themeOverride: { textHeader: theme.accentColor, bgIconHeader: theme.accentColor },
+        }),
       })),
-    [source, widths],
+    [source, widths, onHeaderMenu, filteredColumns, theme],
   );
 
   const getCellContent = useCallback(
@@ -210,6 +218,12 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         getCellsForSelection={getCellsForSelection}
         gridSelection={selection}
         onGridSelectionChange={setSelection}
+        onHeaderMenuClick={onHeaderMenu}
+        onHeaderContextMenu={(col, e) => {
+          if (!onHeaderMenu) return;
+          e.preventDefault();
+          onHeaderMenu(col, e.bounds); // client coordinates, like the menu click
+        }}
         onColumnResize={(column, newSize) =>
           setWidths((w) => ({ ...w, [column.id ?? column.title]: newSize }))
         }

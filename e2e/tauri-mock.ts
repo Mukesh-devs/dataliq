@@ -16,7 +16,11 @@ export interface MockOptions {
   /** Give these recorded files a pageable dataset with this many rows. */
   datasets?: Record<string, number>;
   /** Builds Arrow IPC (base64) for `fetch_rows`; runs in Node. */
-  fetchRows?: (start: number, count: number) => string | Promise<string>;
+  fetchRows?: (start: number, count: number, datasetId: string) => string | Promise<string>;
+  /** Row count of a view (`open_view`); runs in Node. Throw to fail it. */
+  views?: (spec: unknown) => number;
+  /** Value list for `column_values`; runs in Node. */
+  values?: (column: string, search: string | null) => { value: string | null; count: number }[];
   /**
    * Simulated background imports by path: progress events to emit (one per
    * `stepMs`) and the final row count. Paths not listed never finish.
@@ -34,7 +38,19 @@ export interface MockOptions {
 export async function mockTauri(page: Page, options: MockOptions = {}) {
   if (options.fetchRows) {
     const build = options.fetchRows;
-    await page.exposeFunction("__fetchRows", (start: number, count: number) => build(start, count));
+    await page.exposeFunction("__fetchRows", (start: number, count: number, id: string) =>
+      build(start, count, id),
+    );
+  }
+  if (options.views) {
+    const count = options.views;
+    await page.exposeFunction("__viewRows", (spec: unknown) => count(spec));
+  }
+  if (options.values) {
+    const values = options.values;
+    await page.exposeFunction("__values", (column: string, search: string | null) =>
+      values(column, search),
+    );
   }
   await page.addInitScript(
     ({ recordings, dialogPaths, datasets, imports, startupFiles }) => {
@@ -43,6 +59,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       const w = window as unknown as Record<string, unknown>;
       w.__invokes = log;
       let nextCallback = 1;
+      let nextView = 1;
       const listeners: Record<string, number[]> = {};
       const emit = (event: string, payload: unknown) => {
         for (const id of listeners[event] ?? []) {
@@ -117,8 +134,25 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               };
             }
             case "fetch_rows": {
-              const fetchRows = w.__fetchRows as (s: number, c: number) => Promise<string>;
-              return toBuffer(await fetchRows(Number(args.start), Number(args.count)));
+              const fetchRows = w.__fetchRows as (
+                s: number,
+                c: number,
+                id: string,
+              ) => Promise<string>;
+              return toBuffer(
+                await fetchRows(Number(args.start), Number(args.count), String(args.datasetId)),
+              );
+            }
+            case "open_view": {
+              const viewRows = w.__viewRows as (spec: unknown) => Promise<number>;
+              const rowCount = await viewRows(args.spec);
+              const id = `view-${nextView++}`;
+              return { dataset: { id, rowCount, cached: true }, totalRows: 1000, elapsedMs: 15 };
+            }
+            case "column_values": {
+              const values = w.__values as (c: string, s: string | null) => Promise<unknown[]>;
+              const list = await values(String(args.column), (args.search as string) ?? null);
+              return { values: list, truncated: false };
             }
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };

@@ -235,3 +235,12 @@ the user means by "today", and it makes the SQL testable with a fixed date.
 A negated filter is `NOT coalesce(test, FALSE)`, so "doesn't contain x"
 keeps NULL cells instead of silently dropping them, as SQL's three-valued
 logic would. Sorts are always `NULLS LAST`, in both directions.
+
+## D28 — A quoted empty CSV field is an empty string
+
+DuckDB's CSV reader treats `""` as NULL by default (`allow_quoted_nulls`).
+That erases the difference between "no value" and "an empty string" that a
+file states explicitly, and BigView shows NULL and empty text differently.
+We read CSV/TSV with `allow_quoted_nulls = false`: an unquoted empty field is
+NULL and `""` is an empty string. The cache format version was bumped so
+files imported before the change are imported again.

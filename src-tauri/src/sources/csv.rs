@@ -116,6 +116,9 @@ pub fn reader_call_with(
         "compression",
         Param::Text(compression.duckdb_name().to_string()),
     );
+    // A quoted empty field (`""`) is an empty string, not NULL; only an
+    // empty unquoted field is NULL (D28).
+    add("allow_quoted_nulls", Param::Bool(false));
     for (name, value) in extra {
         add(name, value.clone());
     }
@@ -136,10 +139,14 @@ mod tests {
             Compression::None,
             &CsvOptions::default(),
         );
-        assert_eq!(sql, "read_csv(?, compression = ?)");
+        assert_eq!(sql, "read_csv(?, compression = ?, allow_quoted_nulls = ?)");
         assert_eq!(
             params,
-            vec![Param::Text("/d/a.csv".into()), Param::Text("none".into())]
+            vec![
+                Param::Text("/d/a.csv".into()),
+                Param::Text("none".into()),
+                Param::Bool(false)
+            ]
         );
     }
 
@@ -161,10 +168,10 @@ mod tests {
         );
         assert_eq!(
             sql,
-            "read_csv(?, delim = ?, header = ?, encoding = ?, skip = ?, ignore_errors = ?, compression = ?)"
+            "read_csv(?, delim = ?, header = ?, encoding = ?, skip = ?, ignore_errors = ?, compression = ?, allow_quoted_nulls = ?)"
         );
         assert_eq!(params[1], Param::Text("\t".into()));
-        assert_eq!(params.last(), Some(&Param::Text("gzip".into())));
+        assert_eq!(params[params.len() - 2], Param::Text("gzip".into()));
     }
 
     #[test]

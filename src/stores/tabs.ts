@@ -10,8 +10,10 @@ import {
   previewFile,
   type ImportProgress,
   type OpenOptions,
+  type DatasetInfo,
   type SourceInfo,
 } from "../lib/files";
+import { isIdentity, openView, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
 
 export type TabStatus = "loading" | "ready" | "error";
@@ -30,6 +32,19 @@ export interface ImportState {
   fromCache?: boolean;
 }
 
+/** The tab's view (filters, …) opened as its own dataset. */
+export interface ViewState {
+  /** "waiting": the full data isn't ready yet (still importing). */
+  status: "waiting" | "running" | "done" | "error";
+  requestId: string;
+  /** The view's rows; kept while a newer view is computed. */
+  dataset?: DatasetInfo;
+  /** Rows in the whole file. */
+  totalRows?: number;
+  elapsedMs?: number;
+  error?: string;
+}
+
 export interface Tab {
   id: string;
   /** Display name, usually the file name. */
@@ -46,6 +61,9 @@ export interface Tab {
   previewMs?: number;
   /** Background import of the full file. */
   import?: ImportState;
+  /** What the user asked to see (filters, …). */
+  view?: ViewSpec;
+  viewState?: ViewState;
 }
 
 interface TabsState {
@@ -66,10 +84,13 @@ interface TabsState {
   close: (id: string) => void;
   /** Applies an `import-progress` event (subscribed once by the App). */
   applyProgress: (progress: ImportProgress) => void;
+  /** Changes a tab's view (filters, …); the grid follows when it is computed. */
+  setView: (id: string, view: ViewSpec) => Promise<void>;
 }
 
 let nextId = 1;
 let nextJob = 1;
+let nextView = 1;
 
 export const useTabs = create<TabsState>()((set, get) => {
   const patch = (id: string, changes: Partial<Tab>) =>
@@ -98,6 +119,7 @@ export const useTabs = create<TabsState>()((set, get) => {
           fromCache: outcome.fromCache,
         },
       });
+      if (find(id)?.view) void applyView(id);
     } catch (err) {
       if (!isCurrent()) return;
       const kind = (err as { kind?: string }).kind;
@@ -110,6 +132,56 @@ export const useTabs = create<TabsState>()((set, get) => {
           elapsedMs: current?.elapsedMs ?? 0,
           error: err instanceof Error ? err.message : String(err),
           errorKind: kind,
+        },
+      });
+    }
+  };
+
+  /**
+   * Opens the tab's view over its full dataset. The previous view stays on
+   * screen until the new one is counted; a newer request for the tab wins.
+   */
+  const applyView = async (id: string) => {
+    const tab = find(id);
+    if (!tab) return;
+    const spec = tab.view ?? {};
+    const base = tab.info?.dataset;
+    const shown = tab.viewState?.dataset;
+    if (isIdentity(spec) || !base) {
+      if (shown) void closeDataset(shown.id).catch(() => {});
+      patch(id, {
+        viewState: isIdentity(spec) ? undefined : { status: "waiting", requestId: "" },
+      });
+      return;
+    }
+    const requestId = `view-${nextView++}`;
+    patch(id, { viewState: { ...tab.viewState, status: "running", requestId, error: undefined } });
+    const isCurrent = () => find(id)?.viewState?.requestId === requestId;
+    try {
+      const out = await openView(base.id, spec, requestId, `view:${id}`);
+      if (!isCurrent()) {
+        void closeDataset(out.dataset.id).catch(() => {});
+        return;
+      }
+      const old = find(id)?.viewState?.dataset;
+      if (old) void closeDataset(old.id).catch(() => {});
+      patch(id, {
+        viewState: {
+          status: "done",
+          requestId,
+          dataset: out.dataset,
+          totalRows: out.totalRows,
+          elapsedMs: out.elapsedMs,
+        },
+      });
+    } catch (err) {
+      if (!isCurrent() || (err as { kind?: string }).kind === "cancelled") return;
+      patch(id, {
+        viewState: {
+          ...find(id)?.viewState,
+          status: "error",
+          requestId,
+          error: err instanceof Error ? err.message : String(err),
         },
       });
     }
@@ -143,6 +215,8 @@ export const useTabs = create<TabsState>()((set, get) => {
     if (tab.import?.status === "running") void cancelImport(tab.import.jobId).catch(() => {});
     const ds = tab.info?.dataset;
     if (ds) void closeDataset(ds.id).catch(() => {});
+    const view = tab.viewState?.dataset;
+    if (view) void closeDataset(view.id).catch(() => {});
   };
 
   return {
@@ -181,7 +255,12 @@ export const useTabs = create<TabsState>()((set, get) => {
       const tab = find(id);
       if (!tab) return;
       release(tab);
-      patch(id, { info: tab.info ? { ...tab.info, dataset: null } : tab.info });
+      // New import settings can change the columns, so filters start over.
+      patch(id, {
+        info: tab.info ? { ...tab.info, dataset: null } : tab.info,
+        view: undefined,
+        viewState: undefined,
+      });
       await load(id, tab.path, options);
     },
     cancelImport: async (id) => {
@@ -199,6 +278,7 @@ export const useTabs = create<TabsState>()((set, get) => {
           info: { ...t.info, dataset },
           import: { jobId: "direct", status: "done", percent: 100, elapsedMs: 0 },
         });
+        if (find(id)?.view) void applyView(id);
       } catch (err) {
         patch(id, {
           import: {
@@ -219,6 +299,11 @@ export const useTabs = create<TabsState>()((set, get) => {
             : t,
         ),
       })),
+    setView: async (id, view) => {
+      if (!find(id)) return;
+      patch(id, { view: isIdentity(view) ? undefined : view });
+      await applyView(id);
+    },
     close: (id) => {
       const tab = find(id);
       if (tab) release(tab);
