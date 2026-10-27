@@ -47,6 +47,7 @@
     "allow-load-recipe",
     "allow-save-recipe-script",
     "allow-compare-files",
-    "allow-compare-sql"
+    "allow-compare-sql",
+    "allow-data-quality"
   ]
 }

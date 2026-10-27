@@ -690,3 +690,23 @@ tested, and anything left over.
   price 1 · note 2", both notes, the cells filled as expected in dark theme, 38 ms; "2 added"
   shows those 2 rows; Export → CSV through the save dialog gives exactly the documented rows.
 - Left over: none.
+
+### Step 4 — Data quality warnings ✅
+
+- A Quality panel (toolbar with the warning count, palette) checks the rows the tab reads:
+  mostly empty columns (≥ 20%), stray spaces, text that is mostly numbers with exceptions, dates
+  in several formats, numeric outliers (beyond 3 IQR) and exact duplicate rows.
+- Each warning's "Show rows" puts the filters it was counted with on the view, so it shows
+  exactly that many rows; duplicates open a query in the SQL panel listing each duplicated row
+  with its copies; "Fix" adds the cleaning step that clears it (trim, change type, remove
+  duplicates) and the check runs again on the cleaned rows (D42).
+- Measured on 50M rows: 33 s at first (exact quartiles, six regexes per text column); with the
+  outlier bounds from a repeatable 100,000-row sample and number/date tests only on columns that
+  look like them, 6.2 s warm, every count still over all rows.
+- Tested: `fixtures/quality/messy.csv` with documented problems (see its README): every warning,
+  count and message; each warning's filters give exactly its count; the three fixes applied as
+  a recipe leave only the warnings without a fix; a clean file has none; Vitest for the panel;
+  Playwright for show rows, fix (and the new check on the cleaned rows) and duplicates in SQL.
+- Smoke (real app, messy.csv): 6 warnings in 16 ms matching the README; "Show 3 rows" on date
+  formats → ids 4, 9, 16; Fix trim → 5 warnings; Fix duplicates → 20 rows, 4 warnings left.
+- Left over: none.

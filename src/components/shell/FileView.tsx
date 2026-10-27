@@ -3,6 +3,7 @@ import {
   CircleAlert,
   Download,
   GitCompareArrows,
+  ListChecks,
   LoaderCircle,
   SquareTerminal,
   Table,
@@ -24,6 +25,7 @@ import { RecipePanel } from "../recipe/RecipePanel";
 import {
   columnGaps,
   describeGaps,
+  describeStep,
   loadRecipe,
   pickRecipeOpen,
   pickRecipeSave,
@@ -42,6 +44,8 @@ import {
   type RowStatus,
 } from "../../lib/compare";
 import { CompareBar } from "../compare/CompareBar";
+import { QualityPanel } from "../quality/QualityPanel";
+import { dataQuality, duplicatesSql, type QualityReport } from "../../lib/quality";
 import { CompareDialog, type CompareSide } from "../compare/CompareDialog";
 import type { CellTint } from "../grid/gridTheme";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
@@ -318,6 +322,30 @@ export function FileView({
     [setRecipeOpen, tab.id],
   );
   const [recipeWarning, setRecipeWarning] = useState<string>();
+
+  // Data quality warnings of the rows the tab reads (cleaned or not).
+  const setQualityOpen = useTabs((s) => s.setQualityOpen);
+  const qualityOpen = tab.status === "ready" && !!tab.qualityOpen;
+  const qualityBase = baseOf(tab).dataset?.id;
+  const [quality, setQuality] = useState<{
+    base: string;
+    report?: QualityReport;
+    error?: string;
+  } | null>(null);
+  const [qualityRun, setQualityRun] = useState(0);
+  useEffect(() => {
+    if (!qualityOpen || !qualityBase) return;
+    let alive = true;
+    dataQuality(qualityBase, undefined, `quality:${tab.id}`)
+      .then((report) => alive && setQuality({ base: qualityBase, report }))
+      .catch((e: unknown) => {
+        if (!alive || (e as { kind?: string }).kind === "cancelled") return;
+        setQuality({ base: qualityBase, error: e instanceof Error ? e.message : String(e) });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [qualityOpen, qualityBase, qualityRun, tab.id]);
 
   // Comparing this file with another open one.
   const openCompare = useTabs((s) => s.openCompare);
@@ -642,6 +670,14 @@ export function FileView({
         keywords: "cancel",
         run: () => cancelView(tab.id),
       });
+    if (tab.status === "ready" && baseOf(tab).dataset)
+      add({
+        id: "quality",
+        title: qualityOpen ? "Hide data quality" : "Check data quality",
+        group: "View",
+        keywords: "warnings problems nulls spaces duplicates outliers dates types",
+        run: () => setQualityOpen(tab.id, !qualityOpen),
+      });
     if (canCompare)
       // eslint-disable-next-line react-hooks/refs -- measures the button when picked
       add({
@@ -839,6 +875,8 @@ export function FileView({
     hasSteps,
     fileId,
     canCompare,
+    qualityOpen,
+    setQualityOpen,
   ]);
   useRegisterCommands("file", commands);
 
@@ -940,6 +978,23 @@ export function FileView({
             {recipeSteps.length > 0 && (
               <span className="rounded-full bg-accent-soft px-1.5 text-[11px] text-fg tabular">
                 {recipeSteps.length}
+              </span>
+            )}
+          </Button>
+        )}
+        {tab.status === "ready" && baseId && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={qualityOpen}
+            className={qualityOpen ? "bg-surface-2 text-fg" : undefined}
+            onClick={() => setQualityOpen(tab.id, !qualityOpen)}
+            title="Data quality: empty columns, stray spaces, mixed types, dates, outliers, duplicates"
+          >
+            <ListChecks className="size-3.5" aria-hidden /> Quality
+            {quality?.base === baseId && quality.report && quality.report.warnings.length > 0 && (
+              <span className="rounded-full bg-accent-soft px-1.5 text-[11px] text-fg tabular">
+                {quality.report.warnings.length}
               </span>
             )}
           </Button>
@@ -1182,6 +1237,29 @@ export function FileView({
           <div className="flex flex-1 items-center justify-center gap-2 text-fg-muted">
             <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading {tab.title}…
           </div>
+        )}
+        {qualityOpen && (
+          <QualityPanel
+            // The last report stays up while the new one is checked.
+            report={quality?.report}
+            loading={!quality || quality.base !== qualityBase}
+            error={quality?.base === qualityBase ? quality?.error : undefined}
+            onShow={(w) => onViewChange?.({ ...view, filters: w.filters, search: undefined })}
+            onShowCopies={sqlTable ? () => loadSql(duplicatesSql(sqlTable)) : undefined}
+            onFix={
+              canClean
+                ? (step) => {
+                    void setRecipe(tab.id, [...recipeSteps, step]);
+                    notice(`Added a cleaning step: ${describeStep(step)}`);
+                  }
+                : undefined
+            }
+            onRefresh={() => {
+              setQuality(null);
+              setQualityRun((n) => n + 1);
+            }}
+            onClose={() => setQualityOpen(tab.id, false)}
+          />
         )}
         {recipeOpen && (
           <RecipePanel

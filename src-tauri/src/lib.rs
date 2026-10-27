@@ -9,6 +9,7 @@ pub mod engine;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod quality;
 pub mod recipe;
 pub mod settings;
 pub mod sources;
@@ -137,7 +138,8 @@ pub fn run() {
             commands::recipe::load_recipe,
             commands::recipe::save_recipe_script,
             commands::compare::compare_files,
-            commands::compare::compare_sql
+            commands::compare::compare_sql,
+            commands::quality::data_quality
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

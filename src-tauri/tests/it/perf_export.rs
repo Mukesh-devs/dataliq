@@ -349,3 +349,27 @@ fn perf_charts_50m() {
         );
     }
 }
+
+/// Data quality warnings over the same 50M rows (one scan of every column,
+/// one for outliers, one for duplicate rows).
+#[test]
+#[ignore = "needs generated fixtures; a minute or two"]
+fn perf_quality_50m() {
+    let Some((engine, ds, _tmp)) = setup() else {
+        eprintln!("sales_50m.parquet not generated, skipping");
+        return;
+    };
+    for run in ["cold", "warm"] {
+        let t = Instant::now();
+        let report = engine.quality(&ds.id, &RequestKey::default()).unwrap();
+        println!(
+            "quality ({run}) {:>6.2} s  warnings {} of {} rows",
+            t.elapsed().as_secs_f64(),
+            report.warnings.len(),
+            report.rows
+        );
+        for w in &report.warnings {
+            println!("  {:?} {:?}: {}", w.kind, w.column, w.message);
+        }
+    }
+}

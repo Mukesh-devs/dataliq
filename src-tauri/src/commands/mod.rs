@@ -6,6 +6,7 @@ pub mod compare;
 pub mod export;
 pub mod files;
 pub mod import;
+pub mod quality;
 pub mod query;
 pub mod recipe;
 pub mod sql;

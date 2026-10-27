@@ -126,6 +126,8 @@ export interface Tab {
   recipeState?: RecipeState;
   /** The recipe panel is open. */
   recipeOpen?: boolean;
+  /** The data quality panel is open (one side panel at a time). */
+  qualityOpen?: boolean;
   /** A comparison of two files: its counts (the tab's rows are the differences). */
   compare?: CompareInfo;
 }
@@ -232,6 +234,7 @@ interface TabsState {
   undoRecipe: (id: string) => Promise<void>;
   redoRecipe: (id: string) => Promise<void>;
   setRecipeOpen: (id: string, open: boolean) => void;
+  setQualityOpen: (id: string, open: boolean) => void;
 }
 
 let nextId = 1;
@@ -629,7 +632,10 @@ export const useTabs = create<TabsState>()((set, get) => {
         future: h.future.slice(1),
       });
     },
-    setRecipeOpen: (id, recipeOpen) => patch(id, { recipeOpen }),
+    setRecipeOpen: (id, recipeOpen) =>
+      patch(id, recipeOpen ? { recipeOpen, qualityOpen: false } : { recipeOpen }),
+    setQualityOpen: (id, qualityOpen) =>
+      patch(id, qualityOpen ? { qualityOpen, recipeOpen: false } : { qualityOpen }),
     openResult: ({ dataset, preview, sql }) => {
       const id = `tab-${nextId++}`;
       const title = `Result ${nextResult++}`;

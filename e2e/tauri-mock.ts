@@ -54,6 +54,8 @@ export interface MockOptions {
    * dataset is `diff-N`, paged through `fetchRows`.
    */
   comparison?: Record<string, unknown> & { rowCount: number };
+  /** Result of `data_quality`. */
+  quality?: unknown;
 }
 
 /**
@@ -120,6 +122,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       savePaths,
       exportMs,
       comparison,
+      quality,
     }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
@@ -251,6 +254,9 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const id = `diff-${nextDiff++}`;
               return { dataset: { id, rowCount, cached: true }, elapsedMs: 12, ...rest };
             }
+            case "data_quality":
+              if (!quality) throw { kind: "internal", message: "unmocked command data_quality" };
+              return quality;
             case "compare_sql":
               return `SELECT 'changed' AS status FROM ${String(args.leftReader)}, ${String(args.rightReader)};`;
             case "chart_sql":
@@ -393,6 +399,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       savePaths: options.savePaths ?? [],
       exportMs: options.exportMs ?? 0,
       comparison: options.comparison,
+      quality: options.quality,
     },
   );
 }

@@ -503,3 +503,23 @@ sort, search, charts, export and "Copy view as SQL" (one query over both
 files' readers) work as on any file. The bar's counts filter the rows by
 status; changed cells (and their old values) are filled with a soft amber,
 added rows green, removed rows red, as tokens with dark steps.
+
+## D42 — Data quality warnings: counted with the filters that show them
+
+Six checks, run when the Quality panel opens (and again after each
+cleaning step) on the rows the tab reads: a column empty in at least 20%
+of rows; text with a space at the start or end; text that is at least half
+numbers but not all; text that is at least half dates written in two or
+more formats; numbers further than 3 interquartile ranges outside the
+middle half; and exact duplicate rows. Each warning is counted with the
+very tests its "Show rows" button puts on the view (the empty, regex and
+range filters), so the button always shows that many rows; duplicates,
+which no column filter can show, open a query in the SQL panel listing
+each duplicated row with its number of copies. Where a cleaning step fixes
+a warning (trim, change type to number, remove duplicates) the panel adds
+it to the recipe. Spaces are the ones `trim` removes (spaces, not tabs),
+so the fix clears its warning. On 50M rows a full check took 33 s with
+exact quartiles and six regexes per text column; the outlier bounds now
+come from a repeatable sample of 100,000 rows (all rows when fewer), and
+only text columns that are at least 40% numbers or dates in that sample are
+tested for them in full, so every count is still over all rows: 6.2 s.
