@@ -361,3 +361,18 @@ tested, and anything left over.
 - Smoke (real app, people.csv): Ctrl+K → "sort by amount desc" → Enter sorted the grid; "view as
   sql" copied a query that plain DuckDB ran with the same first rows (971, 58, 883).
 - Left over: none.
+
+### v0.2.0 release ✅
+
+- Version test list: all Rust unit + integration tests (incl. the copied-SQL equivalence tests),
+  Vitest, Playwright flows (filters, sort, search, columns, profile, palette, copy, cancel),
+  Tauri debug build; on demand: `perf_views_50m`, `perf_profile_50m`, `perf_sort_strategies`,
+  `excel_reader_sql_reads_the_same_table_in_duckdb`, `bench_small`.
+- Measured (docs/BENCHMARKS.md): filters on 50M rows 0.06–0.79 s to first rows and count; sorts
+  0.8–1.2 s to first and last rows (full sort 20–37 s in the background, D29); column profiles
+  0.44–2.78 s; the small suite unchanged from v0.1.0 when both are run on the same machine today.
+- Done criteria: a subset of a 50M-row file is found in seconds (filters, search, value lists,
+  sorted ends); "Copy view as SQL" reproduces the view exactly — tests run the copied SQL in a
+  fresh DuckDB and compare every value, order of ties included.
+- Left over: the full 50M-row sort stays over 10 s on 4 cores (D29) and goes to the v1.0
+  performance pass with the per-OS budgets.

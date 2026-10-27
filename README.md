@@ -8,8 +8,8 @@ compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
 and no account.
 
-**Status:** v0.1.0 — the core viewer. Filters, sorting, search and column
-profiles come in v0.2; SQL and export in v0.3. See [CHANGELOG.md](CHANGELOG.md),
+**Status:** v0.2.0 — explore: filters, sorting, search, column management and
+profiles, a command palette and "Copy as SQL". SQL and export come in v0.3. See [CHANGELOG.md](CHANGELOG.md),
 [PROGRESS.md](PROGRESS.md) and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
 
 <!-- Screenshots: light and dark theme with a 50M-row file open. -->
@@ -31,6 +31,22 @@ _Screenshots coming soon._
 - A fast canvas data grid: type icons, right-aligned numbers, `null` shown
   distinctly from empty text, column resize, range selection and copy, and
   **Go to row** (Ctrl+G).
+- Filter any column by type (text: contains, equals, starts/ends with, regex,
+  empty; numbers: equals, ranges, greater/less; dates: ranges, before/after,
+  last N days; booleans; null / not null) or by picking values from a
+  searchable list with counts. Filters show as chips; "N of M rows".
+- Sort by one or several columns (click, Shift+click). On 50M rows the first
+  and last rows appear in about a second while the rest sorts in the
+  background.
+- Search all text columns (Ctrl+F) with matches highlighted in the grid.
+- Hide, reorder (drag), pin, rename and auto-fit columns.
+- Column profiles: rows, nulls, distinct values, min, max, mean, standard
+  deviation, a histogram and the most common values, following the current
+  filters; small histograms in the column headers.
+- Command palette (Ctrl+K) with every action; copy a selection as CSV, TSV,
+  JSON, Markdown or SQL INSERT (Shift+Ctrl+C); **Copy view as SQL** gives a
+  query that reproduces the current view in plain DuckDB; cancel running
+  queries from the status bar.
 - Light and dark themes that follow your OS.
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
@@ -43,19 +59,25 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Action | Shortcut |
 | --- | --- |
 | Open file | Ctrl+O |
+| Command palette | Ctrl+K |
+| Find in data | Ctrl+F |
 | Close tab | Ctrl+W |
 | Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab |
 | Go to row | Ctrl+G |
-| Copy selection | Ctrl+C |
+| Copy selection (TSV) | Ctrl+C |
+| Copy as CSV / JSON / Markdown / SQL | Shift+Ctrl+C |
+| Sort by a column / add a sort key | Click / Shift+click a header |
 
-More shortcuts (command palette, find, SQL panel, export) arrive in later versions.
+More shortcuts (SQL panel, export) arrive in later versions.
 
 ## Performance
 
 Measured on a 4-core Linux machine (details in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
 first rows of a 5 GB CSV in 0.3 s and of a 5 GB `.csv.gz` in about 1 s; full
 import of a 5 GB CSV in 32 s; reopening a cached file in a few milliseconds;
-random pages anywhere in 50M rows in under 25 ms.
+random pages anywhere in 50M rows in under 25 ms. On 50M rows: a filter
+shows its first rows and count in 0.1–0.8 s, a sort its first and last rows in
+about 1 s, and a column profile takes 0.4–2.8 s.
 
 ## Installing
 

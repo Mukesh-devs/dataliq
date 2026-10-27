@@ -49,6 +49,9 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Idle memory, whole app incl. webview (release) | < 200 MB | 241 MiB PSS, of which 77 MiB private — see below | v0.1.0 |
 | Installer size (Linux) | < 40 MB | .deb 19.4 MB, .rpm 19.4 MB, .AppImage 92.5 MB — see below | v0.1.0 |
 | Grid scroll, 50M rows (Chromium, mocked backend) | ~60 fps, no blank page > 100 ms | 60 fps; page wait p95 42 ms / max 51 ms (fast scroll), p95 56 / max 77 ms (fling) | v0.1.0 |
+| Simple filter on 50M rows (first rows + count) | < 2 s | 0.06–0.79 s | v0.2 step 3 |
+| Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
+| Column stats on 50M rows | < 3 s | 0.44–2.78 s per column | v0.2 step 6 |
 
 Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
@@ -163,6 +166,28 @@ Strategies measured before choosing (`perf_sort_strategies`): a sort of only
 the row ids is faster (15.6 s) but fetching a page by id list then takes
 1.1 s; writing full sorted rows to an in-memory table instead of the on-disk
 scratch database saves little (26–55 s) and holds memory.
+
+### Small suite at v0.2.0 (linux-dev)
+
+`pnpm bench` at v0.2.0, and v0.1.0 rebuilt and run right after on the same
+machine (best of 5 runs each). The local guard flagged several flows against
+the v0.1 numbers above, but v0.1.0 itself measures the same today: the shared
+container is slower than when v0.1 was recorded, not the code.
+
+| Flow | v0.1.0 (today) | v0.2.0 |
+| --- | --- | --- |
+| first_rows_100mb_csv | 345 ms | 297 ms |
+| first_rows_100mb_csv_gz | 1,181 ms | 1,255 ms |
+| first_rows_100mb_ndjson_gz | 367 ms | 366 ms |
+| first_rows_100k_xlsx | 68 ms | 72 ms |
+| import_100mb_csv | 1,545 ms | 1,581 ms |
+| import_100mb_csv_gz | 3,161 ms | 3,292 ms |
+| import_100mb_ndjson_gz | 2,810 ms | 2,756 ms |
+| import_100k_xlsx | 1,995 ms | 1,981 ms |
+| reopen_cached_100mb_csv | 1.2 ms | 1.3 ms |
+| page_1m_parquet | 12.4 ms | 12.9 ms |
+
+The CI guard (baseline from the runner, D26) runs on the v0.2.0 tag.
 
 ### Column profiles (v0.2 step 6)
 
