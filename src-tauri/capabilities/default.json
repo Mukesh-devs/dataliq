@@ -28,6 +28,12 @@
     "allow-view-sql",
     "allow-register-table",
     "allow-unregister-table",
-    "allow-sql-result"
+    "allow-sql-result",
+    "allow-sql-history",
+    "allow-add-sql-history",
+    "allow-clear-sql-history",
+    "allow-saved-queries",
+    "allow-save-query",
+    "allow-delete-saved-query"
   ]
 }

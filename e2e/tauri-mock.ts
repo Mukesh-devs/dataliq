@@ -93,6 +93,9 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       let nextCallback = 1;
       let nextView = 1;
       let nextResult = 1;
+      // The SQL panel's history and saved queries (kept for the page's life).
+      const history: { sql: string; ranAt: number }[] = [];
+      const saved: { name: string; sql: string; savedAt: number }[] = [];
       // SQL results by dataset id (Arrow IPC, base64).
       const sqlResults: Record<string, string> = {};
       type SqlAnswer = (
@@ -138,6 +141,35 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             case "register_table":
             case "unregister_table":
               return null;
+            case "add_sql_history": {
+              const entry = args.entry as { sql: string };
+              const i = history.findIndex((h) => h.sql === entry.sql);
+              if (i >= 0) history.splice(i, 1);
+              history.unshift({ ...entry, ranAt: Date.now() });
+              return history[0];
+            }
+            case "sql_history": {
+              const q = String(args.search ?? "").toLowerCase();
+              return history.filter((h) => h.sql.toLowerCase().includes(q));
+            }
+            case "clear_sql_history":
+              history.length = 0;
+              return null;
+            case "saved_queries":
+              return [...saved].sort((a, b) => a.name.localeCompare(b.name));
+            case "save_query": {
+              const name = String(args.name).trim();
+              const i = saved.findIndex((q) => q.name.toLowerCase() === name.toLowerCase());
+              if (i >= 0) saved.splice(i, 1);
+              const q = { name, sql: String(args.sql), savedAt: Date.now() };
+              saved.push(q);
+              return q;
+            }
+            case "delete_saved_query": {
+              const i = saved.findIndex((q) => q.name === args.name);
+              if (i >= 0) saved.splice(i, 1);
+              return i >= 0;
+            }
             case "plugin:dialog|open": {
               // The app asks for multiple files; a test may queue a list.
               const next = dialogPaths.shift();

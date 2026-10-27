@@ -24,6 +24,12 @@ fn main() {
             "register_table",
             "unregister_table",
             "sql_result",
+            "sql_history",
+            "add_sql_history",
+            "clear_sql_history",
+            "saved_queries",
+            "save_query",
+            "delete_saved_query",
         ]),
     ))
     .expect("failed to run tauri-build");

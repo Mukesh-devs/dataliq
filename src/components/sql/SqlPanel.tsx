@@ -17,6 +17,7 @@ import { useNotice } from "../../stores/notice";
 import { cleanTableName } from "../../lib/sql";
 import { MAX_RESULT_ROWS, MIN_PANEL_HEIGHT, useSql, type SqlTable } from "../../stores/sql";
 import { useTabs } from "../../stores/tabs";
+import { HistoryButton, SavedButton } from "./QueryLibrary";
 import { RenameTable } from "./RenameTable";
 import { DataGrid } from "../grid/DataGrid";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
@@ -145,6 +146,8 @@ export function SqlPanel() {
         <Button size="sm" variant="ghost" onClick={formatNow} title="Format SQL">
           <WandSparkles className="size-3" aria-hidden /> Format
         </Button>
+        <HistoryButton />
+        <SavedButton />
         <span className="tabular flex-1 truncate text-[12px] text-fg-muted" role="status">
           {running && <LoaderCircle className="mr-1 inline size-3 animate-spin" aria-hidden />}
           {status}

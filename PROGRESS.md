@@ -461,3 +461,19 @@ tested, and anything left over.
   DESC` → 7 rows in 22 ms; "Open in tab" → "Result 1" tab with its own columns, header
   histograms and "7 rows · SQL result".
 - Left over: none.
+
+### Step 4 — History and saved queries ✅
+
+- Every finished run of the SQL panel is remembered (newest first, the same SQL moved to the
+  top instead of copied, at most 500): when, how long, how many rows or that it failed.
+  "History" in the panel (or the palette "SQL history…") lists and searches them; a click puts
+  the query back in the editor (undoable); Clear empties the list. Cancelled runs are not kept.
+- "Saved" (palette "Saved queries…"): name the current query (or the selection) to keep it;
+  the same name in any case replaces it; a click loads it; the bin deletes it.
+- Both are JSON files in the app data directory (`sql-history.json`, `sql-saved.json`), written
+  whole (temporary file + rename); a broken file is set aside as `.broken`, never overwritten.
+- Tested: Rust — order, de-duplication, search, limit, the 500 cap, persistence across a new
+  library over the same files, saved names (case, empty name or SQL rejected, delete), broken
+  files kept aside; Vitest — time-ago and first-line helpers, the store recording successes and
+  errors but not cancels; Playwright — history with outcomes, search, load; save, load from the
+  palette, delete.

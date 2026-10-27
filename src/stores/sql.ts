@@ -5,6 +5,7 @@ import { cancelQuery, runQuery } from "../lib/ipc";
 import { closeDataset, fetchRows, type DatasetInfo } from "../lib/files";
 import { errorOffset, errorText, returnsRows, splitStatements, sqlResult } from "../lib/sql";
 import { formatSql } from "../lib/sqlFormat";
+import { addSqlHistory } from "../lib/sqlLibrary";
 
 /** What the store needs from the mounted editor. */
 export interface EditorHandle {
@@ -78,6 +79,9 @@ interface SqlState {
    */
   run: (script: string, base?: number) => Promise<void>;
   cancel: () => void;
+  /** Which list is open next to the editor: past runs or saved queries. */
+  library: "history" | "saved" | null;
+  setLibrary: (library: "history" | "saved" | null) => void;
   /** The result was opened in a tab: don't close its dataset on the next run. */
   markOwned: () => void;
   /** The mounted editor (none while the panel is closed). */
@@ -91,6 +95,15 @@ interface SqlState {
 
 let nextRun = 1;
 
+/** Adds a run to the history (in the background; a failure only loses the entry). */
+function remember(script: string, started: number, outcome: { rows?: number; error?: string }) {
+  void addSqlHistory({
+    sql: script.trim(),
+    elapsedMs: Math.round(performance.now() - started),
+    ...outcome,
+  }).catch(() => {});
+}
+
 export const useSql = create<SqlState>()(
   persist(
     (set, get) => ({
@@ -100,6 +113,8 @@ export const useSql = create<SqlState>()(
       tables: [],
       running: null,
       editor: null,
+      library: null,
+      setLibrary: (library) => set({ library }),
       setEditor: (editor) => set({ editor }),
       runEditor: () => {
         const r = get().editor?.runnable();
@@ -151,6 +166,9 @@ export const useSql = create<SqlState>()(
             const kind = (e as { kind?: string }).kind;
             const message = e instanceof Error ? e.message : String(e);
             const at = errorOffset(message, st.text);
+            if (kind !== "cancelled") {
+              remember(script, started, { error: errorText(message) });
+            }
             set({
               running: null,
               error:
@@ -167,6 +185,7 @@ export const useSql = create<SqlState>()(
         }
         const last = statements[statements.length - 1]!;
         const truncated = !dataset && table!.numRows > MAX_RESULT_ROWS;
+        remember(script, started, { rows: dataset?.rowCount ?? table!.numRows });
         const previous = get().result;
         if (previous?.dataset && !previous.owned) {
           void closeDataset(previous.dataset.id).catch(() => {});

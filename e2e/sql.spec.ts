@@ -192,3 +192,47 @@ test("open a result in its own tab: filter, sort and query it again", async ({ p
     .poll(async () => (await invokes(page, "open_view")).at(-1))
     .toMatchObject({ datasetId: "sql-1", spec: { sort: [{ column: "n", descending: true }] } });
 });
+
+test("history of runs and saved queries", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+j");
+  await editor(page).click();
+  await page.keyboard.type("SELECT DISTINCT n FROM comma");
+  await page.keyboard.press("Control+Enter");
+  await expect(panel(page)).toContainText(/2 rows in/);
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("SELECT nope FROM comma");
+  await page.keyboard.press("Control+Enter");
+  await expect(panel(page).getByRole("alert")).toBeVisible();
+
+  // History: newest first, with what happened; searchable; a click loads it.
+  await panel(page).getByRole("button", { name: "History" }).click();
+  const list = page.getByRole("list", { name: "Past queries" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(list.getByRole("listitem").first()).toContainText("failed");
+  await expect(list.getByRole("listitem").nth(1)).toContainText("2 rows");
+  await page.getByLabel("Search history").fill("distinct");
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await list.getByRole("button").click();
+  await expect(editor(page)).toHaveText("SELECT DISTINCT n FROM comma");
+
+  // Save it under a name; load it back later; delete it.
+  await panel(page).getByRole("button", { name: "Saved" }).click();
+  await page.getByLabel("Query name").fill("Distinct n");
+  await page.getByLabel("Query name").press("Enter");
+  const saved = page.getByRole("list", { name: "Saved query list" });
+  await expect(saved).toContainText("Distinct n");
+  await page.keyboard.press("Escape");
+  await editor(page).click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("SELECT 1");
+  // From the palette this time.
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox").fill("saved queries");
+  await page.keyboard.press("Enter");
+  await saved.getByRole("button", { name: /^Distinct n/ }).click();
+  await expect(editor(page)).toHaveText("SELECT DISTINCT n FROM comma");
+  await panel(page).getByRole("button", { name: "Saved" }).click();
+  await saved.getByRole("button", { name: "Delete Distinct n" }).click();
+  await expect(saved).toContainText("Name a query above");
+});

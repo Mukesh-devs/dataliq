@@ -278,6 +278,27 @@ export function App() {
         },
       );
     }
+    // Opens the SQL panel first if needed, then the list.
+    const showLibrary = (library: "history" | "saved") => () => {
+      setSqlOpen(true);
+      setTimeout(() => useSql.getState().setLibrary(library), 0);
+    };
+    list.push(
+      {
+        id: "sql-history",
+        title: "SQL history…",
+        group: "SQL",
+        keywords: "past queries recent",
+        run: showLibrary("history"),
+      },
+      {
+        id: "saved-queries",
+        title: "Saved queries…",
+        group: "SQL",
+        keywords: "snippets save query",
+        run: showLibrary("saved"),
+      },
+    );
     const themes: [ThemePreference, string][] = [
       ["light", "Light"],
       ["dark", "Dark"],
@@ -318,6 +339,7 @@ export function App() {
     setHeaderCharts,
     clearCache,
     sqlOpen,
+    setSqlOpen,
     sidebar,
     profileOpen,
     reload,

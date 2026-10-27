@@ -23,6 +23,7 @@ function backend(answer: (sql: string) => unknown) {
     }
     if (cmd === "fetch_rows") return ipcBytes({ n: [1, 2, 3] });
     if (cmd === "cancel_query" || cmd === "close_dataset") return true;
+    if (cmd === "add_sql_history") return { ...(args.entry as object), ranAt: 1 };
     throw new Error(`unexpected ${cmd}`);
   });
   return calls;
@@ -37,7 +38,8 @@ describe("sql store", () => {
   it("runs each statement in order; a final query becomes a dataset", async () => {
     const calls = backend((sql) => ipcBytes({ n: [sql.length] }));
     await useSql.getState().run("CREATE TABLE t AS SELECT 1; SELECT * FROM t");
-    expect(calls.map((c) => [c.cmd, c.args.sql ?? c.args.datasetId])).toEqual([
+    const work = calls.filter((c) => c.cmd !== "add_sql_history");
+    expect(work.map((c) => [c.cmd, c.args.sql ?? c.args.datasetId])).toEqual([
       ["run_query", "CREATE TABLE t AS SELECT 1"],
       ["sql_result", "SELECT * FROM t"],
       ["fetch_rows", expect.stringMatching(/^sql-/)],
@@ -87,7 +89,7 @@ describe("sql store", () => {
     // As a selection starting at offset 100 of the editor text.
     const script = "SELECT 1;\n  SELECT nope;\nSELECT 3";
     await useSql.getState().run(script, 100);
-    expect(calls).toHaveLength(2);
+    expect(calls.filter((c) => c.cmd !== "add_sql_history")).toHaveLength(2);
     expect(useSql.getState().error).toEqual({
       message: 'Binder Error: column "nope" not found',
       offset: 100 + script.indexOf("nope"),
@@ -112,5 +114,30 @@ describe("sql store", () => {
     const calls = backend(() => ipcBytes({ n: [1] }));
     await useSql.getState().run("  -- nothing\n");
     expect(calls).toEqual([]);
+  });
+
+  it("remembers finished runs in the history, not cancelled ones", async () => {
+    const calls = backend((sql) => {
+      if (sql.includes("nope")) throw { kind: "query", message: "Binder Error: nope" };
+      return ipcBytes({ n: [1] });
+    });
+    const history = () => calls.filter((c) => c.cmd === "add_sql_history").map((c) => c.args.entry);
+    await useSql.getState().run("  SELECT 1;\nSELECT 2  ");
+    await Promise.resolve();
+    expect(history()).toEqual([
+      { sql: "SELECT 1;\nSELECT 2", elapsedMs: expect.any(Number) as number, rows: 1234 },
+    ]);
+    await useSql.getState().run("SELECT nope");
+    await Promise.resolve();
+    expect(history().at(-1)).toMatchObject({ sql: "SELECT nope", error: "Binder Error: nope" });
+
+    let answer!: (v: unknown) => void;
+    backend(() => new Promise((r) => (answer = r)));
+    const done = useSql.getState().run("SELECT 3");
+    await Promise.resolve();
+    useSql.getState().cancel();
+    answer(ipcBytes({ n: [1] }));
+    await done;
+    expect(history()).toHaveLength(2);
   });
 });

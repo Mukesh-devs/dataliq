@@ -1,6 +1,8 @@
 //! The SQL panel's tables: every open file's dataset is queryable under a
 //! name, as a view in the in-memory main schema.
 
+pub mod library;
+
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::engine::sql::{inline_params, quote_ident};
