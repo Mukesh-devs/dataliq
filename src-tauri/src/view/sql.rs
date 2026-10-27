@@ -14,22 +14,30 @@ use crate::sources::ColumnMeta;
 pub struct Relation {
     pub sql: String,
     pub params: Vec<Param>,
+    /// Expression giving the file order (e.g. `rowid`), appended to every
+    /// sort so rows with equal keys keep their original order.
+    pub row_order: Option<String>,
 }
 
 impl Relation {
     pub fn of(source: &DatasetSource) -> Relation {
         match source {
-            DatasetSource::Table(name) => Relation {
+            DatasetSource::Table(name) | DatasetSource::Materialized { table: name } => Relation {
                 sql: name.clone(),
                 params: Vec::new(),
+                row_order: Some("rowid".into()),
             },
+            // Ties keep DuckDB's order here; the view is written to a table
+            // once, so its pages stay stable either way.
             DatasetSource::Query { sql, params } => Relation {
                 sql: sql.clone(),
                 params: params.clone(),
+                row_order: None,
             },
             DatasetSource::Parquet { path } => Relation {
                 sql: "read_parquet(?)".into(),
                 params: vec![Param::Text(path.clone())],
+                row_order: None,
             },
         }
     }
@@ -72,7 +80,11 @@ pub fn build_at(
     if let Some(text) = spec.search.as_deref().filter(|s| !s.is_empty()) {
         conditions.push(b.search(text));
     }
-    let order = b.order_by(&spec.sort)?;
+    let mut order = b.order_by(&spec.sort)?;
+    if let (false, Some(row_order)) = (order.is_empty(), &relation.row_order) {
+        order.push_str(", ");
+        order.push_str(row_order);
+    }
 
     let mut from = format!("FROM {}", relation.sql);
     if !conditions.is_empty() {
@@ -304,6 +316,7 @@ mod tests {
         Relation {
             sql: "\"ds\".\"main\".\"data\"".into(),
             params: vec![],
+            row_order: Some("rowid".into()),
         }
     }
 

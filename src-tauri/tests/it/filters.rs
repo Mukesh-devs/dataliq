@@ -12,15 +12,17 @@ use bigview_lib::sources::{OpenOptions, Source};
 use bigview_lib::view::{Filter, FilterOp, ViewSpec};
 
 #[derive(Debug)]
-struct Person {
-    name: Option<String>,
-    city: Option<String>,
-    amount: Option<f64>,
-    joined: Option<String>,
-    active: Option<bool>,
+pub(crate) struct Person {
+    pub id: i64,
+    pub name: Option<String>,
+    pub city: Option<String>,
+    pub amount: Option<f64>,
+    pub joined: Option<String>,
+    pub active: Option<bool>,
 }
 
-fn people() -> Vec<Person> {
+/// The rows of `fixtures/csv/people.csv`, parsed independently of DuckDB.
+pub(crate) fn people() -> Vec<Person> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/csv/people.csv");
     let text = std::fs::read_to_string(path).unwrap();
     let opt = |s: &str| (!s.is_empty()).then(|| s.to_string());
@@ -30,6 +32,7 @@ fn people() -> Vec<Person> {
             let f: Vec<&str> = line.split(',').collect();
             assert_eq!(f.len(), 6, "{line}");
             Person {
+                id: f[0].parse().unwrap(),
                 // `""` is an empty string; an empty field is NULL.
                 name: if f[1] == "\"\"" {
                     Some(String::new())
@@ -45,14 +48,15 @@ fn people() -> Vec<Person> {
         .collect()
 }
 
-struct Fx {
-    engine: Engine,
-    dataset: Dataset,
-    people: Vec<Person>,
+pub(crate) struct Fx {
+    pub engine: Engine,
+    pub dataset: Dataset,
+    pub people: Vec<Person>,
     _tmp: tempfile::TempDir,
 }
 
-fn fx() -> Fx {
+/// people.csv imported into the cache, as the app does.
+pub(crate) fn fx() -> Fx {
     let tmp = tempfile::tempdir().unwrap();
     let engine = Engine::open_in_memory(&EngineConfig {
         memory_limit_bytes: 1 << 30,

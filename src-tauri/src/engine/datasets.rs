@@ -20,6 +20,10 @@ pub enum DatasetSource {
     /// A Parquet file queried in place, paged with its `file_row_number`
     /// (DuckDB skips row groups, so any page costs about the same).
     Parquet { path: String },
+    /// A view written to a session-only table (quoted, qualified name), in
+    /// view order with contiguous rowids. Paged like `Table`; dropped when
+    /// the dataset is closed.
+    Materialized { table: String },
 }
 
 /// Data the grid can page through.
@@ -56,6 +60,18 @@ impl Datasets {
         self.map.write().remove(id)
     }
 
+    /// Swaps how an open dataset's rows are read (same rows, same order).
+    /// Returns false if the dataset was closed meanwhile.
+    pub fn replace_source(&self, id: &str, source: DatasetSource) -> bool {
+        match self.map.write().get_mut(id) {
+            Some(ds) => {
+                ds.source = source;
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn ids(&self) -> Vec<String> {
         self.map.read().keys().cloned().collect()
     }
@@ -79,7 +95,7 @@ impl Engine {
         let count = count.min(MAX_PAGE_ROWS);
         let end = start.saturating_add(count).min(ds.row_count);
         match &ds.source {
-            DatasetSource::Table(relation) => {
+            DatasetSource::Table(relation) | DatasetSource::Materialized { table: relation } => {
                 let sql = format!(
                     "SELECT * FROM {relation} WHERE rowid >= ? AND rowid < ? ORDER BY rowid"
                 );

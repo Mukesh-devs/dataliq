@@ -16,5 +16,7 @@ mod json_parquet_sources;
 mod paging;
 mod perf_import;
 mod perf_preview;
+mod perf_sort;
+mod sort;
 mod ui_recordings;
 mod view_sql;

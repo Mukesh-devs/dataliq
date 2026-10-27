@@ -66,6 +66,7 @@ pub fn run() {
                 temp_dir = %cfg.temp_dir.display(),
                 "starting DuckDB"
             );
+            engine::remove_stale_scratch(&cfg.temp_dir);
             let engine = Engine::open_in_memory(&cfg)?;
             app.manage(Arc::new(engine));
 

@@ -2,6 +2,6 @@
 source: src-tauri/src/view/sql.rs
 expression: render(&v)
 ---
-SELECT "first name", "say ""hi""", "it's", "select", "ORDER", "日本語", "émoji 🎉", "a;DROP TABLE x;--" FROM "ds"."main"."data" WHERE "first name" = ? AND "say ""hi""" = ? AND "it's" = ? AND "select" = ? AND "ORDER" = ? AND "日本語" = ? AND "émoji 🎉" = ? AND "a;DROP TABLE x;--" = ? ORDER BY "first name" ASC NULLS LAST, "say ""hi""" ASC NULLS LAST, "it's" ASC NULLS LAST, "select" ASC NULLS LAST, "ORDER" ASC NULLS LAST, "日本語" ASC NULLS LAST, "émoji 🎉" ASC NULLS LAST, "a;DROP TABLE x;--" ASC NULLS LAST
+SELECT "first name", "say ""hi""", "it's", "select", "ORDER", "日本語", "émoji 🎉", "a;DROP TABLE x;--" FROM "ds"."main"."data" WHERE "first name" = ? AND "say ""hi""" = ? AND "it's" = ? AND "select" = ? AND "ORDER" = ? AND "日本語" = ? AND "émoji 🎉" = ? AND "a;DROP TABLE x;--" = ? ORDER BY "first name" ASC NULLS LAST, "say ""hi""" ASC NULLS LAST, "it's" ASC NULLS LAST, "select" ASC NULLS LAST, "ORDER" ASC NULLS LAST, "日本語" ASC NULLS LAST, "émoji 🎉" ASC NULLS LAST, "a;DROP TABLE x;--" ASC NULLS LAST, rowid
 SELECT count(*) FROM "ds"."main"."data" WHERE "first name" = ? AND "say ""hi""" = ? AND "it's" = ? AND "select" = ? AND "ORDER" = ? AND "日本語" = ? AND "émoji 🎉" = ? AND "a;DROP TABLE x;--" = ?
 params: ["v","v","v","v","v","v","v","v"]

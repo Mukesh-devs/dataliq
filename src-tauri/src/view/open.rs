@@ -6,7 +6,8 @@ use arrow::array::{Array, AsArray};
 use arrow::datatypes::Int64Type;
 use serde::Serialize;
 
-use super::{Filter, FilterOp, Relation, ViewSpec, build};
+use super::{BuiltView, Filter, FilterOp, Relation, ViewSpec, build};
+use crate::engine::sql::quote_ident;
 use crate::engine::{Dataset, DatasetSource, Engine, Param, RequestKey};
 use crate::error::{AppError, Result};
 use crate::sources::ColumnMeta;
@@ -15,6 +16,11 @@ use crate::sources::ColumnMeta;
 pub const MAX_VALUES: usize = 1000;
 
 static NEXT_VIEW: AtomicU64 = AtomicU64::new(1);
+
+/// Request id of a view's background materialization, for cancelling it.
+pub fn materialize_request_id(view_id: &str) -> String {
+    format!("materialize:{view_id}")
+}
 
 /// One entry of a column's value list.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -43,6 +49,9 @@ pub struct OpenedView {
     /// Rows in the underlying dataset, for "N of M rows".
     pub total_rows: u64,
     pub elapsed_ms: u64,
+    /// The view still reads through its query; it is being written to a
+    /// table in the background (see [`Engine::materialize_view`]).
+    pub materializing: bool,
 }
 
 impl Engine {
@@ -76,21 +85,56 @@ impl Engine {
         Ok(col.value(0) as u64)
     }
 
-    /// Counts the rows of `spec` over dataset `id` and registers the view as
-    /// a new dataset the grid can page through. Close it with
-    /// `close_dataset` when it is replaced.
+    /// Writes `view` to a new session table and returns its qualified name.
+    fn write_view(&self, view_id: &str, view: &BuiltView, key: &RequestKey) -> Result<String> {
+        let table = format!(
+            "{}.{}",
+            self.scratch_schema()?,
+            quote_ident(&format!("v_{view_id}"))
+        );
+        let sql = format!("CREATE TABLE {table} AS {}", view.select);
+        if let Err(e) = self.execute_keyed(&sql, &view.params, key) {
+            let _ = self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"));
+            return Err(e);
+        }
+        Ok(table)
+    }
+
+    /// Opens `spec` over dataset `id` as a new dataset the grid can page
+    /// through. Close it with `close_dataset` when it is replaced.
+    ///
+    /// Sorted views are written to a table right away (the sort reads every
+    /// row anyway), so every page is a fast rowid range. Unsorted views are
+    /// only counted, which is quick, and read through their query until
+    /// [`Engine::materialize_view`] has written them out.
     pub fn open_view(&self, id: &str, spec: &ViewSpec, key: &RequestKey) -> Result<OpenedView> {
         let started = std::time::Instant::now();
         let base = self.datasets.get(id)?;
         let schema = self.dataset_columns(id)?;
         let view = build(spec, &Relation::of(&base.source), &schema)?;
-        let rows = self.count(&view.count, &view.params, key)?;
-        let dataset = Dataset {
-            id: format!("view-{}", NEXT_VIEW.fetch_add(1, Ordering::Relaxed)),
-            source: DatasetSource::Query {
+        let view_id = format!("view-{}", NEXT_VIEW.fetch_add(1, Ordering::Relaxed));
+        let (source, rows, materializing) = if spec.sort.is_empty() {
+            let rows = self.count(&view.count, &view.params, key)?;
+            let source = DatasetSource::Query {
                 sql: format!("({})", view.select),
                 params: view.params,
-            },
+            };
+            (source, rows, true)
+        } else {
+            let table = self.write_view(&view_id, &view, key)?;
+            let rows = self.count(&format!("SELECT count(*) FROM {table}"), &[], key);
+            let rows = match rows {
+                Ok(n) => n,
+                Err(e) => {
+                    let _ = self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"));
+                    return Err(e);
+                }
+            };
+            (DatasetSource::Materialized { table }, rows, false)
+        };
+        let dataset = Dataset {
+            id: view_id,
+            source,
             row_count: rows,
             cached: base.cached,
         };
@@ -99,7 +143,41 @@ impl Engine {
             dataset,
             total_rows: base.row_count,
             elapsed_ms: started.elapsed().as_millis() as u64,
+            materializing,
         })
+    }
+
+    /// Writes an unsorted view (opened by [`Engine::open_view`]) to a table
+    /// so deep pages are as fast as the first, then switches the dataset to
+    /// it. Same rows in the same order, so the grid doesn't notice. Returns
+    /// false if there was nothing to do or the view was closed meanwhile;
+    /// `close_dataset` cancels a running materialization.
+    pub fn materialize_view(&self, view_id: &str) -> Result<bool> {
+        let ds = self.datasets.get(view_id)?;
+        let DatasetSource::Query { sql, params } = ds.source else {
+            return Ok(false);
+        };
+        let key = RequestKey {
+            id: Some(materialize_request_id(view_id)),
+            group: None,
+        };
+        let view = BuiltView {
+            select: format!("SELECT * FROM {sql}"),
+            count: String::new(),
+            params,
+        };
+        let table = self.write_view(view_id, &view, &key)?;
+        if self.datasets.replace_source(
+            view_id,
+            DatasetSource::Materialized {
+                table: table.clone(),
+            },
+        ) {
+            Ok(true)
+        } else {
+            self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
+            Ok(false)
+        }
     }
 
     /// The most frequent values of `column` among the rows matching the

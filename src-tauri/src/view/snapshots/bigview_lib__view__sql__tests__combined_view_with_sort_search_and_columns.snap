@@ -2,6 +2,6 @@
 source: src-tauri/src/view/sql.rs
 expression: sql_for(&spec)
 ---
-SELECT "name", "amount", "id" FROM "ds"."main"."data" WHERE "amount" > ? AND "active" = ? AND (contains(lower("name"), lower(?)) OR contains(lower("note"), lower(?))) ORDER BY "joined" DESC NULLS LAST, "name" ASC NULLS LAST
+SELECT "name", "amount", "id" FROM "ds"."main"."data" WHERE "amount" > ? AND "active" = ? AND (contains(lower("name"), lower(?)) OR contains(lower("note"), lower(?))) ORDER BY "joined" DESC NULLS LAST, "name" ASC NULLS LAST, rowid
 SELECT count(*) FROM "ds"."main"."data" WHERE "amount" > ? AND "active" = ? AND (contains(lower("name"), lower(?)) OR contains(lower("note"), lower(?)))
 params: [100,true,"smith","smith"]

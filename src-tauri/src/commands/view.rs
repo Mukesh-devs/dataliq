@@ -21,9 +21,21 @@ pub async fn open_view(
         id: request_id,
         group,
     };
-    tauri::async_runtime::spawn_blocking(move || engine.open_view(&dataset_id, &spec, &key))
-        .await
-        .map_err(|e| AppError::Internal(format!("view task failed: {e}")))?
+    let view = {
+        let engine = Arc::clone(&engine);
+        tauri::async_runtime::spawn_blocking(move || engine.open_view(&dataset_id, &spec, &key))
+            .await
+            .map_err(|e| AppError::Internal(format!("view task failed: {e}")))??
+    };
+    if view.materializing {
+        // Deep pages of a filtered view get fast once it is written out.
+        let id = view.dataset.id.clone();
+        tauri::async_runtime::spawn_blocking(move || match engine.materialize_view(&id) {
+            Ok(_) | Err(AppError::Cancelled) => {}
+            Err(e) => tracing::warn!("could not write view {id}: {e}"),
+        });
+    }
+    Ok(view)
 }
 
 /// The most frequent values of a column under the view's other filters.
