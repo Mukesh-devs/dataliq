@@ -457,3 +457,7 @@ tested, and anything left over.
   visible to results, error lines; Vitest — query detection, store runs (dataset for the final
   query, earlier statements fetch one row, previous result closed unless owned); Playwright —
   open in tab, status, result as a table, next run keeping the tab's rows, sorting the result.
+- Smoke (real app, people.csv): `SELECT city, count(*) AS n FROM people GROUP BY 1 ORDER BY n
+  DESC` → 7 rows in 22 ms; "Open in tab" → "Result 1" tab with its own columns, header
+  histograms and "7 rows · SQL result".
+- Left over: none.
