@@ -477,3 +477,7 @@ tested, and anything left over.
   files kept aside; Vitest — time-ago and first-line helpers, the store recording successes and
   errors but not cancels; Playwright — history with outcomes, search, load; save, load from the
   palette, delete.
+- Smoke (real app): ran `SELECT count(*) AS adults FROM people WHERE amount > 100`, quit, started
+  again; the palette's "SQL history…" listed it ("just now · 1 row · 29 ms") from
+  `sql-history.json` in the app data directory.
+- Left over: none.
