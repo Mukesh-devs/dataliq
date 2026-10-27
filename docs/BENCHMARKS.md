@@ -258,3 +258,23 @@ into the scratch database, then paged):
 A query returning all 50M rows is written out before it shows (11.5 s here), so every row then
 pages in milliseconds; queries that aggregate or limit, the usual case, are fast (D35).
 
+### Small suite at v0.3.0 (linux-dev)
+
+`pnpm bench`, best of 5 runs, next to the v0.2.0 numbers recorded on the same machine. The
+local guard compares against the CI runner's baseline (`bench/baseline/linux.json`) and flags
+the Excel flows (+34–40 %), but against this machine's own v0.2.0 run they are unchanged; the
+CI guard on the tag is the one that counts (D26).
+
+| Flow | v0.2.0 | v0.3.0 |
+| --- | --- | --- |
+| first_rows_100mb_csv | 297 ms | 257 ms |
+| first_rows_100mb_csv_gz | 1,255 ms | 1,245 ms |
+| first_rows_100mb_ndjson_gz | 366 ms | 368 ms |
+| first_rows_100k_xlsx | 72 ms | 69 ms |
+| import_100mb_csv | 1,581 ms | 1,614 ms |
+| import_100mb_csv_gz | 3,292 ms | 3,489 ms |
+| import_100mb_ndjson_gz | 2,756 ms | 2,744 ms |
+| import_100k_xlsx | 1,981 ms | 1,957 ms |
+| reopen_cached_100mb_csv | 1.3 ms | 1.5 ms |
+| page_1m_parquet | 12.9 ms | 11.9 ms |
+
