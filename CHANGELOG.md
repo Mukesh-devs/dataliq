@@ -6,6 +6,47 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-27
+
+SQL and export: query every open file with SQL, export any view or result.
+
+### Added
+
+- SQL panel (Ctrl+J): CodeMirror editor with highlighting, completion of keywords, tables and
+  columns, run all or the selection (Ctrl+Enter), Format, Cancel, errors in plain words with
+  the position underlined. Scripts run statement by statement on the panel's own session
+  (temp tables, `SET` and variables last).
+- Every open file is a table named after it (`sales_2024.csv` → `sales_2024`), renameable from
+  the table chips; `current_view` is the active tab's filtered and sorted rows.
+- Query results are datasets in the same grid: every row pages, not just the first ones; "Open
+  in tab" gives a result filters, sort, search, profiles, copy and export, and it becomes a
+  table (`result_1`) for further queries.
+- Query history (searchable, with row counts, times and failures) and named saved queries,
+  kept across restarts.
+- Export (Ctrl+E, the toolbar, or the SQL panel) of the current view or a SQL result to CSV,
+  CSV.gz, TSV, Parquet (zstd), JSON, NDJSON and Excel: the shown columns in order under their
+  display names, filters, search and sort applied. Options: header row, delimiter, quoting,
+  date and timestamp formats, the whole view or only the selection. Excel cells are typed;
+  past 1,048,575 rows the export splits into more sheets or keeps the first. Progress and
+  Cancel in the status bar; a cancelled or failed export never leaves half a file.
+- Open view in SQL panel: the view as an editable query over the file's table.
+- Panel toggles at the top right: sidebar (Ctrl+B), SQL panel (Ctrl+J), column profile
+  (Ctrl+Alt+B).
+- Right-click menu on cells: copy (with or without headers), copy the value or the column name,
+  copy as …, keep or exclude rows with the value, sort, column profile, reload the file
+  (filters kept). The webview's own menu is gone outside text fields.
+
+### Changed
+
+- DuckDB's cached pages are handed back after an import or a big view (166 → 61 MiB after a
+  100 MB CSV).
+
+### Fixed
+
+- The grid could stay empty after switching back to a tab until the next sort or filter.
+- Changing the theme left the grid in the old colours until a tab switch.
+- A request running several statements could cancel a newer request of the same kind.
+
 ## [0.2.0] - 2026-10-27
 
 Explore: narrow a 50M-row file down in seconds.
@@ -67,6 +108,7 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mukesh-dsnl/dataliq/releases/tag/v0.1.0

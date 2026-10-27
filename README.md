@@ -8,8 +8,9 @@ compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
 and no account.
 
-**Status:** v0.2.0 — explore: filters, sorting, search, column management and
-profiles, a command palette and "Copy as SQL". SQL and export come in v0.3. See [CHANGELOG.md](CHANGELOG.md),
+**Status:** v0.3.0 — SQL over every open file, query history, and export of any
+view or result to CSV, CSV.gz, TSV, Parquet, JSON, NDJSON and Excel. Charts come
+in v0.4. See [CHANGELOG.md](CHANGELOG.md),
 [PROGRESS.md](PROGRESS.md) and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
 
 <!-- Screenshots: light and dark theme with a 50M-row file open. -->
@@ -47,6 +48,16 @@ _Screenshots coming soon._
   JSON, Markdown or SQL INSERT (Shift+Ctrl+C); **Copy view as SQL** gives a
   query that reproduces the current view in plain DuckDB; cancel running
   queries from the status bar.
+- **SQL panel** (Ctrl+J): every open file is a table (`sales_2024`), plus
+  `current_view` for the active tab's filtered rows. Completion of tables and
+  columns, run all or the selection, format, errors pointed out in the editor;
+  results page through every row, open in their own tab and become tables
+  themselves. Searchable history and saved queries.
+- **Export** (Ctrl+E) the current view or a SQL result, exactly as shown, to
+  CSV, CSV.gz, TSV, Parquet, JSON, NDJSON or Excel (typed cells, more sheets
+  past Excel's row limit), with header, delimiter, quoting and date options,
+  the whole view or just the selection, progress and Cancel.
+- **Open view in SQL panel** turns the current view into a query to edit.
 - Light and dark themes that follow your OS.
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
@@ -67,8 +78,11 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Copy selection (TSV) | Ctrl+C |
 | Copy as CSV / JSON / Markdown / SQL | Shift+Ctrl+C |
 | Sort by a column / add a sort key | Click / Shift+click a header |
-
-More shortcuts (SQL panel, export) arrive in later versions.
+| Export | Ctrl+E |
+| Show / hide the SQL panel | Ctrl+J |
+| Run SQL (or the selection) | Ctrl+Enter |
+| Show / hide the sidebar | Ctrl+B |
+| Show / hide the column profile | Ctrl+Alt+B |
 
 ## Performance
 

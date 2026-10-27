@@ -16,6 +16,7 @@ mod filters;
 mod import_cache;
 mod json_parquet_sources;
 mod paging;
+mod perf_export;
 mod perf_import;
 mod perf_preview;
 mod perf_sort;
