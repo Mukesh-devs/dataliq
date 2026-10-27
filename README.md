@@ -8,9 +8,8 @@ compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
 and no account.
 
-**Status:** v0.3.0 — SQL over every open file, query history, and export of any
-view or result to CSV, CSV.gz, TSV, Parquet, JSON, NDJSON and Excel. Charts come
-in v0.4. See [CHANGELOG.md](CHANGELOG.md),
+**Status:** v0.4.0 — SQL over every open file, export to every format, and charts of any
+view. Cleaning, comparing and data quality checks come in v0.5. See [CHANGELOG.md](CHANGELOG.md),
 [PROGRESS.md](PROGRESS.md) and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
 
 <!-- Screenshots: light and dark theme with a 50M-row file open. -->
@@ -58,6 +57,11 @@ _Screenshots coming soon._
   past Excel's row limit), with header, delimiter, quoting and date options,
   the whole view or just the selection, progress and Cancel.
 - **Open view in SQL panel** turns the current view into a query to edit.
+- **Charts** of the current view: bar, horizontal bar, line, histogram and
+  scatter, grouped by any column (dates by day, week, month or year) with
+  count, sum, average, min, max or distinct count. DuckDB does the work, so a
+  chart of 50M rows takes about a second. Export as PNG or SVG, or copy the
+  chart as SQL.
 - Light and dark themes that follow your OS.
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
@@ -91,7 +95,8 @@ first rows of a 5 GB CSV in 0.3 s and of a 5 GB `.csv.gz` in about 1 s; full
 import of a 5 GB CSV in 32 s; reopening a cached file in a few milliseconds;
 random pages anywhere in 50M rows in under 25 ms. On 50M rows: a filter
 shows its first rows and count in 0.1–0.8 s, a sort its first and last rows in
-about 1 s, and a column profile takes 0.4–2.8 s.
+about 1 s, a column profile takes 0.4–2.8 s, a chart 0.1–1.7 s, and an export
+to Parquet 7.6 s.
 
 ## Installing
 
