@@ -20,6 +20,18 @@ import { useNotice } from "../../stores/notice";
 import { baseOf, useTabs } from "../../stores/tabs";
 import type { Tab } from "../../stores/tabs";
 import { RecipePanel } from "../recipe/RecipePanel";
+import {
+  columnGaps,
+  describeGaps,
+  loadRecipe,
+  pickRecipeOpen,
+  pickRecipeSave,
+  readableScript,
+  recipeFileName,
+  saveRecipe,
+  saveRecipeScript,
+} from "../../lib/recipe";
+import { baseName } from "../../lib/files";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
@@ -273,6 +285,75 @@ export function FileView({
     },
     [setRecipeOpen, tab.id],
   );
+  const [recipeWarning, setRecipeWarning] = useState<string>();
+  const fileId = tab.info?.dataset?.id;
+  const fileReader = tab.info?.readerSql;
+  const fileColumns = tab.info?.columns;
+  const hasSteps = recipeSteps.length > 0;
+  /** The recipe as a script over the file (needs the full data, for its columns). */
+  const recipeSql = useCallback(async () => {
+    if (!fileId || !fileReader) throw new Error("the file isn't read in full yet");
+    return readableScript(fileId, recipeSteps, fileReader, tab.title);
+  }, [fileId, fileReader, recipeSteps, tab.title]);
+  const recipeActions = useMemo(() => {
+    const failed = (what: string) => (e: unknown) =>
+      notice(`Couldn't ${what}: ${e instanceof Error ? e.message : String(e)}`);
+    return {
+      copySql: () =>
+        void recipeSql()
+          .then((sql) => navigator.clipboard.writeText(sql))
+          .then(() => notice("Copied the recipe as SQL"), failed("copy the recipe")),
+      exportSql: async () => {
+        try {
+          const sql = await recipeSql();
+          const path = await pickRecipeSave(recipeFileName(tab.title, "sql"), "sql");
+          if (!path) return;
+          await saveRecipeScript(path, sql);
+          notice(`Saved the recipe script to ${baseName(path)}`);
+        } catch (e) {
+          failed("export the recipe")(e);
+        }
+      },
+      save: async () => {
+        try {
+          const path = await pickRecipeSave(recipeFileName(tab.title, "json"), "json");
+          if (!path) return;
+          await saveRecipe(path, {
+            source: tab.title,
+            columns: fileColumns ?? [],
+            steps: recipeSteps,
+          });
+          notice(`Saved the recipe to ${baseName(path)}`);
+        } catch (e) {
+          failed("save the recipe")(e);
+        }
+      },
+      load: async () => {
+        try {
+          const path = await pickRecipeOpen();
+          if (!path) return;
+          const file = await loadRecipe(path);
+          setRecipeOpen(tab.id, true);
+          setRecipeWarning(describeGaps(columnGaps(file.columns, fileColumns ?? [])) ?? undefined);
+          await setRecipe(tab.id, file.steps);
+          const n = file.steps.length;
+          notice(`Loaded ${n} step${n === 1 ? "" : "s"} from ${baseName(path)}`);
+        } catch (e) {
+          failed("load the recipe")(e);
+        }
+      },
+    };
+  }, [
+    recipeSql,
+    notice,
+    tab.title,
+    tab.id,
+    fileColumns,
+    recipeSteps,
+    setRecipe,
+    setRecipeOpen,
+    setRecipeWarning,
+  ]);
 
   /** Copies the selected cells (shown columns, display names) as `format`. */
   const copySelection = useCallback(
@@ -491,6 +572,38 @@ export function FileView({
         keywords: "recipe steps trim rename replace split fill duplicates type",
         run: () => (recipeOpen ? setRecipeOpen(tab.id, false) : openClean()),
       });
+      add({
+        id: "load-recipe",
+        title: "Load recipe…",
+        group: "Clean",
+        keywords: "open steps json apply",
+        run: () => void recipeActions.load(),
+      });
+      if (hasSteps) {
+        add({
+          id: "save-recipe",
+          title: "Save recipe…",
+          group: "Clean",
+          keywords: "steps json",
+          run: () => void recipeActions.save(),
+        });
+        if (fileId) {
+          add({
+            id: "export-recipe-sql",
+            title: "Export recipe as SQL…",
+            group: "Clean",
+            keywords: "script duckdb save",
+            run: () => void recipeActions.exportSql(),
+          });
+          add({
+            id: "copy-recipe-sql",
+            title: "Copy recipe as SQL",
+            group: "Copy",
+            keywords: "script duckdb clean",
+            run: recipeActions.copySql,
+          });
+        }
+      }
       if (canUndo)
         add({
           id: "undo-clean",
@@ -635,6 +748,9 @@ export function FileView({
     setRecipeOpen,
     undoRecipe,
     redoRecipe,
+    recipeActions,
+    hasSteps,
+    fileId,
   ]);
   useRegisterCommands("file", commands);
 
@@ -957,7 +1073,15 @@ export function FileView({
             column={cleanColumn}
             canUndo={canUndo}
             canRedo={canRedo}
-            onChange={(steps) => void setRecipe(tab.id, steps)}
+            onChange={(steps) => {
+              setRecipeWarning(undefined);
+              void setRecipe(tab.id, steps);
+            }}
+            onCopySql={hasSteps && fileId ? recipeActions.copySql : undefined}
+            onExportSql={hasSteps && fileId ? () => void recipeActions.exportSql() : undefined}
+            onSave={hasSteps ? () => void recipeActions.save() : undefined}
+            onLoad={() => void recipeActions.load()}
+            warning={recipeWarning}
             onUndo={() => void undoRecipe(tab.id)}
             onRedo={() => void redoRecipe(tab.id)}
             onClose={() => setRecipeOpen(tab.id, false)}

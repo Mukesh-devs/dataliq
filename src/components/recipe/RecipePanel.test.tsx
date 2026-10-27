@@ -116,4 +116,17 @@ describe("RecipePanel", () => {
     expect(onUndo).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /^Redo/ })).toBeDisabled();
   });
+
+  it("shows the recipe actions it is given, and a warning", async () => {
+    const onSave = vi.fn();
+    const onLoad = vi.fn();
+    const { user } = setup({ onSave, onLoad, warning: "This file has no column “city”" });
+    const bar = within(screen.getByRole("toolbar", { name: "Recipe" }));
+    expect(bar.queryByRole("button", { name: /Copy SQL/ })).toBeNull();
+    await user.click(bar.getByRole("button", { name: /Save/ }));
+    await user.click(bar.getByRole("button", { name: /Load/ }));
+    expect(onSave).toHaveBeenCalledOnce();
+    expect(onLoad).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status")).toHaveTextContent("no column “city”");
+  });
 });

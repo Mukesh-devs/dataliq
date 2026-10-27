@@ -164,3 +164,79 @@ test("a column's menu starts a step on it; failures are shown on their step", as
     { op: "changeType", column: "amount", to: "integer" },
   ]);
 });
+
+test("save a recipe, export it as SQL, and load it onto another file", async ({ page }) => {
+  applied = [];
+  await mockTauri(page, {
+    dialogPaths: ["/data/comma.csv", "/data/semicolon.csv", "/out/comma-recipe.json"],
+    datasets: { "/data/comma.csv": 1000, "/data/semicolon.csv": 1000 },
+    savePaths: ["/out/comma-recipe.sql", "/out/comma-recipe.json"],
+    fetchRows: buildPage,
+    views: () => 42,
+    recipes,
+  });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  await expect(status(page)).toContainText("1,000 rows");
+  await page.getByRole("button", { name: /^Clean/ }).click();
+  await form(page).getByLabel("Column").selectOption("name");
+  await form(page).getByRole("button", { name: "Add step" }).click();
+  await expect(status(page)).toContainText("cleaned in");
+  const bar = panel(page).getByRole("toolbar", { name: "Recipe" });
+
+  // Copy: a script that says what it is, each step under its description.
+  await bar.getByRole("button", { name: "Copy SQL" }).click();
+  await expect(status(page)).toHaveText("Copied the recipe as SQL");
+  const sql = await page.evaluate(() => navigator.clipboard.readText());
+  expect(sql).toMatch(/^-- BigView recipe for comma\.csv: 1 step\.\n-- Runs as-is in DuckDB/);
+  expect((await invokes(page, "recipe_script")).at(-1)).toMatchObject({
+    datasetId: "ds-1",
+    steps: [{ op: "trim", column: "name" }],
+    labels: ["Trim spaces in “name”"],
+  });
+
+  await bar.getByRole("button", { name: /Export SQL/ }).click();
+  await expect(status(page)).toHaveText("Saved the recipe script to comma-recipe.sql");
+  expect((await invokes(page, "plugin:dialog|save")).at(-1)).toMatchObject({
+    options: { defaultPath: "comma-recipe.sql" },
+  });
+  expect((await invokes(page, "save_recipe_script")).at(-1)).toMatchObject({
+    path: "/out/comma-recipe.sql",
+    script: expect.stringMatching(/^-- BigView recipe for comma\.csv/) as unknown,
+  });
+
+  await bar.getByRole("button", { name: /Save/ }).click();
+  await expect(status(page)).toHaveText("Saved the recipe to comma-recipe.json");
+  expect((await invokes(page, "save_recipe")).at(-1)).toMatchObject({
+    path: "/out/comma-recipe.json",
+    recipe: {
+      format: "bigview-recipe",
+      version: 1,
+      source: "comma.csv",
+      columns: expect.arrayContaining([{ name: "joined", type: expect.any(String) }]) as unknown,
+      steps: [{ op: "trim", column: "name" }],
+    },
+  });
+
+  // Another file, without a joined column: the recipe applies, with a warning.
+  await page.keyboard.press("Control+o");
+  await expect(page.getByRole("tab", { name: /semicolon\.csv/ })).toBeVisible();
+  await expect(status(page)).toContainText("1,000 rows");
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox", { name: "Search commands" }).fill("load recipe");
+  await page.keyboard.press("Enter");
+  await expect(status(page)).toHaveText("Loaded 1 step from comma-recipe.json");
+  await expect(panel(page).getByRole("listitem")).toHaveText(/Trim spaces in “name”/);
+  await expect(panel(page).getByRole("status")).toContainText("no column “joined”");
+  // Applied to the second file too (the mock names every file's data ds-1).
+  const applies = await invokes(page, "apply_recipe");
+  expect(applies).toHaveLength(2);
+  expect(applies[1]).toMatchObject({ steps: [{ op: "trim", column: "name" }] });
+  // The first file keeps its own recipe.
+  await page.getByRole("tab", { name: /comma\.csv/ }).click();
+  await expect(page.getByRole("button", { name: /^Clean/ })).toContainText("1");
+});

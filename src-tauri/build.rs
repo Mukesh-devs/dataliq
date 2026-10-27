@@ -37,6 +37,9 @@ fn main() {
             "save_chart_image",
             "apply_recipe",
             "recipe_script",
+            "save_recipe",
+            "load_recipe",
+            "save_recipe_script",
         ]),
     ))
     .expect("failed to run tauri-build");

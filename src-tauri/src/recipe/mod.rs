@@ -4,6 +4,7 @@
 //! change: the recipe's output is a new dataset, read through its query and
 //! then written to a session table in the background, like a view.
 
+mod file;
 mod sql;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -16,6 +17,7 @@ use crate::error::{AppError, Result};
 use crate::sources::ColumnMeta;
 use crate::view::{Filter, Relation};
 
+pub use file::{RecipeFile, load_recipe, save_recipe, save_script};
 pub use sql::{convert, duckdb_type, step_sql};
 
 static NEXT_RECIPE: AtomicU64 = AtomicU64::new(1);
@@ -142,6 +144,8 @@ pub struct RecipeOutcome {
 /// that fails, with its index and message.
 pub(crate) struct Chain {
     pub ctes: Vec<String>,
+    /// The recipe step each CTE comes from.
+    pub steps: Vec<usize>,
     pub schema: Vec<ColumnMeta>,
 }
 
@@ -154,23 +158,38 @@ impl Chain {
         }
     }
 
-    /// `WITH base AS (…), step_1 AS (…), …` for the chain so far.
-    fn with_clause(&self, base: &str) -> String {
+    /// `WITH base AS (…), step_1 AS (…), …` for the chain so far, each
+    /// step under its label (a `--` comment) when given.
+    fn with_clause(&self, base: &str, labels: &[String]) -> String {
         let mut withs = vec![format!("base AS (SELECT * FROM {base})")];
         for (i, cte) in self.ctes.iter().enumerate() {
-            withs.push(format!("step_{} AS (\n  {cte}\n)", i + 1));
+            let label = self
+                .steps
+                .get(i)
+                .and_then(|&s| labels.get(s))
+                .map(|l| format!("-- {}\n", l.replace(['\n', '\r'], " ")))
+                .unwrap_or_default();
+            withs.push(format!("{label}step_{} AS (\n  {cte}\n)", i + 1));
         }
         format!("WITH {}", withs.join(",\n"))
     }
 
     /// The query of the chain so far.
     fn query(&self, base: &str) -> String {
-        format!("{}\nSELECT * FROM {}", self.with_clause(base), self.last())
+        self.labelled_query(base, &[])
+    }
+
+    fn labelled_query(&self, base: &str, labels: &[String]) -> String {
+        format!(
+            "{}\nSELECT * FROM {}",
+            self.with_clause(base, labels),
+            self.last()
+        )
     }
 }
 
 impl Engine {
-    fn describe(&self, sql: &str) -> Result<Vec<ColumnMeta>> {
+    pub(crate) fn describe(&self, sql: &str) -> Result<Vec<ColumnMeta>> {
         let conn = self.connection()?;
         let mut stmt = conn.prepare(&format!("DESCRIBE {sql}"))?;
         let cols = stmt
@@ -196,11 +215,12 @@ impl Engine {
     ) -> Result<(Chain, Vec<StepOutcome>)> {
         let mut chain = Chain {
             ctes: Vec::new(),
+            steps: Vec::new(),
             schema,
         };
         let mut outcomes = Vec::with_capacity(steps.len());
         let mut failed = false;
-        for s in steps {
+        for (index, s) in steps.iter().enumerate() {
             if failed || !s.enabled {
                 outcomes.push(StepOutcome {
                     error: None,
@@ -233,6 +253,7 @@ impl Engine {
                 }
                 let mut next = Chain {
                     ctes: chain.ctes.clone(),
+                    steps: Vec::new(),
                     schema: Vec::new(),
                 };
                 next.ctes.push(cte);
@@ -245,7 +266,7 @@ impl Engine {
                         Some(self.count(
                             &format!(
                                 "{}\nSELECT count(*) FILTER ({col} IS NOT NULL AND {conv} IS NULL)::BIGINT FROM {prev}",
-                                chain.with_clause(base)
+                                chain.with_clause(base, &[])
                             ),
                             &[],
                             key,
@@ -258,6 +279,7 @@ impl Engine {
             match attempt {
                 Ok((cte, schema, failures)) => {
                     chain.ctes.push(cte);
+                    chain.steps.push(index);
                     chain.schema = schema;
                     outcomes.push(StepOutcome {
                         error: None,
@@ -317,7 +339,14 @@ impl Engine {
 
     /// The recipe as one standalone script over `reader` (the file's reader
     /// call): it runs as-is in plain DuckDB and gives the cleaned rows.
-    pub fn recipe_script(&self, id: &str, steps: &[RecipeStep], reader: &str) -> Result<String> {
+    /// `labels` (one per step) are written above their steps as comments.
+    pub fn recipe_script(
+        &self,
+        id: &str,
+        steps: &[RecipeStep],
+        reader: &str,
+        labels: &[String],
+    ) -> Result<String> {
         let schema = self.dataset_columns(id)?;
         let (chain, outcomes) = self.recipe_chain(reader, schema, steps, None)?;
         if let Some((i, e)) = outcomes
@@ -327,6 +356,6 @@ impl Engine {
         {
             return Err(AppError::Query(format!("Step {} fails: {e}", i + 1)));
         }
-        Ok(format!("{};", chain.query(reader)))
+        Ok(format!("{};", chain.labelled_query(reader, labels)))
     }
 }

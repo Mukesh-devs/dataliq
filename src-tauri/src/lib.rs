@@ -131,7 +131,10 @@ pub fn run() {
             commands::chart::chart_sql,
             commands::chart::save_chart_image,
             commands::recipe::apply_recipe,
-            commands::recipe::recipe_script
+            commands::recipe::recipe_script,
+            commands::recipe::save_recipe,
+            commands::recipe::load_recipe,
+            commands::recipe::save_recipe_script
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

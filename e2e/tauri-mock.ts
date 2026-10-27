@@ -218,6 +218,15 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const id = `recipe-${nextRecipe++}`;
               return { dataset: { id, rowCount, cached: true }, elapsedMs: 21, ...rest };
             }
+            // A saved recipe can be loaded again (in another tab) for the page's life.
+            case "save_recipe":
+              w.__savedRecipe = args.recipe;
+              return null;
+            case "load_recipe":
+              if (!w.__savedRecipe) throw { kind: "io", message: "No such file" };
+              return w.__savedRecipe;
+            case "save_recipe_script":
+              return null;
             case "recipe_script":
               return `WITH base AS (SELECT * FROM ${String(args.reader)}),\nstep_1 AS (SELECT * FROM base)\nSELECT * FROM step_1;`;
             case "chart_sql":

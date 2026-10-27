@@ -3,8 +3,12 @@
 //! the exported script gives the same rows in plain DuckDB.
 
 use arrow::array::{Array, AsArray};
-use bigview_lib::engine::{Param, RequestKey};
-use bigview_lib::recipe::{Case, NewType, RecipeOutcome, RecipeStep, Step};
+use bigview_lib::cache::{Cache, CacheConfig};
+use bigview_lib::engine::{Dataset, Param, RequestKey};
+use bigview_lib::import::{self, ImportTarget, Imports};
+use bigview_lib::recipe::{
+    Case, NewType, RecipeFile, RecipeOutcome, RecipeStep, Step, load_recipe, save_recipe,
+};
 use bigview_lib::sources::{OpenOptions, Source};
 use bigview_lib::view::{Filter, FilterOp};
 
@@ -402,7 +406,7 @@ fn the_script_gives_the_same_rows_in_plain_duckdb() {
         .unwrap();
     let script = fx
         .engine
-        .recipe_script(&fx.dataset.id, &steps, &reader)
+        .recipe_script(&fx.dataset.id, &steps, &reader, &[])
         .unwrap();
     assert!(
         script.starts_with("WITH base AS (SELECT * FROM read_csv("),
@@ -433,4 +437,170 @@ fn the_script_gives_the_same_rows_in_plain_duckdb() {
     let got = rows(&fx, &app);
     assert!(!got.is_empty());
     assert_eq!(plain, got, "{script}");
+}
+
+/// `rows` of people.csv (header kept) written as their own CSV, imported.
+fn import_part(fx: &Fx, dir: &std::path::Path, keep: impl Fn(usize) -> bool) -> Dataset {
+    let path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/csv/people.csv");
+    let text = std::fs::read_to_string(path).unwrap();
+    let mut lines = text.lines();
+    let mut out = format!("{}\n", lines.next().unwrap());
+    for (i, l) in lines.enumerate() {
+        if keep(i) {
+            out.push_str(l);
+            out.push('\n');
+        }
+    }
+    let part = dir.join("people-part.csv");
+    std::fs::write(&part, out).unwrap();
+    let cache = Cache::new(CacheConfig {
+        dir: dir.join("cache"),
+        max_bytes: 1 << 30,
+        enabled: true,
+    })
+    .unwrap();
+    let source = Source::new(&part, OpenOptions::default())
+        .unwrap()
+        .resolve_dialect(&fx.engine)
+        .unwrap();
+    let target = ImportTarget {
+        cache: &cache,
+        temp_dir: dir.join("tmp"),
+    };
+    import::import(
+        &fx.engine,
+        &Imports::default(),
+        &target,
+        &source,
+        "part",
+        &|_| {},
+    )
+    .unwrap()
+    .dataset
+}
+
+#[test]
+fn a_saved_recipe_cleans_another_file_with_the_same_columns() {
+    let fx = fx();
+    let dir = tempfile::tempdir().unwrap();
+    let steps = vec![
+        on(Step::ChangeCase {
+            column: "name".into(),
+            case: Case::Upper,
+        }),
+        on(Step::RemoveRows {
+            filter: Filter {
+                column: "amount".into(),
+                op: FilterOp::Lt {
+                    value: Param::Float(0.0),
+                },
+                not: false,
+            },
+        }),
+    ];
+    let saved = dir.path().join("clean.json");
+    save_recipe(
+        &saved,
+        &RecipeFile {
+            format: String::new(),
+            version: 0,
+            source: Some("people.csv".into()),
+            columns: fx.engine.dataset_columns(&fx.dataset.id).unwrap(),
+            steps: steps.clone(),
+        },
+    )
+    .unwrap();
+
+    // The second half of the file, as another file.
+    let other = import_part(&fx, dir.path(), |i| i >= 500);
+    let loaded = load_recipe(&saved).unwrap();
+    assert_eq!(loaded.steps, steps);
+    assert_eq!(
+        loaded.columns,
+        fx.engine.dataset_columns(&other.id).unwrap(),
+        "the same columns"
+    );
+    let out = fx
+        .engine
+        .apply_recipe(&other.id, &loaded.steps, &RequestKey::default())
+        .unwrap();
+    assert!(
+        out.steps.iter().all(|s| s.error.is_none()),
+        "{:?}",
+        out.steps
+    );
+    let want: Vec<(String, Option<String>)> = fx.people[500..]
+        .iter()
+        .filter(|p| !p.amount.is_some_and(|a| a < 0.0))
+        .map(|p| (p.id.to_string(), p.name.as_ref().map(|n| n.to_uppercase())))
+        .collect();
+    let got: Vec<(String, Option<String>)> = rows(&fx, &out)
+        .into_iter()
+        .map(|r| (r[0].clone().unwrap(), r[1].clone()))
+        .collect();
+    assert_eq!(got, want);
+}
+
+#[test]
+fn the_script_explains_each_step() {
+    let fx = fx();
+    let steps = [
+        on(Step::Trim {
+            column: "name".into(),
+        }),
+        RecipeStep {
+            step: Step::Trim {
+                column: "city".into(),
+            },
+            enabled: false,
+        },
+        on(Step::Calculate {
+            name: "double".into(),
+            expression: "amount * 2".into(),
+        }),
+    ];
+    let labels = [
+        "Trim spaces in “name”".to_string(),
+        "Trim spaces in “city”".to_string(),
+        "New column “double” = amount * 2\n(evil -- */ comment)".to_string(),
+    ];
+    let path =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/csv/people.csv");
+    let reader = Source::new(&path, OpenOptions::default())
+        .unwrap()
+        .resolve_dialect(&fx.engine)
+        .unwrap()
+        .reader_display_sql()
+        .unwrap();
+    let script = fx
+        .engine
+        .recipe_script(&fx.dataset.id, &steps, &reader, &labels)
+        .unwrap();
+    assert!(
+        script.contains("-- Trim spaces in “name”\nstep_1 AS ("),
+        "{script}"
+    );
+    // A step that is off isn't in it; labels stay on one line.
+    assert!(!script.contains("“city”"), "{script}");
+    assert!(
+        script.contains("-- New column “double” = amount * 2 (evil -- */ comment)\nstep_2 AS ("),
+        "{script}"
+    );
+    // Still runs in plain DuckDB: the comments don't change the rows.
+    let plain = fx
+        .engine
+        .recipe_script(&fx.dataset.id, &steps, &reader, &[])
+        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let count = |sql: &str| -> i64 {
+        conn.query_row(
+            &format!("SELECT count(*) FROM ({})", sql.trim_end_matches(';')),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(count(&script), count(&plain));
+    assert_eq!(count(&script), fx.people.len() as i64);
 }

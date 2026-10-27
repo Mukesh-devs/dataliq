@@ -464,3 +464,19 @@ recipe there: the rows are those of the steps before it, the step shows
 DuckDB's message and the later steps say they weren't applied. Undo and
 redo keep up to 100 recipes per tab. SQL results (already a query) have no
 recipe.
+
+## D40 — Recipe files: JSON with the columns they were made for
+
+A saved recipe is a small JSON file (`"format": "bigview-recipe"`,
+`"version": 1`) holding the steps exactly as the app sends them to the
+backend, the name of the file it was made on and that file's columns with
+their types. Loading it onto any open file replaces that tab's recipe (one
+undo brings the old one back) and compares the columns: missing columns
+and columns of another type are named in the Clean panel ("This file has no
+column “joined”: steps using them may fail"), and the steps still apply, so
+a step that can't run says why on its own line. Files from a newer
+version, other JSON and damaged recipes are refused with a sentence each.
+The exported `.sql` script is the same query the app runs (D39) over the
+file's reader, with a two-line header and each step's description as a
+`--` comment above it; disabled steps are left out. Files are written whole
+(a `.partial` file renamed), and only as `.json` or `.sql`.

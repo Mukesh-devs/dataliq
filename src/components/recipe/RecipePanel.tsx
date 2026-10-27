@@ -2,6 +2,10 @@ import {
   ArrowDown,
   ArrowUp,
   CircleAlert,
+  Copy,
+  FileCode,
+  FolderOpen,
+  Save,
   LoaderCircle,
   Redo2,
   Trash2,
@@ -45,6 +49,13 @@ interface RecipePanelProps {
   onUndo: () => void;
   onRedo: () => void;
   onClose: () => void;
+  /** Recipe actions; each button shows only with its handler. */
+  onCopySql?: () => void;
+  onExportSql?: () => void;
+  onSave?: () => void;
+  onLoad?: () => void;
+  /** E.g. a loaded recipe needs columns this file lacks. */
+  warning?: string;
 }
 
 const control =
@@ -68,6 +79,11 @@ export function RecipePanel({
   onUndo,
   onRedo,
   onClose,
+  onCopySql,
+  onExportSql,
+  onSave,
+  onLoad,
+  warning,
 }: RecipePanelProps) {
   const move = (i: number, by: -1 | 1) => {
     const next = [...steps];
@@ -108,6 +124,56 @@ export function RecipePanel({
           <X className="size-3.5" aria-hidden />
         </IconButton>
       </header>
+      <div
+        role="toolbar"
+        aria-label="Recipe"
+        className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1"
+      >
+        {onCopySql && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onCopySql}
+            title="Copy the recipe as a DuckDB script"
+          >
+            <Copy className="size-3.5" aria-hidden /> Copy SQL
+          </Button>
+        )}
+        {onExportSql && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onExportSql}
+            title="Save the recipe as a .sql script"
+          >
+            <FileCode className="size-3.5" aria-hidden /> Export SQL…
+          </Button>
+        )}
+        {onSave && (
+          <Button size="sm" variant="ghost" onClick={onSave} title="Save the steps to use again">
+            <Save className="size-3.5" aria-hidden /> Save…
+          </Button>
+        )}
+        {onLoad && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onLoad}
+            title="Load saved steps onto this file"
+          >
+            <FolderOpen className="size-3.5" aria-hidden /> Load…
+          </Button>
+        )}
+      </div>
+      {warning && (
+        <p
+          role="status"
+          className="flex items-start gap-1.5 border-b border-border px-3 py-2 text-fg-muted"
+        >
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
+          {warning}
+        </p>
+      )}
       {error && (
         <p role="alert" className="flex items-start gap-1.5 px-3 py-2 text-fg-muted">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />

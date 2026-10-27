@@ -648,3 +648,23 @@ tested, and anything left over.
   the cleaned table (913 rows, lowest amount 0.28). Found and fixed: Title Case lowered letters
   after an apostrophe ("O'neil"), and the Clean button didn't look pressed with its panel open.
 - Left over: none (saving, loading and exporting recipes is step 2).
+
+### Step 2 — Recipes: SQL script, save/load, apply to another file ✅
+
+- From the Clean panel's toolbar or the palette: Copy SQL, Export SQL… (a `.sql` file), Save…
+  (a `.json` recipe), Load… (onto the tab's file; one undo brings the old steps back).
+- The script is the same query the app runs over the file's reader, with a header and each
+  step's description as a comment above it; disabled steps are left out.
+- A recipe file keeps the columns (and types) it was made for: loading it onto a file without
+  some of them, or with other types, says so in the panel; the steps still apply (D40).
+- Tested: recipe files load back exactly, other files are refused with a reason (not JSON, not a
+  recipe, a newer version, damaged), only `.json`/`.sql` are written, files are written whole; a
+  recipe saved on people.csv cleans another file with the same columns exactly as expected; the
+  labelled script runs in plain DuckDB and gives the app's rows; Vitest for the helpers, the
+  column check and the panel; Playwright for copy, export, save and loading onto another file.
+- Smoke (real app): people.csv → Title Case on name ("O'Neil Müller" stays right) → Save… through
+  the GTK dialog (`people-recipe.json` suggested) → the JSON with its 6 columns and the step;
+  Export SQL… → the commented script, which run in plain DuckDB 1.5.6 (Python) gives the same
+  1,000 rows; Ctrl+O people-q2.csv (500 rows, no `joined`) → Load recipe… → "Loaded 1 step from
+  smoke-recipe.json", names in Title Case, and the panel says the file has no column “joined”.
+- Left over: none.

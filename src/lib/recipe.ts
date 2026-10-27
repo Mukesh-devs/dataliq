@@ -1,3 +1,4 @@
+import { fileBase } from "./exporting";
 import type { ColumnMeta, DatasetInfo } from "./files";
 import { call } from "./ipc";
 import { describeFilter, type Filter, type ViewSpec } from "./view";
@@ -58,13 +59,109 @@ export function applyRecipe(
   return call("apply_recipe", { datasetId, steps, requestId, group });
 }
 
-/** The recipe as one DuckDB script over `reader` (the file's reader call). */
+/**
+ * The recipe as one DuckDB script over `reader` (the file's reader call);
+ * `labels` (one per step) are written above their steps as comments.
+ */
 export function recipeScript(
   datasetId: string,
   steps: RecipeStep[],
   reader: string,
+  labels?: string[],
 ): Promise<string> {
-  return call("recipe_script", { datasetId, steps, reader });
+  return call("recipe_script", { datasetId, steps, reader, labels });
+}
+
+/** A recipe saved as JSON; mirrors `RecipeFile` in src-tauri/src/recipe/file.rs. */
+export interface RecipeFile {
+  format: string;
+  version: number;
+  /** Name of the file it was made on. */
+  source?: string | null;
+  /** The columns it was made for. */
+  columns: ColumnMeta[];
+  steps: RecipeStep[];
+}
+
+export function saveRecipe(
+  path: string,
+  recipe: Pick<RecipeFile, "source" | "columns" | "steps">,
+): Promise<void> {
+  return call("save_recipe", { path, recipe: { format: "bigview-recipe", version: 1, ...recipe } });
+}
+
+export function loadRecipe(path: string): Promise<RecipeFile> {
+  return call("load_recipe", { path });
+}
+
+export function saveRecipeScript(path: string, script: string): Promise<void> {
+  return call("save_recipe_script", { path, script });
+}
+
+/** The script with a header saying what it is, each step under its description. */
+export async function readableScript(
+  datasetId: string,
+  steps: RecipeStep[],
+  reader: string,
+  title: string,
+): Promise<string> {
+  const script = await recipeScript(datasetId, steps, reader, steps.map(describeStep));
+  const n = steps.filter(isEnabled).length;
+  return (
+    `-- BigView recipe for ${title}: ${n} step${n === 1 ? "" : "s"}.\n` +
+    "-- Runs as-is in DuckDB: it reads the file and gives the cleaned rows.\n" +
+    script
+  );
+}
+
+/** Suggested file name for a recipe of `title`, e.g. `people-recipe.json`. */
+export const recipeFileName = (title: string, ext: "json" | "sql") =>
+  `${fileBase(title, "data")}-recipe.${ext}`;
+
+export async function pickRecipeSave(name: string, ext: "json" | "sql"): Promise<string | null> {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  return save({
+    defaultPath: name,
+    filters: [{ name: ext === "json" ? "BigView recipe" : "SQL script", extensions: [ext] }],
+  });
+}
+
+export async function pickRecipeOpen(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const picked = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: "BigView recipe", extensions: ["json"] }],
+  });
+  return Array.isArray(picked) ? (picked[0] ?? null) : picked;
+}
+
+/**
+ * What a file lacks for a recipe made on other columns: columns it doesn't
+ * have, and columns of another type.
+ */
+export function columnGaps(
+  wanted: ColumnMeta[],
+  have: ColumnMeta[],
+): { missing: string[]; retyped: { name: string; wanted: string; have: string }[] } {
+  const types = new Map(have.map((c) => [c.name, c.type]));
+  const missing = wanted.filter((c) => !types.has(c.name)).map((c) => c.name);
+  const retyped = wanted.flatMap((c) => {
+    const t = types.get(c.name);
+    return t !== undefined && t !== c.type ? [{ name: c.name, wanted: c.type, have: t }] : [];
+  });
+  return { missing, retyped };
+}
+
+/** One line about the gaps, or null when the columns match. */
+export function describeGaps(gaps: ReturnType<typeof columnGaps>): string | null {
+  const parts: string[] = [];
+  if (gaps.missing.length)
+    parts.push(
+      `no column${gaps.missing.length === 1 ? "" : "s"} ${gaps.missing.map(q).join(", ")}`,
+    );
+  for (const r of gaps.retyped) parts.push(`${q(r.name)} is ${r.have}, not ${r.wanted}`);
+  return parts.length ? `This file has ${parts.join("; ")}: steps using them may fail.` : null;
 }
 
 export const isEnabled = (s: RecipeStep) => s.enabled !== false;
