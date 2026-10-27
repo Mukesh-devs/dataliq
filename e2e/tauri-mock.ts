@@ -44,6 +44,11 @@ export interface MockOptions {
   exportMs?: number;
   /** Result of `chart_data`; runs in Node. Default: three bars. */
   charts?: (chart: Record<string, unknown>, spec: unknown) => unknown;
+  /**
+   * Result of `apply_recipe` without its dataset (columns, rowCount, steps);
+   * runs in Node. The dataset is `recipe-N`, paged through `fetchRows`.
+   */
+  recipes?: (steps: { op: string; enabled?: boolean }[]) => unknown;
 }
 
 /**
@@ -96,6 +101,10 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       charts(chart, spec),
     );
   }
+  if (options.recipes) {
+    const recipes = options.recipes;
+    await page.exposeFunction("__recipes", (steps: { op: string }[]) => recipes(steps));
+  }
   await page.addInitScript(
     ({ recordings, dialogPaths, datasets, imports, startupFiles, savePaths, exportMs }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
@@ -105,6 +114,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       let nextCallback = 1;
       let nextView = 1;
       let nextResult = 1;
+      let nextRecipe = 1;
       // The SQL panel's history and saved queries (kept for the page's life).
       const history: { sql: string; ranAt: number }[] = [];
       const saved: { name: string; sql: string; savedAt: number }[] = [];
@@ -199,6 +209,17 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 elapsedMs: 5,
               };
             }
+            case "apply_recipe": {
+              const recipes = w.__recipes as
+                | ((s: unknown) => Promise<{ rowCount: number } & Record<string, unknown>>)
+                | undefined;
+              if (!recipes) throw { kind: "internal", message: "unmocked command apply_recipe" };
+              const { rowCount, ...rest } = await recipes(args.steps);
+              const id = `recipe-${nextRecipe++}`;
+              return { dataset: { id, rowCount, cached: true }, elapsedMs: 21, ...rest };
+            }
+            case "recipe_script":
+              return `WITH base AS (SELECT * FROM ${String(args.reader)}),\nstep_1 AS (SELECT * FROM base)\nSELECT * FROM step_1;`;
             case "chart_sql":
               return `SELECT city, count(*) AS "Count" FROM ${String(args.reader)} GROUP BY 1`;
             case "save_chart_image":

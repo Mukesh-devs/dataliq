@@ -22,6 +22,7 @@ mod perf_import;
 mod perf_preview;
 mod perf_sort;
 mod profile;
+mod recipes;
 mod sort;
 mod sql_results;
 mod sql_tables;

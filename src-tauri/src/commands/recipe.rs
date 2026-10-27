@@ -1,0 +1,64 @@
+use std::sync::Arc;
+
+use tauri::{AppHandle, Emitter, State};
+
+use crate::commands::view::ViewReady;
+use crate::engine::{Engine, RequestKey};
+use crate::error::{AppError, Result};
+use crate::recipe::{RecipeOutcome, RecipeStep};
+
+/// Applies the cleaning `steps` to dataset `dataset_id`: a new dataset of
+/// the cleaned rows, read through its query at first and written to a
+/// session table in the background (announced with `view-ready`). A newer
+/// request in the same `group` (one per tab) cancels this one.
+#[tauri::command]
+pub async fn apply_recipe(
+    app: AppHandle,
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    steps: Vec<RecipeStep>,
+    request_id: Option<String>,
+    group: Option<String>,
+) -> Result<RecipeOutcome> {
+    let started = std::time::Instant::now();
+    let engine = Arc::clone(&engine);
+    let key = RequestKey {
+        id: request_id,
+        group,
+    };
+    let outcome = {
+        let engine = Arc::clone(&engine);
+        tauri::async_runtime::spawn_blocking(move || engine.apply_recipe(&dataset_id, &steps, &key))
+            .await
+            .map_err(|e| AppError::Internal(format!("recipe task failed: {e}")))??
+    };
+    let id = outcome.dataset.id.clone();
+    tauri::async_runtime::spawn_blocking(move || match engine.materialize_view(&id) {
+        Ok(true) => {
+            let ready = ViewReady {
+                dataset_id: id,
+                elapsed_ms: started.elapsed().as_millis() as u64,
+            };
+            let _ = app.emit("view-ready", ready);
+            if let Err(e) = engine.release_memory() {
+                tracing::warn!("could not release memory after a recipe: {e}");
+            }
+        }
+        // Closed or replaced meanwhile.
+        Ok(false) | Err(AppError::Cancelled) => {}
+        Err(e) => tracing::warn!("could not write recipe {id}: {e}"),
+    });
+    Ok(outcome)
+}
+
+/// The recipe as one standalone DuckDB script over `reader` (the file's
+/// reader call), for "Export recipe as SQL".
+#[tauri::command]
+pub fn recipe_script(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    steps: Vec<RecipeStep>,
+    reader: String,
+) -> Result<String> {
+    engine.recipe_script(&dataset_id, &steps, &reader)
+}

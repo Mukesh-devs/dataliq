@@ -441,3 +441,26 @@ all pass except light-mode contrast of slots 3–4, so every chart also has a
 table view of its values. Bars are at most 24 px thick with 4 px rounded
 ends, lines 2 px, one value axis only, legend from two series up, text in
 the text colours.
+
+## D39 — Cleaning recipes: one chain of CTEs over the file, a new dataset
+
+A recipe is an ordered list of steps, each a `SELECT` over the step before
+(`WITH base AS (…), step_1 AS (…), step_2 AS (… FROM step_1) …`), so the
+whole recipe is one query DuckDB plans at once and the exported script is
+the same text. Column steps keep the column's place (`SELECT a, f(b) AS b,
+c`); rows keep file order (duplicates keep the first row, by a row number
+taken over the step's input). Change type uses `TRY_CAST` (or
+`try_strptime` with a format), so a value that doesn't convert becomes
+empty, and the step says how many did. Remove rows reuses the view's
+filter builder with the test turned around, so the rows where the test
+can't tell (NULL) stay. The output is a new dataset read through its query
+and written to a session table in the background, exactly like a view, so
+the cached file never changes. The tab's base becomes the cleaned rows:
+the grid, filters, profiles, charts, exports and the tab's SQL table all
+read them, and filters on columns a step removed or renamed are dropped.
+The grid switches only when the cleaned rows' view is open, so it never
+shows one set of columns over another's pages. A failing step stops the
+recipe there: the rows are those of the steps before it, the step shows
+DuckDB's message and the later steps say they weren't applied. Undo and
+redo keep up to 100 recipes per tab. SQL results (already a query) have no
+recipe.

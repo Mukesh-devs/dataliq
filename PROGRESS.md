@@ -617,3 +617,34 @@ tested, and anything left over.
 - Done criteria: charts are fast on huge files (aggregated in DuckDB, one small result) and
   always match the filtered view (the same view builder as the grid; tests with filters).
 - Left over: none.
+
+## v0.5 — Clean, Compare, Quality
+
+### Step 1 — Cleaning steps (recipe) ✅
+
+- Ten steps: rename, change type (counts the values that don't convert; dates with an optional
+  strptime format), trim, change case (Title Case as spreadsheets' PROPER: "o'neil" → "O'Neil"),
+  find and replace (text or pattern, match case), split column, fill empty cells, remove
+  duplicate rows (all columns or one), remove rows matching a filter, calculated column (a DuckDB
+  expression).
+- One chain of CTEs over the file, applied as a new dataset written in the background like a
+  view; the file and its cache never change (D39). The grid, filters, profiles, charts, export and
+  the tab's SQL table read the cleaned rows; filters on columns a step removed or renamed go.
+- A Clean panel (toolbar, palette, "Clean column…" in the column menu): steps listed with what
+  happened (failed conversions, errors, steps not applied), turn on/off, move up/down, remove,
+  remove all; undo/redo (buttons, Ctrl+Z / Ctrl+Shift+Z, palette).
+- Fixed on the way: Ctrl+F then typing at once lost the first key (the search box was focused one
+  frame late); it is focused at once now, and the slow-frame test types right after the shortcut.
+- Tested: SQL snapshots for every step; integration tests over people.csv check each step against
+  values computed from the parsed CSV (column steps, failure counts, split/title/regex, row steps
+  in file order, disabled and failing steps, a bad fill value) and that the exported script run in
+  plain DuckDB gives exactly the app's rows; Vitest for descriptions, view fitting, the store
+  (cleaned base for views and SQL, renames dropping filters, undo/redo, waiting for the import,
+  closing datasets) and the panel; Playwright for the whole flow and the column menu.
+- Smoke (real app, people.csv): Clean column… on name → Title Case: 1,000 rows cleaned in 3 ms
+  ("søren smith" → "Søren Smith"); change name to number → "989 values couldn't be converted";
+  Ctrl+Z from the grid undoes it; remove rows where amount < 0 → 913 rows (913 counted
+  independently from the CSV); search "o'neil" → 130 of 913 rows; SQL panel `FROM people` sees
+  the cleaned table (913 rows, lowest amount 0.28). Found and fixed: Title Case lowered letters
+  after an apostrophe ("O'neil"), and the Clean button didn't look pressed with its panel open.
+- Left over: none (saving, loading and exporting recipes is step 2).

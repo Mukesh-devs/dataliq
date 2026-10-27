@@ -1,0 +1,11 @@
+---
+source: src-tauri/src/recipe/sql.rs
+expression: "all.join(\"\\n\\n\")"
+---
+SELECT * EXCLUDE ("__bigview_pos") FROM (SELECT *, row_number() OVER () AS "__bigview_pos" FROM t) QUALIFY row_number() OVER (PARTITION BY "id", "name", "amount", "joined" ORDER BY "__bigview_pos") = 1 ORDER BY "__bigview_pos"
+
+SELECT * EXCLUDE ("__bigview_pos") FROM (SELECT *, row_number() OVER () AS "__bigview_pos" FROM t) QUALIFY row_number() OVER (PARTITION BY "name" ORDER BY "__bigview_pos") = 1 ORDER BY "__bigview_pos"
+
+SELECT * FROM t WHERE NOT coalesce("amount" < 0.0, FALSE)
+
+SELECT *, (amount * 1.2) AS "with tax" FROM t

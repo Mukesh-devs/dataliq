@@ -7,7 +7,7 @@ import {
   unregisterTable,
 } from "../lib/sql";
 import { useSql, type SqlTable } from "../stores/sql";
-import type { Tab } from "../stores/tabs";
+import { baseOf, type Tab } from "../stores/tabs";
 
 /**
  * Each tab with full data, as a table name: the name chosen for it, else
@@ -15,7 +15,8 @@ import type { Tab } from "../stores/tabs";
  * names) in tab order, chosen names first.
  */
 export function tableNames(tabs: Tab[]): { tab: Tab; name: string; datasetId: string }[] {
-  const ready = tabs.filter((t) => t.info?.dataset);
+  // A cleaned tab's table is its cleaned rows.
+  const ready = tabs.filter((t) => baseOf(t).dataset);
   const chosen = ready.flatMap((t) => (t.sqlName ? [t.sqlName] : []));
   const unnamed = ready.filter((t) => !t.sqlName);
   const auto = uniqueNames(
@@ -26,7 +27,7 @@ export function tableNames(tabs: Tab[]): { tab: Tab; name: string; datasetId: st
   return ready.map((tab) => ({
     tab,
     name: tab.sqlName ?? autoOf.get(tab.id)!,
-    datasetId: tab.info!.dataset!.id,
+    datasetId: baseOf(tab).dataset!.id,
   }));
 }
 
@@ -42,17 +43,18 @@ export function useSqlTables(tabs: Tab[], activeId: string | null) {
       name: w.name,
       datasetId: w.datasetId,
       tabId: w.tab.id,
-      columns: (w.tab.info?.columns ?? []).map((c) => c.name),
+      columns: baseOf(w.tab).columns.map((c) => c.name),
     }));
     const active = tabs.find((t) => t.id === activeId);
-    const base = active?.info?.dataset;
-    if (active && base) {
+    const activeBase = active && baseOf(active);
+    const base = activeBase?.dataset;
+    if (active && activeBase && base) {
       list.push({
         name: CURRENT_VIEW,
         // The rows on screen: the view's own dataset, else the whole file.
         datasetId: active.viewState?.dataset?.id ?? base.id,
         tabId: active.id,
-        columns: (active.info?.columns ?? []).map((c) => c.name),
+        columns: activeBase.columns.map((c) => c.name),
       });
     }
     return list;

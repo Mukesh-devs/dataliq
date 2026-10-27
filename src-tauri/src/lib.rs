@@ -8,6 +8,7 @@ pub mod engine;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod recipe;
 pub mod settings;
 pub mod sources;
 pub mod sql;
@@ -128,7 +129,9 @@ pub fn run() {
             commands::export::cancel_export,
             commands::chart::chart_data,
             commands::chart::chart_sql,
-            commands::chart::save_chart_image
+            commands::chart::save_chart_image,
+            commands::recipe::apply_recipe,
+            commands::recipe::recipe_script
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

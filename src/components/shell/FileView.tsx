@@ -5,6 +5,7 @@ import {
   LoaderCircle,
   SquareTerminal,
   Table,
+  WandSparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
@@ -16,8 +17,9 @@ import { useSql } from "../../stores/sql";
 import { isMac, modKey } from "../../lib/platform";
 import { useRegisterCommands, type Command } from "../../stores/commands";
 import { useNotice } from "../../stores/notice";
-import { useTabs } from "../../stores/tabs";
+import { baseOf, useTabs } from "../../stores/tabs";
 import type { Tab } from "../../stores/tabs";
+import { RecipePanel } from "../recipe/RecipePanel";
 import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
@@ -103,20 +105,22 @@ const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "
 
 /** The view's rows, else the full dataset (paged from the backend), else the preview. */
 function useRowSource(tab: Tab): RowSource | null {
-  const dataset = tab.viewState?.dataset ?? tab.info?.dataset ?? undefined;
+  const base = baseOf(tab);
+  const preview = base.preview;
+  const dataset = tab.viewState?.dataset ?? base.dataset;
   const datasetId = dataset?.id;
   const rowCount = dataset?.rowCount;
   const source = useMemo(() => {
-    if (!tab.preview) return null;
+    if (!preview) return null;
     if (datasetId !== undefined && rowCount !== undefined) {
       return new PagedRowSource({
         rowCount,
-        columns: describeColumns(tab.preview),
+        columns: describeColumns(preview),
         fetchPage: (start, count) => fetchRows(datasetId, start, count),
       });
     }
-    return new StaticRowSource(tab.preview);
-  }, [tab.preview, datasetId, rowCount]);
+    return new StaticRowSource(preview);
+  }, [preview, datasetId, rowCount]);
   useEffect(() => () => source?.dispose(), [source]);
   return source;
 }
@@ -131,7 +135,10 @@ export function FileView({
   onReload,
 }: FileViewProps) {
   const source = useRowSource(tab);
-  const columns = useMemo(() => (tab.preview ? describeColumns(tab.preview) : []), [tab.preview]);
+  // The cleaned rows when the tab has a recipe, else the file.
+  const base = baseOf(tab);
+  const basePreview = base.preview;
+  const columns = useMemo(() => (basePreview ? describeColumns(basePreview) : []), [basePreview]);
   const view = useMemo(() => tab.view ?? {}, [tab.view]);
   const filters = useMemo(() => view.filters ?? [], [view]);
   const filtered = useMemo(() => new Set(filters.map((f) => f.column)), [filters]);
@@ -171,7 +178,7 @@ export function FileView({
   );
   const sort = useMemo(() => view.sort ?? [], [view]);
   const setSort = (next: SortKey[]) => onViewChange?.({ ...view, sort: next });
-  const baseId = tab.info?.dataset?.id;
+  const baseId = base.dataset?.id;
   const setFilters = (next: Filter[]) => onViewChange?.({ ...view, filters: next });
   const editColumn = editing?.column.name;
   const loadValues = useMemo(
@@ -246,6 +253,27 @@ export function FileView({
   const notice = useNotice((s) => s.show);
   const cancelView = useTabs((s) => s.cancelView);
 
+  // Cleaning steps, applied to the whole file.
+  const setRecipe = useTabs((s) => s.setRecipe);
+  const undoRecipe = useTabs((s) => s.undoRecipe);
+  const redoRecipe = useTabs((s) => s.redoRecipe);
+  const setRecipeOpen = useTabs((s) => s.setRecipeOpen);
+  const [cleanColumn, setCleanColumn] = useState<string>();
+  const canClean = tab.status === "ready" && !!tab.info && tab.info.format !== "sql";
+  const recipeOpen = canClean && !!tab.recipeOpen;
+  const recipe = tab.recipe;
+  const recipeSteps = useMemo(() => recipe ?? [], [recipe]);
+  const canUndo = (tab.recipeHistory?.past.length ?? 0) > 0;
+  const canRedo = (tab.recipeHistory?.future.length ?? 0) > 0;
+  const cleaning = tab.recipeState?.status === "running";
+  const openClean = useCallback(
+    (column?: string) => {
+      setCleanColumn(column);
+      setRecipeOpen(tab.id, true);
+    },
+    [setRecipeOpen, tab.id],
+  );
+
   /** Copies the selected cells (shown columns, display names) as `format`. */
   const copySelection = useCallback(
     async (format: CopyFormat, opts: { headers?: boolean } = {}) => {
@@ -288,7 +316,7 @@ export function FileView({
   );
 
   /** Copies the view (shown columns, names, filters, search, sort) as runnable SQL. */
-  const readerSql = tab.info?.readerSql;
+  const readerSql = base.readerSql;
   const copyViewSql = useCallback(async () => {
     if (!baseId || !readerSql) return;
     try {
@@ -307,7 +335,7 @@ export function FileView({
 
   /** Opens the export dialog for the view (and the grid's selection). */
   const showExport = useExport((s) => s.show);
-  const viewRows = tab.viewState?.dataset?.rowCount ?? tab.info?.dataset?.rowCount;
+  const viewRows = tab.viewState?.dataset?.rowCount ?? base.dataset?.rowCount;
   const openExport = useCallback(() => {
     if (!baseId || viewRows === undefined) return;
     showExport({
@@ -390,7 +418,7 @@ export function FileView({
     };
   };
 
-  const running = tab.viewState?.status === "running";
+  const running = tab.viewState?.status === "running" || cleaning;
   const sorting = !!tab.viewState?.sorting;
   const importing = tab.import?.status === "running";
   const canExport = tab.status === "ready" && !!baseId && viewRows !== undefined && !running;
@@ -455,6 +483,29 @@ export function FileView({
         keywords: "cancel",
         run: () => cancelView(tab.id),
       });
+    if (canClean) {
+      add({
+        id: "clean",
+        title: recipeOpen ? "Hide cleaning steps" : "Clean data…",
+        group: "Clean",
+        keywords: "recipe steps trim rename replace split fill duplicates type",
+        run: () => (recipeOpen ? setRecipeOpen(tab.id, false) : openClean()),
+      });
+      if (canUndo)
+        add({
+          id: "undo-clean",
+          title: "Undo cleaning step",
+          group: "Clean",
+          run: () => void undoRecipe(tab.id),
+        });
+      if (canRedo)
+        add({
+          id: "redo-clean",
+          title: "Redo cleaning step",
+          group: "Clean",
+          run: () => void redoRecipe(tab.id),
+        });
+    }
     if (importing && onCancelImport)
       add({ id: "cancel-import", title: "Cancel import", group: "File", run: onCancelImport });
     for (const f of COPY_FORMATS) {
@@ -576,6 +627,14 @@ export function FileView({
     chart,
     mode,
     setMode,
+    canClean,
+    recipeOpen,
+    canUndo,
+    canRedo,
+    openClean,
+    setRecipeOpen,
+    undoRecipe,
+    redoRecipe,
   ]);
   useRegisterCommands("file", commands);
 
@@ -594,15 +653,26 @@ export function FileView({
       };
       if (mod && key === "g" && source) afterGrid(() => setGoToOpen(true));
       if (mod && key === "e" && canExport) afterGrid(openExport);
-      if (mod && key === "f" && searchInput.current)
+      const typing = (e.target as HTMLElement | null)?.closest?.(
+        "input, textarea, select, [contenteditable]",
+      );
+      if (mod && key === "z" && recipeOpen && !typing) {
+        e.preventDefault();
+        void (e.shiftKey ? redoRecipe(tab.id) : undoRecipe(tab.id));
+      }
+      if (mod && key === "f" && searchInput.current) {
+        // At once, so the next key typed goes in; again after the grid's
+        // frame if it took the focus back (keeping what was typed).
+        searchInput.current.focus();
+        searchInput.current.select();
         afterGrid(() => {
-          searchInput.current?.focus();
-          searchInput.current?.select();
+          if (document.activeElement !== searchInput.current) searchInput.current?.focus();
         });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [source, canExport, openExport]);
+  }, [source, canExport, openExport, recipeOpen, undoRecipe, redoRecipe, tab.id]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -650,6 +720,23 @@ export function FileView({
               </button>
             ))}
           </div>
+        )}
+        {canClean && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={recipeOpen}
+            className={recipeOpen ? "bg-surface-2 text-fg" : undefined}
+            onClick={() => (recipeOpen ? setRecipeOpen(tab.id, false) : openClean())}
+            title="Cleaning steps: rename, change types, trim, replace, split, …"
+          >
+            <WandSparkles className="size-3.5" aria-hidden /> Clean
+            {recipeSteps.length > 0 && (
+              <span className="rounded-full bg-accent-soft px-1.5 text-[11px] text-fg tabular">
+                {recipeSteps.length}
+              </span>
+            )}
+          </Button>
         )}
         {tab.status === "ready" && baseId && sqlTable && (
           <Button
@@ -739,6 +826,7 @@ export function FileView({
             onAutoFit: () => grid.current?.autoFit(menu.column.name),
           })}
           onProfile={baseId ? () => showProfile(menu.column.name) : undefined}
+          onClean={canClean ? () => openClean(menu.column.name) : undefined}
         />
       )}
       {renaming && onLayoutChange && (
@@ -773,88 +861,109 @@ export function FileView({
           }
         />
       )}
-      {tab.status === "error" ? (
-        <div
-          role="alert"
-          className="m-6 flex max-w-2xl items-start gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-4"
-        >
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <p className="font-medium text-fg">Couldn't open {tab.title}</p>
-            <p className="text-fg-muted">{tab.error}</p>
+      <div className="flex min-h-0 flex-1">
+        {tab.status === "error" ? (
+          <div
+            role="alert"
+            className="m-6 flex max-w-2xl items-start gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-4"
+          >
+            <CircleAlert className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <p className="font-medium text-fg">Couldn't open {tab.title}</p>
+              <p className="text-fg-muted">{tab.error}</p>
+            </div>
           </div>
-        </div>
-      ) : mode === "chart" && chart && baseId ? (
-        <ChartPanel
-          tabId={tab.id}
-          datasetId={baseId}
-          view={view}
-          columns={columns}
-          labelOf={labelOf}
-          chart={chart}
-          onChange={(c) => setChart(tab.id, c)}
-          title={tab.title}
-          readerSql={readerSql}
-        />
-      ) : source ? (
-        <div className="flex min-h-0 flex-1">
-          <DataGrid
-            ref={grid}
-            source={source}
-            layout={layout}
-            onLayoutChange={onLayoutChange}
-            onHeaderMenu={onViewChange ? onHeaderMenu : undefined}
-            onHeaderClick={onViewChange ? onHeaderClick : undefined}
-            filteredColumns={filtered}
-            sort={sort}
-            highlight={tab.viewState?.dataset ? view.search : undefined}
-            histograms={chartsWanted ? charts : undefined}
-            onCellMenu={(column, row, p) =>
-              setCellMenu({
-                column,
-                row,
-                anchor: rectAnchor({ x: p.x, y: p.y, width: 1, height: 1 }),
-              })
+        ) : mode === "chart" && chart && baseId ? (
+          <ChartPanel
+            tabId={tab.id}
+            datasetId={baseId}
+            view={view}
+            columns={columns}
+            labelOf={labelOf}
+            chart={chart}
+            onChange={(c) => setChart(tab.id, c)}
+            title={tab.title}
+            readerSql={readerSql}
+          />
+        ) : source ? (
+          <div className="flex min-h-0 min-w-0 flex-1">
+            <DataGrid
+              ref={grid}
+              source={source}
+              layout={layout}
+              onLayoutChange={onLayoutChange}
+              onHeaderMenu={onViewChange ? onHeaderMenu : undefined}
+              onHeaderClick={onViewChange ? onHeaderClick : undefined}
+              filteredColumns={filtered}
+              sort={sort}
+              highlight={tab.viewState?.dataset ? view.search : undefined}
+              histograms={chartsWanted ? charts : undefined}
+              onCellMenu={(column, row, p) =>
+                setCellMenu({
+                  column,
+                  row,
+                  anchor: rectAnchor({ x: p.x, y: p.y, width: 1, height: 1 }),
+                })
+              }
+            />
+            {cellMenu && (
+              <CellMenu
+                anchor={cellMenu.anchor}
+                column={label(layout, cellMenu.column)}
+                valueText={cellText(cellMenu.column, cellMenu.row) ?? "null"}
+                onOpenChange={(o) => !o && setCellMenu(null)}
+                {...cellActions(cellMenu.column, cellMenu.row)}
+              />
+            )}
+            <GoToRow
+              open={goToOpen}
+              onOpenChange={setGoToOpen}
+              rowCount={source.rowCount}
+              onGo={(row) => grid.current?.scrollToRow(row - 1)}
+            />
+            {profileOpen && !profiled && (
+              <ProfilePicker
+                columns={visible(layout).map((c) => ({ name: c, label: label(layout, c) }))}
+                onPick={showProfile}
+                onClose={() => setProfileOpen(false)}
+              />
+            )}
+            {profileOpen && profiled && (
+              <ProfilePanel
+                title={label(layout, profiled)}
+                // The previous result stays on screen while the new one loads.
+                profile={profile?.column === profiled ? profile.data : undefined}
+                loading={profile?.key !== profileKey}
+                error={profile?.key === profileKey ? profile.error : undefined}
+                onClose={() => setProfileOpen(false)}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center gap-2 text-fg-muted">
+            <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading {tab.title}…
+          </div>
+        )}
+        {recipeOpen && (
+          <RecipePanel
+            steps={recipeSteps}
+            // Outcomes belong to the steps they were computed for.
+            outcomes={
+              tab.recipeState?.steps === recipe ? tab.recipeState?.outcome?.steps : undefined
             }
+            running={cleaning}
+            error={tab.recipeState?.status === "error" ? tab.recipeState.error : undefined}
+            columns={columns}
+            column={cleanColumn}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onChange={(steps) => void setRecipe(tab.id, steps)}
+            onUndo={() => void undoRecipe(tab.id)}
+            onRedo={() => void redoRecipe(tab.id)}
+            onClose={() => setRecipeOpen(tab.id, false)}
           />
-          {cellMenu && (
-            <CellMenu
-              anchor={cellMenu.anchor}
-              column={label(layout, cellMenu.column)}
-              valueText={cellText(cellMenu.column, cellMenu.row) ?? "null"}
-              onOpenChange={(o) => !o && setCellMenu(null)}
-              {...cellActions(cellMenu.column, cellMenu.row)}
-            />
-          )}
-          <GoToRow
-            open={goToOpen}
-            onOpenChange={setGoToOpen}
-            rowCount={source.rowCount}
-            onGo={(row) => grid.current?.scrollToRow(row - 1)}
-          />
-          {profileOpen && !profiled && (
-            <ProfilePicker
-              columns={visible(layout).map((c) => ({ name: c, label: label(layout, c) }))}
-              onPick={showProfile}
-              onClose={() => setProfileOpen(false)}
-            />
-          )}
-          {profileOpen && profiled && (
-            <ProfilePanel
-              title={label(layout, profiled)}
-              // The previous result stays on screen while the new one loads.
-              profile={profile?.column === profiled ? profile.data : undefined}
-              loading={profile?.key !== profileKey}
-              error={profile?.key === profileKey ? profile.error : undefined}
-              onClose={() => setProfileOpen(false)}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-1 items-center justify-center gap-2 text-fg-muted">
-          <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading {tab.title}…
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

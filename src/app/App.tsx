@@ -29,7 +29,7 @@ import { useEngine } from "../stores/engine";
 import { useExport } from "../stores/export";
 import { baseName } from "../lib/files";
 import { useRecent } from "../stores/recent";
-import { useTabs, type Tab } from "../stores/tabs";
+import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
 import { useSqlTables } from "./useSqlTables";
@@ -48,13 +48,18 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
   if (!tab) parts.push("Ready");
   else if (tab.status === "loading") parts.push(`Opening ${tab.title}…`);
   else if (tab.status === "error") parts.push("Could not open file");
+  else if (tab.recipeState?.status === "waiting") {
+    parts.push("Cleaning applies when the import finishes");
+    if (tab.import?.status === "running") parts.push("importing…");
+  } else if (tab.recipeState?.status === "running") parts.push("Cleaning…");
   else if (tab.viewState?.status === "waiting") {
     parts.push("Filters apply when the import finishes");
     if (tab.import?.status === "running") parts.push("importing…");
-  } else if (tab.viewState?.dataset && tab.info?.dataset) {
+  } else if (tab.viewState?.dataset && baseOf(tab).dataset) {
     const v = tab.viewState;
     const rows = v.dataset ? formatCount(v.dataset.rowCount) : "";
-    parts.push(`${rows} of ${formatCount(v.totalRows ?? tab.info.dataset.rowCount)} rows`);
+    const total = v.totalRows ?? baseOf(tab).dataset!.rowCount;
+    parts.push(`${rows} of ${formatCount(total)} rows`);
     const verb = viewVerb(tab);
     if (v.status === "running") parts.push(`${verb.ing}…`);
     else if (v.sorting)
@@ -63,6 +68,10 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
   } else if (tab.viewState?.status === "running") {
     const ing = viewVerb(tab).ing;
     parts.push(`${ing[0]!.toUpperCase()}${ing.slice(1)}…`);
+  } else if (tab.recipeState?.outcome) {
+    const r = tab.recipeState.outcome;
+    parts.push(`${formatCount(r.dataset.rowCount)} rows`);
+    parts.push(`cleaned in ${formatDuration(r.elapsedMs)}`);
   } else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
     if (tab.info.format === "sql") parts.push("SQL result");

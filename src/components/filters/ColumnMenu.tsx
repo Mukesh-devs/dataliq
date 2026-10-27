@@ -10,6 +10,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -34,6 +35,8 @@ interface ColumnMenuProps {
   onAutoFit?: () => void;
   /** Opens the column's statistics. */
   onProfile?: () => void;
+  /** Opens the cleaning steps with this column picked. */
+  onClean?: () => void;
 }
 
 /** The column header menu (▼ or right-click): sort and filter. */
@@ -50,6 +53,7 @@ export function ColumnMenu({
   onRename,
   onAutoFit,
   onProfile,
+  onClean,
 }: ColumnMenuProps) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor]);
   const current = sort.find((k) => k.column === column);
@@ -98,6 +102,11 @@ export function ColumnMenu({
           {onProfile && (
             <Item icon={<ChartColumn />} onSelect={choose(onProfile)}>
               Column profile
+            </Item>
+          )}
+          {onClean && (
+            <Item icon={<WandSparkles />} onSelect={choose(onClean)}>
+              Clean column…
             </Item>
           )}
           {(onPin || onHide || onRename || onAutoFit) && <MenuSeparator />}
