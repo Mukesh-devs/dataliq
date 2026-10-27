@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
+
+Clean, compare, quality: fix a messy file without touching it, compare two versions, and see
+what is wrong with a file at a glance.
+
+### Added
+
+- Cleaning steps (Clean, or "Clean column…" in a column's menu): rename, change type (with a
+  count of values that don't convert), trim, change case, find and replace (text or pattern),
+  split a column, fill empty cells, remove duplicate rows, remove rows matching a filter, and
+  calculated columns from a SQL expression. Steps can be turned off, reordered and removed, with
+  undo and redo; the file itself never changes. Grid, filters, charts, exports and the SQL table
+  all see the cleaned rows.
+- Recipes: save the steps as a JSON file and load them onto any other file (missing columns are
+  pointed out), or copy and export them as a readable SQL script that runs in plain DuckDB.
+- Compare two open files by key columns: counts of added, removed, changed and unchanged rows
+  (each one filters the list), the differing rows with changed cells highlighted and their old
+  values beside them, notes on repeated keys and columns of different types; the differences
+  export like any view.
+- Data quality warnings (Quality): mostly empty columns, stray spaces, mixed numbers and text,
+  dates in several formats, outliers and duplicate rows. Each shows exactly the rows it is
+  about, and most have a one-click fix that adds the right cleaning step.
+
+### Fixed
+
+- Pressing Ctrl+F and typing straight away no longer loses the first key.
+
 ## [0.4.0] - 2026-10-27
 
 Charts: chart any view of a huge file in about a second.

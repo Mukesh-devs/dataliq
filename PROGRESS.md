@@ -710,3 +710,18 @@ tested, and anything left over.
 - Smoke (real app, messy.csv): 6 warnings in 16 ms matching the README; "Show 3 rows" on date
   formats → ids 4, 9, 16; Fix trim → 5 warnings; Fix duplicates → 20 rows, 4 warnings left.
 - Left over: none.
+
+### v0.5.0 release ✅
+
+- Version test list: all Rust tests (recipe SQL snapshots; every step, recipe files, scripts in
+  plain DuckDB; compare fixtures with duplicate keys and type differences, an edited people.csv
+  and the standalone SQL; quality fixture with every warning, its rows and its fix), Vitest,
+  Playwright (recipes, compare with canvas fills, quality), Tauri debug build; on demand
+  `perf_recipe_compare_50m` and `perf_quality_50m`; small suite (`pnpm bench`) within the guard.
+- Measured (docs/BENCHMARKS.md): on 50M rows a 4-step recipe shows its first page in 0.15 s
+  (written in full in 14.8 s), a quality check takes 6.5 s, and comparing with an edited 50M-row
+  copy 14 s.
+- Done criteria: a messy file can be cleaned (fixture `messy.csv`: the quality panel's fixes
+  and the cleaning steps), the steps saved as SQL (Export SQL…, run in plain DuckDB in the
+  smoke test), and two file versions compared (`orders_v1.csv` → `orders_v2.csv`).
+- Left over: none.
