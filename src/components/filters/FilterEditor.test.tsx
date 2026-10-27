@@ -143,3 +143,34 @@ describe("FilterEditor", () => {
     expect(option?.disabled).toBe(true);
   });
 });
+
+describe("FilterEditor focus", () => {
+  it("focuses Apply when the condition has no input, so Enter applies", async () => {
+    const onApply = vi.fn();
+    render(
+      <FilterEditor
+        column={col("active", "boolean")}
+        anchor={anchor}
+        open
+        onOpenChange={() => {}}
+        onApply={onApply}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Apply" })).toHaveFocus();
+    await userEvent.setup().keyboard("{Enter}");
+    expect(onApply).toHaveBeenCalledWith({ column: "active", op: "equals", value: true });
+  });
+
+  it("focuses the value input otherwise", () => {
+    render(
+      <FilterEditor
+        column={col("name", "text")}
+        anchor={anchor}
+        open
+        onOpenChange={() => {}}
+        onApply={() => {}}
+      />,
+    );
+    expect(screen.getByLabelText("Value")).toHaveFocus();
+  });
+});

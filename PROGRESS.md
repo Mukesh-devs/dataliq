@@ -232,3 +232,25 @@ tested, and anything left over.
   the exact rows, sort order (NULLS LAST) and that `count` agrees with `select`.
 - Smoke: no UI yet (filters arrive in step 2); the app still starts and opens files as before.
 - Left over: none.
+
+### Step 2 — Column filters by type ✅
+
+- Backend: `open_view` counts a ViewSpec and registers it as its own pageable dataset (a newer
+  request per tab cancels the older); `column_values` lists a column's most common values with
+  counts under the view's other filters, optionally searched. Views over imported tables, direct
+  reads and Parquet in place.
+- UI: filter editor per column type, opened from the column header menu / right-click or the
+  toolbar's Filter button (searchable column list): text (contains, equals, starts/ends with,
+  regex, empty), numbers (=, between, >, ≥, <, ≤), dates (between, before, after, on, last N
+  days), booleans, null / not null, and "is one of" with a searchable value list and counts;
+  "Exclude matching rows" negates (keeping NULLs). Filters show as chips (edit, remove, clear);
+  filtered headers are highlighted; status bar shows "N of M rows · filtered in X ms". Filters
+  chosen while importing apply when the import finishes.
+- CSV `""` is now an empty string, not NULL (D28; cache format v2).
+- Tested: `fixtures/csv/people.csv` (1,000 rows) with expected counts computed by parsing the file
+  in Rust for every filter type and its negation, value lists and combinations; Vitest for the
+  editor, chips, drafts and the store; Playwright for add / edit / remove / clear from the toolbar
+  and header, value lists, and filters set during an import. Smoke (real app): right-click "city",
+  type "par", Enter → "167 of 1,000 rows · filtered in 2 ms" (167 matches the CSV); a second
+  boolean filter from the header with Enter.
+- Left over: deep pages of a filtered view use LIMIT/OFFSET until step 3 materializes views.

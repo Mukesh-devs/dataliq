@@ -16,6 +16,7 @@ output is reproducible byte-for-byte, so edit the generator rather than the file
 | `csv/header_only.csv`, `csv/empty.csv` | header without rows; zero-byte file |
 | `csv/bad_rows.csv` | a row with too many columns |
 | `csv/wide_500.csv` | 500 columns |
+| `csv/people.csv` | 1,000 seeded rows for filter tests: text with case and unicode variants, numbers, dates, booleans, NULLs and `""` empty strings |
 | `csv/corrupted.csv.gz` | truncated gzip stream |
 | `*.gz` twins | gzip versions of comma, tab, quoted, JSON array and NDJSON |
 | `json/array.json`, `json/records.ndjson`, `json/nested.json` | JSON array, newline-delimited JSON, nested objects and arrays |

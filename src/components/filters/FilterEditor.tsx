@@ -69,6 +69,8 @@ export function FilterEditor(props: FilterEditorProps) {
     "lt",
     "lte",
   ];
+  // Conditions without inputs (e.g. "is true") focus Apply, so Enter applies.
+  const hasInput = needsValue.includes(draft.op) || ["range", "lastDays", "in"].includes(draft.op);
 
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
@@ -203,7 +205,7 @@ export function FilterEditor(props: FilterEditorProps) {
                   Remove
                 </Button>
               )}
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" autoFocus={!hasInput}>
                 Apply
               </Button>
             </div>
