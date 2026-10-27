@@ -12,6 +12,7 @@ import { smallFileBytes, useApp } from "../../stores/app";
 import { columnValues, toggleSort, type Filter, type SortKey, type ViewSpec } from "../../lib/view";
 import { ColumnMenu } from "../filters/ColumnMenu";
 import { FilterBar } from "../filters/FilterBar";
+import { SearchBox } from "../filters/SearchBox";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
 import { ExcelSettings } from "../import/ExcelSettings";
 import { ImportBar } from "../import/ImportBar";
@@ -107,6 +108,7 @@ export function FileView({
   );
   const settings = useApp((s) => s.settings);
   const grid = useRef<DataGridHandle>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [goToOpen, setGoToOpen] = useState(false);
   const showSettings =
     isCsv(tab) || (tab.status === "error" && /\.(csv|tsv|txt|tab)/i.test(tab.path));
@@ -116,6 +118,11 @@ export function FileView({
       if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "g" && source) {
         e.preventDefault();
         setGoToOpen(true);
+      }
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f" && searchInput.current) {
+        e.preventDefault();
+        searchInput.current.focus();
+        searchInput.current.select();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -172,6 +179,13 @@ export function FileView({
           onClear={() => setFilters([])}
           sort={sort}
           onSortChange={setSort}
+          end={
+            <SearchBox
+              ref={searchInput}
+              value={view.search ?? ""}
+              onChange={(search) => onViewChange?.({ ...view, search: search || undefined })}
+            />
+          }
         />
       )}
       {tab.viewState?.status === "error" && (
@@ -236,6 +250,7 @@ export function FileView({
             onHeaderClick={onViewChange ? onHeaderClick : undefined}
             filteredColumns={filtered}
             sort={sort}
+            highlight={tab.viewState?.dataset ? view.search : undefined}
           />
           <GoToRow
             open={goToOpen}

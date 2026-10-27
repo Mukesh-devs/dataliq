@@ -51,6 +51,11 @@ export function gridTheme(root: HTMLElement = document.documentElement): Partial
   };
 }
 
+/** Background behind search matches in cells. */
+export function matchColor(root: HTMLElement = document.documentElement): string {
+  return cssVar(getComputedStyle(root), "--match", "rgba(250,204,21,0.45)");
+}
+
 export function nullColor(root: HTMLElement = document.documentElement): string {
   return getComputedStyle(root).getPropertyValue("--null").trim() || "#a1a1aa";
 }

@@ -652,3 +652,57 @@ fn filters_on_parquet_queried_in_place() {
     assert_eq!(values.values.len(), 1);
     assert_eq!(values.values[0].count, 200);
 }
+
+/// Global search: case-insensitive "contains" over the text columns only,
+/// with SQL-special characters taken literally, combined with filters and
+/// sorting.
+#[test]
+fn search_covers_text_columns_literally() {
+    let fx = fx();
+    let count = |search: &str, filters: Vec<Filter>| {
+        fx.engine
+            .open_view(
+                &fx.dataset.id,
+                &ViewSpec {
+                    search: Some(search.into()),
+                    filters,
+                    ..ViewSpec::default()
+                },
+                &RequestKey::default(),
+            )
+            .unwrap()
+            .dataset
+            .row_count
+    };
+    let hit = |p: &Person, s: &str| {
+        let s = s.to_lowercase();
+        lower(p).contains(&s) || p.city.as_deref().unwrap_or("").to_lowercase().contains(&s)
+    };
+    for term in ["smith", "PARIS", "ø", "東京", "o'n", "an"] {
+        let want = fx.expect(|p| hit(p, term));
+        assert!(want > 0, "{term}");
+        assert_eq!(count(term, vec![]), want, "search {term:?}");
+    }
+    // LIKE wildcards and quotes are plain characters.
+    for term in ["%", "_", "'", "\"", "\\", "a%n"] {
+        assert_eq!(
+            count(term, vec![]),
+            fx.expect(|p| hit(p, term)),
+            "search {term:?}"
+        );
+    }
+    // Numbers and dates are not searched.
+    assert_eq!(count("882.05", vec![]), 0);
+    assert_eq!(count("2024-", vec![]), 0);
+    // Search + filter.
+    let active = f(
+        "active",
+        FilterOp::Equals {
+            value: Param::Bool(true),
+        },
+    );
+    assert_eq!(
+        count("müller", vec![active]),
+        fx.expect(|p| hit(p, "müller") && p.active == Some(true))
+    );
+}

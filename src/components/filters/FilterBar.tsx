@@ -1,6 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import { ArrowDown, ArrowUp, ListFilter, Plus, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ColumnInfo } from "../../lib/arrow";
 import { describeFilter, type Filter, type SortKey } from "../../lib/view";
 import { Button } from "../ui/Button";
@@ -16,6 +16,8 @@ interface FilterBarProps {
   onAdd: (column: ColumnInfo, anchor: HTMLElement) => void;
   sort?: SortKey[];
   onSortChange?: (sort: SortKey[]) => void;
+  /** Shown at the right end of the bar (the search box). */
+  end?: ReactNode;
 }
 
 /** Toolbar with one removable chip per filter and a button to add one. */
@@ -28,6 +30,7 @@ export function FilterBar({
   onAdd,
   sort = [],
   onSortChange,
+  end,
 }: FilterBarProps) {
   const kinds = useMemo(() => new Map(columns.map((c) => [c.name, c.kind])), [columns]);
   return (
@@ -112,6 +115,7 @@ export function FilterBar({
           Clear filters
         </Button>
       )}
+      {end}
     </div>
   );
 }

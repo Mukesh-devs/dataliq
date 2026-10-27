@@ -2,7 +2,9 @@ import "@glideapps/glide-data-grid/dist/index.css";
 import {
   CompactSelection,
   DataEditor,
+  GridCellKind,
   GridColumnIcon,
+  type DrawCellCallback,
   type DataEditorRef,
   type GridCell,
   type GridColumn,
@@ -24,7 +26,8 @@ import type { ColumnKind } from "../../lib/arrow";
 import { sortMark, type SortKey } from "../../lib/view";
 import { useSettings } from "../../stores/settings";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
-import { gridTheme, nullColor, rowHeight } from "./gridTheme";
+import { gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
+import { paintMatches } from "./highlight";
 import type { RowSource } from "./rowSource";
 import { scrollToRow } from "./scrollToRow";
 
@@ -57,6 +60,8 @@ interface DataGridProps {
   sort?: SortKey[];
   /** Header clicked (outside its menu button); `add` = Shift held. */
   onHeaderClick?: (col: number, add: boolean) => void;
+  /** Search text to highlight in text cells. */
+  highlight?: string;
 }
 
 /** Width of Glide's header menu button (`menuButtonSize` in its source). */
@@ -74,7 +79,7 @@ const emptySelection: GridSelection = {
  * arrive asynchronously and only the affected cells are redrawn.
  */
 export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataGrid(
-  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns, sort, onHeaderClick },
+  { source, onVisibleRowsChange, onHeaderMenu, filteredColumns, sort, onHeaderClick, highlight },
   ref,
 ) {
   const editor = useRef<DataEditorRef>(null);
@@ -162,6 +167,31 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     [source, onVisibleRowsChange],
   );
 
+  // Search matches: painted behind the text of left-aligned text cells.
+  const matchFill = useMemo(() => {
+    void resolvedTheme;
+    return matchColor();
+  }, [resolvedTheme]);
+  const drawCell = useMemo<DrawCellCallback | undefined>(() => {
+    if (!highlight) return undefined;
+    return (args, drawContent) => {
+      const { cell, ctx, rect, theme: t } = args;
+      // Search covers text columns only, and never the null / "" markers.
+      if (
+        cell.kind === GridCellKind.Text &&
+        cell.copyData !== "" &&
+        source.columns[args.col]?.kind === "text"
+      ) {
+        paintMatches(ctx, cell.displayData, highlight, rect, {
+          font: `${t.baseFontStyle} ${t.fontFamily}`,
+          padding: t.cellHorizontalPadding,
+          color: matchFill,
+        });
+      }
+      drawContent();
+    };
+  }, [highlight, matchFill, source]);
+
   const getCellsForSelection = useCallback(
     (rect: Rectangle) => async () => {
       await source.load(rect.y, rect.y + rect.height);
@@ -244,6 +274,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         onColumnResize={(column, newSize) =>
           setWidths((w) => ({ ...w, [column.id ?? column.title]: newSize }))
         }
+        drawCell={drawCell}
         rowMarkers="number"
         rowMarkerWidth={Math.max(40, digits * 8 + 20)}
         rowHeight={height}
