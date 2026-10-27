@@ -26,6 +26,8 @@ export interface SqlEditorHandle {
   runnable(): { script: string; base: number };
   /** Replaces the whole text (undoable). */
   replace(text: string): void;
+  /** Types `text` at the cursor (over the selection). */
+  insert(text: string): void;
   focus(): void;
 }
 
@@ -200,6 +202,12 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
         const v = view.current;
         if (!v) return;
         v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
+      },
+      insert(text: string) {
+        const v = view.current;
+        if (!v) return;
+        v.dispatch(v.state.replaceSelection(text));
+        v.focus();
       },
       focus() {
         view.current?.focus();

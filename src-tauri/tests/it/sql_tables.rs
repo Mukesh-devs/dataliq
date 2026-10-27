@@ -142,3 +142,70 @@ fn a_newer_panel_query_cancels_the_running_one() {
         ));
     });
 }
+
+#[test]
+fn current_view_follows_a_filtered_sorted_view() {
+    use bigview_lib::engine::Param;
+    use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
+    let fx = fx();
+    let spec = ViewSpec {
+        filters: vec![Filter {
+            column: "amount".into(),
+            op: FilterOp::Gt {
+                value: Param::Int(500),
+            },
+            not: false,
+        }],
+        sort: vec![SortKey {
+            column: "amount".into(),
+            descending: true,
+        }],
+        ..ViewSpec::default()
+    };
+    let view = fx
+        .engine
+        .open_view(&fx.dataset.id, &spec, &RequestKey::default())
+        .unwrap();
+    let expected = fx
+        .people
+        .iter()
+        .filter(|p| p.amount.is_some_and(|a| a > 500.0))
+        .count() as i64;
+    fx.engine
+        .register_table(&view.dataset.id, "current_view")
+        .unwrap();
+    assert_eq!(
+        count(&fx.engine, "SELECT count(*) FROM current_view").unwrap(),
+        expected
+    );
+    // Once the view is written out it is still the same rows.
+    fx.engine.materialize_view(&view.dataset.id).unwrap();
+    fx.engine
+        .register_table(&view.dataset.id, "current_view")
+        .unwrap();
+    assert_eq!(
+        count(&fx.engine, "SELECT count(*) FROM current_view").unwrap(),
+        expected
+    );
+    let top = fx
+        .engine
+        .query(
+            "SELECT amount FROM current_view LIMIT 1",
+            &[],
+            1,
+            &RequestKey::default(),
+        )
+        .unwrap();
+    let max = fx
+        .people
+        .iter()
+        .filter_map(|p| p.amount)
+        .fold(f64::MIN, f64::max);
+    assert_eq!(
+        top.batches[0]
+            .column(0)
+            .as_primitive::<arrow::datatypes::Float64Type>()
+            .value(0),
+        max
+    );
+}

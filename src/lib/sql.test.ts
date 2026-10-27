@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { cleanTableName, errorOffset, errorText, splitStatements, uniqueNames } from "./sql";
+import {
+  cleanTableName,
+  errorOffset,
+  errorText,
+  splitStatements,
+  tableNameProblem,
+  uniqueNames,
+} from "./sql";
 
 describe("splitStatements", () => {
   it("splits at semicolons outside strings, identifiers and comments", () => {
@@ -59,6 +66,15 @@ describe("table names", () => {
     expect(cleanTableName("Ünïcode Café.parquet")).toBe("unicode_cafe");
     expect(cleanTableName("2024.csv")).toBe("t_2024");
     expect(cleanTableName("東京.csv")).toBe("data");
+  });
+
+  it("checks chosen names", () => {
+    expect(tableNameProblem("sales_2024", ["people"])).toBeNull();
+    expect(tableNameProblem("2024", [])).toMatch(/letters, digits/);
+    expect(tableNameProblem("my table", [])).toMatch(/letters, digits/);
+    expect(tableNameProblem("People", ["people"])).toMatch(/already/);
+    expect(tableNameProblem("Current_View", [])).toMatch(/active tab/);
+    expect(uniqueNames(["a", "a"], ["A"])).toEqual(["a_2", "a_3"]);
   });
 
   it("makes them unique in order", () => {

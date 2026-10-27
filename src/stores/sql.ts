@@ -9,6 +9,8 @@ import { formatSql } from "../lib/sqlFormat";
 export interface EditorHandle {
   runnable(): { script: string; base: number };
   replace(text: string): void;
+  /** Types `text` at the cursor (over the selection). */
+  insert(text: string): void;
   focus(): void;
 }
 
@@ -21,6 +23,10 @@ export const MIN_PANEL_HEIGHT = 160;
 export interface SqlTable {
   name: string;
   columns: string[];
+  /** The tab it comes from. */
+  tabId?: string;
+  /** `current_view`: the active tab's filtered, sorted rows. */
+  current?: boolean;
 }
 
 export interface SqlResult {

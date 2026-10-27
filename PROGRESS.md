@@ -424,3 +424,20 @@ tested, and anything left over.
 - Tested: Playwright for the toggles, the cell menu (copy with headers, filter by value, reload
   keeping the filter), the context-menu suppression and the theme pixel check (fails on the old
   code); Rust for releasing memory (limit restored, skipped while busy); Vitest for value filters.
+
+### Step 2 — Tables for every file ✅
+
+- Each tab with full data is a table named from its file; a chosen name wins and file names
+  move out of its way (`people`, `people_2`, …, compared ignoring case as SQL does).
+- `current_view` is the active tab's rows on screen: its view dataset (filters, search, sort)
+  or the whole file; re-pointed when the view or the active tab changes, dropped with no tab.
+- The SQL panel lists the tables as chips above the editor: a click types the name at the
+  cursor, the pencil renames a file's table (letters, digits, `_`; unique; not `current_view`;
+  Reset goes back to the file's name). The old name is dropped, the new one registered.
+- Tested: Rust — `current_view` over a filtered + sorted view before and after it is written out
+  (same rows, sorted top row); Vitest — chosen names and collisions, name checks, `current_view`
+  following the view and the active tab, renames re-registering; Playwright — rename with
+  invalid names rejected, `current_view` re-pointed after a sort, chips typing names.
+- Smoke (real app, people.csv): palette "sort by amount desc", then `SELECT name, amount FROM
+  current_view LIMIT 3` → 998.5, 998.18, 996.77 (the grid's top rows), 15 ms.
+- Left over: names are kept for the session (workspaces in v0.6 will save them).

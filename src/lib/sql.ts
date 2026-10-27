@@ -116,13 +116,32 @@ export function cleanTableName(fileName: string): string {
   return /^[0-9]/.test(base) ? `t_${base}` : base;
 }
 
-/** Makes names unique in order: the second "sales" becomes "sales_2". */
-export function uniqueNames(names: string[]): string[] {
-  const used = new Set<string>();
+/** The table that always holds the active tab's view (filters, search, sort). */
+export const CURRENT_VIEW = "current_view";
+
+/**
+ * Why `name` can't be a table name, or null if it can: letters, digits and
+ * underscores, not starting with a digit, not taken by another table.
+ */
+export function tableNameProblem(name: string, taken: string[]): string | null {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+    return "Use letters, digits and underscores, not starting with a digit.";
+  const lower = name.toLowerCase();
+  if (lower === CURRENT_VIEW) return `"${CURRENT_VIEW}" is the active tab's view.`;
+  if (taken.some((t) => t.toLowerCase() === lower)) return `Another file is already "${name}".`;
+  return null;
+}
+
+/**
+ * Makes names unique in order, also against `taken` (compared ignoring
+ * case, as SQL does): the second "sales" becomes "sales_2".
+ */
+export function uniqueNames(names: string[], taken: string[] = []): string[] {
+  const used = new Set(taken.map((t) => t.toLowerCase()));
   return names.map((name) => {
     let candidate = name;
-    for (let n = 2; used.has(candidate); n++) candidate = `${name}_${n}`;
-    used.add(candidate);
+    for (let n = 2; used.has(candidate.toLowerCase()); n++) candidate = `${name}_${n}`;
+    used.add(candidate.toLowerCase());
     return candidate;
   });
 }

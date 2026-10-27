@@ -1,9 +1,12 @@
-import { CircleAlert, LoaderCircle, Play, Square, WandSparkles, X } from "lucide-react";
-import { useMemo } from "react";
+import { CircleAlert, LoaderCircle, Pencil, Play, Square, WandSparkles, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { formatCount, formatDuration } from "../../lib/format";
 import { modKey } from "../../lib/platform";
 import { useNotice } from "../../stores/notice";
-import { MAX_RESULT_ROWS, MIN_PANEL_HEIGHT, useSql } from "../../stores/sql";
+import { cleanTableName } from "../../lib/sql";
+import { MAX_RESULT_ROWS, MIN_PANEL_HEIGHT, useSql, type SqlTable } from "../../stores/sql";
+import { useTabs } from "../../stores/tabs";
+import { RenameTable } from "./RenameTable";
 import { DataGrid } from "../grid/DataGrid";
 import { StaticRowSource } from "../grid/rowSource";
 import { Button, IconButton } from "../ui/Button";
@@ -60,7 +63,7 @@ export function SqlPanel() {
             result.count > 1 ? ` · ${result.count} statements` : ""
           }`
         : tables.length > 0
-          ? `Tables: ${tables.map((t) => t.name).join(", ")}`
+          ? "Ready"
           : "Open a file to query it as a table";
 
   return (
@@ -104,15 +107,23 @@ export function SqlPanel() {
         </IconButton>
       </div>
       <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 w-[45%] min-w-64 border-r border-border">
-          <SqlEditor
-            ref={setEditor}
-            value={text}
-            onChange={setText}
-            tables={tables}
-            onRun={runEditor}
-            error={error}
-          />
+        <div className="flex min-h-0 w-[45%] min-w-64 flex-col border-r border-border">
+          {tables.length > 0 && (
+            <TableStrip
+              tables={tables}
+              onInsert={(name) => useSql.getState().editor?.insert(name)}
+            />
+          )}
+          <div className="min-h-0 flex-1">
+            <SqlEditor
+              ref={setEditor}
+              value={text}
+              onChange={setText}
+              tables={tables}
+              onRun={runEditor}
+              error={error}
+            />
+          </div>
         </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {error ? (
@@ -133,5 +144,74 @@ export function SqlPanel() {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * The tables to query: a click types the name into the editor; the pencil
+ * renames a file's table. `current_view` is the active tab's view.
+ */
+function TableStrip({
+  tables,
+  onInsert,
+}: {
+  tables: SqlTable[];
+  onInsert: (name: string) => void;
+}) {
+  const tabs = useTabs((s) => s.tabs);
+  const setSqlName = useTabs((s) => s.setSqlName);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  return (
+    <div
+      role="list"
+      aria-label="Tables"
+      className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1"
+    >
+      {tables.map((t) => {
+        const tab = tabs.find((x) => x.id === t.tabId);
+        const chip = (
+          <span
+            role="listitem"
+            className="group inline-flex h-6 items-center rounded-[var(--radius-sm)] border border-border bg-surface text-[12px]"
+          >
+            <button
+              type="button"
+              title={
+                t.current
+                  ? "The active tab's rows: its filters, search and sort"
+                  : `${tab?.title ?? t.name} — click to insert`
+              }
+              onClick={() => onInsert(t.name)}
+              className={`px-1.5 font-mono ${t.current ? "text-accent" : "text-fg"} hover:underline`}
+            >
+              {t.name}
+            </button>
+            {!t.current && tab && (
+              <button
+                type="button"
+                aria-label={`Rename table ${t.name}`}
+                onClick={() => setRenaming(t.name)}
+                className="mr-0.5 flex size-5 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-60 hover:bg-hover hover:text-fg group-hover:opacity-100"
+              >
+                <Pencil className="size-3" aria-hidden />
+              </button>
+            )}
+          </span>
+        );
+        if (renaming !== t.name || !tab) return <span key={t.name}>{chip}</span>;
+        return (
+          <RenameTable
+            key={t.name}
+            current={t.name}
+            fromFile={cleanTableName(tab.title)}
+            taken={tables.filter((o) => o.name !== t.name && !o.current).map((o) => o.name)}
+            onRename={(name) => setSqlName(tab.id, name)}
+            onOpenChange={(open) => !open && setRenaming(null)}
+          >
+            {chip}
+          </RenameTable>
+        );
+      })}
+    </div>
   );
 }

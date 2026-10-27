@@ -119,7 +119,7 @@ export function App() {
   const runEditor = useSql((s) => s.runEditor);
   const formatEditor = useSql((s) => s.formatEditor);
   const notice = useNotice((s) => s.show);
-  useSqlTables(tabs);
+  useSqlTables(tabs, activeId);
   // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
   const [palette, setPalette] = useState<{ query: string } | null>(null);
   const engineVersion = useEngine((s) => s.version);

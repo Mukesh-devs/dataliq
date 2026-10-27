@@ -29,6 +29,7 @@ async function open(page: Page) {
     dialogPaths: ["/data/comma.csv"],
     datasets: { "/data/comma.csv": 1000 },
     fetchRows: buildPage,
+    views: () => 500,
     sql: (sql) => {
       if (sql.includes("nope")) {
         return {
@@ -57,10 +58,15 @@ test("query open files as tables with autocomplete, run with Ctrl+Enter", async 
   await open(page);
   await page.keyboard.press("Control+j");
   await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toContainText("Tables: comma");
+  await expect(panel(page).getByRole("list", { name: "Tables" })).toHaveText(
+    /comma\s*current_view/,
+  );
   await expect
     .poll(() => invokes(page, "register_table"))
-    .toEqual([{ datasetId: "ds-1", name: "comma" }]);
+    .toEqual([
+      { datasetId: "ds-1", name: "comma" },
+      { datasetId: "ds-1", name: "current_view" },
+    ]);
 
   await expect(editor(page)).toBeFocused();
   await page.keyboard.type("SELECT DISTINCT n FROM co");
@@ -122,4 +128,37 @@ test("run just the selection, from the command palette", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(panel(page)).toContainText(/1 row in/);
   expect((await invokes(page, "run_query")).at(-1)?.sql).toBe("SELECT 42");
+});
+
+test("rename a file's table; current_view follows the active view", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+j");
+  const tables = panel(page).getByRole("list", { name: "Tables" });
+  await tables.getByRole("button", { name: "Rename table comma" }).click();
+  const input = page.getByLabel("Table name");
+  await input.fill("2024");
+  await expect(page.getByRole("alert")).toContainText("letters, digits");
+  await input.fill("current_view");
+  await expect(page.getByRole("alert")).toContainText("active tab");
+  await input.fill("sales");
+  await input.press("Enter");
+  await expect(tables).toHaveText(/sales\s*current_view/);
+  expect(await invokes(page, "unregister_table")).toContainEqual({ name: "comma" });
+  expect(await invokes(page, "register_table")).toContainEqual({
+    datasetId: "ds-1",
+    name: "sales",
+  });
+
+  // Sort the grid: current_view now reads the view's rows.
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox").fill("sort by id desc");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(async () => (await invokes(page, "register_table")).at(-1))
+    .toEqual({ datasetId: "view-1", name: "current_view" });
+
+  // A click on a table types its name.
+  await editor(page).click();
+  await tables.getByRole("button", { name: "current_view" }).click();
+  await expect(editor(page)).toHaveText("current_view");
 });

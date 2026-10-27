@@ -75,6 +75,8 @@ export interface Tab {
   viewState?: ViewState;
   /** Column order, hidden and pinned columns, names and widths. */
   layout?: ColumnLayout;
+  /** Table name chosen for the SQL panel (else one made from the file name). */
+  sqlName?: string;
 }
 
 interface TabsState {
@@ -111,6 +113,8 @@ interface TabsState {
   /** Applies a `view-ready` event (subscribed once by the App). */
   applyViewReady: (ready: ViewReady) => void;
   setLayout: (id: string, layout: ColumnLayout) => void;
+  /** Renames the tab's SQL table; undefined goes back to the file's name. */
+  setSqlName: (id: string, name: string | undefined) => void;
 }
 
 let nextId = 1;
@@ -353,6 +357,7 @@ export const useTabs = create<TabsState>()((set, get) => {
         ),
       })),
     setLayout: (id, layout) => patch(id, { layout }),
+    setSqlName: (id, sqlName) => patch(id, { sqlName }),
     setView: async (id, view) => {
       if (!find(id)) return;
       patch(id, { view: isIdentity(view) ? undefined : view });
