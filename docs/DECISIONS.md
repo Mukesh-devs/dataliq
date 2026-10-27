@@ -244,3 +244,27 @@ file states explicitly, and BigView shows NULL and empty text differently.
 We read CSV/TSV with `allow_quoted_nulls = false`: an unquoted empty field is
 NULL and `""` is an empty string. The cache format version was bumped so
 files imported before the change are imported again.
+
+## D29 — Sorted views: first and last rows first, full sort in the background
+
+A sort has to read every row, and writing 50M sorted rows takes 20–40 s on
+a 4-core machine — over the 10 s budget. What the user needs first is the
+top of the sort (and often the bottom), which DuckDB answers with a single
+scan using a top-N heap (about 1 s). So a sorted view writes its first
+10,000 rows at once and opens; a background job then writes the last 10,000
+(from the exact reverse order: every key flipped, NULLs first, tiebreak
+descending) and finally the full sort into the session's scratch database,
+and the dataset switches to that table. Pages in the head or tail are served
+immediately; pages in the middle wait for the full table. A `view-ready`
+event tells the UI when it is done ("first rows in …, sorting the rest…" →
+"sorted in …").
+
+Filter-only views are counted immediately (and read through their query)
+and written out in the background too, so deep pages get fast without
+delaying the count. Views live in a scratch database on disk (compressed,
+not counted against the memory limit) that is deleted on exit; leftovers
+from a crash are removed at the next start. Ties keep file order for
+imported tables (rowid tiebreak).
+
+Sorting only the row ids (15.6 s) and joining back for each page was
+rejected: pages took over a second each.

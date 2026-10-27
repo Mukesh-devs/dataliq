@@ -254,3 +254,23 @@ tested, and anything left over.
   type "par", Enter → "167 of 1,000 rows · filtered in 2 ms" (167 matches the CSV); a second
   boolean filter from the header with Enter.
 - Left over: deep pages of a filtered view use LIMIT/OFFSET until step 3 materializes views.
+
+### Step 3 — Multi-column sort with materialized view paging ✅
+
+- Sort from the header: click sorts by a column (ascending → descending → off), Shift+click adds
+  it as the next key; arrows (numbered for several keys) in the headers. The header menu (▼ or
+  right-click) has sort ascending/descending, add to / remove from sort, and Filter…. Sort chips
+  in the toolbar reverse or remove a key. Clearing the view cancels a sort still running.
+- Views are written to a session-only scratch database (D29): a sorted view writes its first
+  10,000 rows at once (~1 s on 50M rows), then its last 10,000 and the full sort in the
+  background, switching over transparently; filter-only views are counted at once and written
+  out in the background. Stable paging (rowid ranges on the written table; ties in file order).
+  Closing a view drops its tables; a newer view in the tab cancels an older one.
+- Merged v0.1.0 + steps 1–2 into `main` (mukesh-dsnl/dataliq#1, merge commit).
+- Tested: integration tests for exact order (NULLs last, stable ties) on people.csv, multi-key
+  sorts with filters, head/tail/middle paging on 30,000 rows (middle waits for the full sort),
+  background materialization, cleanup and cancellation, Parquet in place; unit tests for the
+  reversed order; Vitest for sort toggling, the column menu, sort chips and the store (view-ready,
+  cancelling); Playwright for header click / Shift+click / chips / column menu. Perf: see
+  docs/BENCHMARKS.md (filter budget met; full 50M sort 20–37 s in the background, first rows ~1 s).
+- Left over: none for this step.

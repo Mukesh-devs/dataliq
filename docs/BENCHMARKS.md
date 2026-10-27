@@ -136,3 +136,30 @@ is woken when the import ends).
 
 Windows and macOS numbers (all budgets) are not measured yet: CI only builds
 and tests there. They are part of the v1.0 performance pass.
+
+## v0.2 — views on 50M cached rows (linux-dev)
+
+`cargo test -p bigview --test it perf_views_50m -- --ignored --nocapture` on
+`sales_50m.parquet` imported into a cache database (9 columns: ids, dates,
+timestamps, text, decimals, booleans). "First rows" is `open_view` plus the
+first 500-row page, i.e. what the user waits for.
+
+| View | Matching rows | First rows | Written in background | Page afterwards |
+| --- | --- | --- | --- | --- |
+| Sort by `customer` (text) desc | 50,000,000 | 1.19 s | 37.0 s | 18 ms |
+| Sort by `order_date`, `unit_price` desc | 50,000,000 | 0.81 s | 20.3 s | 16 ms |
+| Filter `quantity > 5` (broad) | 37,502,068 | 0.06 s (deep page before the write: 0.98 s) | 14.1 s | 12 ms |
+| Filter `customer` contains "ab" (text) | 0 | 0.79 s | 0.7 s | 3 ms |
+| Filter `quantity = 1` + sort `unit_price` | 2,500,387 | 0.38 s | 1.6 s | 4 ms |
+
+Budgets: **simple filter on 50M rows < 2 s — met** (0.06–0.8 s to the first
+rows and the count). **Sort 50M rows < 10 s — first and last rows met (about
+1 s), full sort missed** on this 4-vCPU machine (20–37 s; the reference
+laptop has twice the cores). The full sort runs in the background while the
+first and last 10,000 sorted rows are already on screen; only pages in the
+middle wait for it (D29).
+
+Strategies measured before choosing (`perf_sort_strategies`): a sort of only
+the row ids is faster (15.6 s) but fetching a page by id list then takes
+1.1 s; writing full sorted rows to an in-memory table instead of the on-disk
+scratch database saves little (26–55 s) and holds memory.
