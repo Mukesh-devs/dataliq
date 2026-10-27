@@ -85,6 +85,9 @@ struct Plan {
     compared: Vec<String>,
     /// Compared columns whose types differ (compared as text).
     as_text: HashSet<String>,
+    /// No key repeats on either side: rows join on the keys alone, without
+    /// numbering each key's occurrences (a sort of each side).
+    unique: bool,
 }
 
 impl Plan {
@@ -119,6 +122,7 @@ impl Plan {
             keys: keys.to_vec(),
             compared,
             as_text,
+            unique: false,
         })
     }
 
@@ -145,11 +149,15 @@ impl Plan {
     fn sides(&self, left: &Side, right: &Side) -> String {
         let keys = self.key_list();
         let side = |s: &Side| {
-            format!(
-                "SELECT *, row_number() OVER (PARTITION BY {keys} ORDER BY {POS}) AS {DUP} \
-                 FROM (SELECT *, {} AS {POS} FROM {})",
-                s.order, s.sql
-            )
+            if self.unique {
+                format!("SELECT *, {} AS {POS} FROM {}", s.order, s.sql)
+            } else {
+                format!(
+                    "SELECT *, row_number() OVER (PARTITION BY {keys} ORDER BY {POS}) AS {DUP} \
+                     FROM (SELECT *, {} AS {POS} FROM {})",
+                    s.order, s.sql
+                )
+            }
         };
         format!("WITH l AS ({}),\nr AS ({})", side(left), side(right))
     }
@@ -163,7 +171,7 @@ impl Plan {
                 let q = quote_ident(k);
                 format!("l.{q} IS NOT DISTINCT FROM r.{q}")
             })
-            .chain(std::iter::once(format!("l.{DUP} = r.{DUP}")))
+            .chain((!self.unique).then(|| format!("l.{DUP} = r.{DUP}")))
             .collect::<Vec<_>>()
             .join(" AND ");
         format!("FROM l FULL OUTER JOIN r ON {on}")
@@ -311,6 +319,39 @@ impl Side {
 }
 
 impl Engine {
+    /// Rows of `side` beyond the first with each key (0: every key is unique).
+    fn repeated_keys(&self, side: &Side, keys: &str, key: &RequestKey) -> Result<u64> {
+        self.count(
+            &format!(
+                "SELECT CAST(count(*) - count(DISTINCT hash({keys})) AS BIGINT) FROM {}",
+                side.sql
+            ),
+            &[],
+            key,
+        )
+    }
+
+    /// The plan for `left` against `right`, knowing whether keys repeat;
+    /// also each side's rows whose key repeats.
+    fn plan(
+        &self,
+        spec: &CompareSpec,
+        (lcols, rcols): (&[ColumnMeta], &[ColumnMeta]),
+        (ls, rs): (&Side, &Side),
+        key: &RequestKey,
+    ) -> Result<(Plan, u64, u64)> {
+        let mut plan = Plan::new(&spec.keys, lcols, rcols)?;
+        let keys = plan.key_list();
+        let mut dups = [0, 0];
+        for (i, side) in [ls, rs].into_iter().enumerate() {
+            if self.repeated_keys(side, &keys, key)? > 0 {
+                dups[i] = self.duplicate_rows(side, &keys, key)?;
+            }
+        }
+        plan.unique = dups == [0, 0];
+        Ok((plan, dups[0], dups[1]))
+    }
+
     /// Rows whose key appears more than once in `side`.
     fn duplicate_rows(&self, side: &Side, keys: &str, key: &RequestKey) -> Result<u64> {
         self.count(
@@ -336,8 +377,9 @@ impl Engine {
         let started = std::time::Instant::now();
         let (lds, rds) = (self.datasets.get(left)?, self.datasets.get(right)?);
         let (lcols, rcols) = (self.dataset_columns(left)?, self.dataset_columns(right)?);
-        let plan = Plan::new(&spec.keys, &lcols, &rcols)?;
         let (ls, rs) = (Side::of(&lds), Side::of(&rds));
+        let (plan, duplicate_left, duplicate_right) =
+            self.plan(spec, (&lcols, &rcols), (&ls, &rs), key)?;
 
         let counts = self.query(&plan.counts(&ls, &rs), &[], 1, key)?;
         let batch = counts
@@ -362,7 +404,6 @@ impl Engine {
             .filter(|c| c.rows > 0)
             .collect();
         let changed_cols: Vec<String> = changes.iter().map(|c| c.name.clone()).collect();
-        let keys = plan.key_list();
         let sql = format!("({})", plan.rows(&ls, &rs, &changed_cols));
         let columns = self.describe(&format!("SELECT * FROM {sql}"))?;
         let (added, removed, changed, same) = (at(0), at(1), at(2), at(3));
@@ -375,8 +416,6 @@ impl Engine {
             row_count: added + removed + changed,
             cached: lds.cached && rds.cached,
         };
-        let duplicate_left = self.duplicate_rows(&ls, &keys, key)?;
-        let duplicate_right = self.duplicate_rows(&rs, &keys, key)?;
         self.datasets.insert(dataset.clone());
         let names = |cols: &[ColumnMeta], other: &[ColumnMeta]| {
             cols.iter()
@@ -425,11 +464,11 @@ impl Engine {
         right_reader: &str,
     ) -> Result<String> {
         let (lcols, rcols) = (self.dataset_columns(left)?, self.dataset_columns(right)?);
-        let plan = Plan::new(&spec.keys, &lcols, &rcols)?;
         let (ls, rs) = (
             Side::of(&self.datasets.get(left)?),
             Side::of(&self.datasets.get(right)?),
         );
+        let (plan, _, _) = self.plan(spec, (&lcols, &rcols), (&ls, &rs), &RequestKey::default())?;
         let counts = self.query(&plan.counts(&ls, &rs), &[], 1, &RequestKey::default())?;
         let batch = counts
             .batches

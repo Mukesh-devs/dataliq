@@ -523,3 +523,9 @@ exact quartiles and six regexes per text column; the outlier bounds now
 come from a repeatable sample of 100,000 rows (all rows when fewer), and
 only text columns that are at least 40% numbers or dates in that sample are
 tested for them in full, so every count is still over all rows: 6.2 s.
+
+Unique keys (the usual case) are found with one `count(DISTINCT hash(keys))`
+per side; then rows join on the keys alone, without numbering each key's
+occurrences, which sorts both sides. On 50M rows against 50M (5M
+differences) the numbering ran out of the container's disk while
+spilling; without it the comparison takes 14 s (D41).
