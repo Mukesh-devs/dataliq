@@ -441,3 +441,19 @@ tested, and anything left over.
 - Smoke (real app, people.csv): palette "sort by amount desc", then `SELECT name, amount FROM
   current_view LIMIT 3` → 998.5, 998.18, 996.77 (the grid's top rows), 15 ms.
 - Left over: names are kept for the session (workspaces in v0.6 will save them).
+
+### Step 3 — Results ✅
+
+- `sql_result`: the panel's last statement, when it is a query, is written once on the session
+  into the scratch database and becomes a pageable dataset (D35); the grid pages all its rows
+  (no more 10,000 cap for queries) and the status shows the full row count.
+- "Open in tab": the result becomes a tab ("Result 1", "SQL result") with everything a file tab
+  has — filters, sort, search, column profiles, copy as …, copy view as SQL over the query — and
+  is a SQL table (`result_1`) for further queries. The panel's next run keeps it.
+- Error positions of wrapped queries point at the user's text (line moved back, caret kept).
+- Tested: Rust — SQL over CSV (people), Excel (orders sheet), JSON (accounts) and Parquet
+  (in place), a CSV × Parquet join (count and sum checked against the parsed file), results
+  paging in the query's order (ties broken by id), closing dropping the rows, session temp tables
+  visible to results, error lines; Vitest — query detection, store runs (dataset for the final
+  query, earlier statements fetch one row, previous result closed unless owned); Playwright —
+  open in tab, status, result as a table, next run keeping the tab's rows, sorting the result.

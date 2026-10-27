@@ -2,7 +2,8 @@ import type { Table } from "apache-arrow";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { cancelQuery, runQuery } from "../lib/ipc";
-import { errorOffset, errorText, splitStatements } from "../lib/sql";
+import { closeDataset, fetchRows, type DatasetInfo } from "../lib/files";
+import { errorOffset, errorText, returnsRows, splitStatements, sqlResult } from "../lib/sql";
 import { formatSql } from "../lib/sqlFormat";
 
 /** What the store needs from the mounted editor. */
@@ -14,8 +15,11 @@ export interface EditorHandle {
   focus(): void;
 }
 
-/** Rows of a result shown in the panel (more are counted, not shown). */
+/** Rows shown of a statement that isn't a query (EXPLAIN, PRAGMA …). */
 export const MAX_RESULT_ROWS = 10_000;
+
+/** A query result's first page, fetched with it. */
+const RESULT_PAGE = 500;
 
 export const MIN_PANEL_HEIGHT = 160;
 
@@ -30,13 +34,21 @@ export interface SqlTable {
 }
 
 export interface SqlResult {
+  /**
+   * The rows: a query's first page (all of them are in `dataset`), or the
+   * rows of another statement as they came (EXPLAIN, PRAGMA …).
+   */
   table: Table;
+  /** A query's rows as a pageable dataset. */
+  dataset?: DatasetInfo;
+  /** Opened in a tab, which now owns (and will close) the dataset. */
+  owned?: boolean;
   /** The statement whose rows these are (the last one run). */
   statement: string;
   /** Statements run. */
   count: number;
   elapsedMs: number;
-  /** More than MAX_RESULT_ROWS rows; only those are shown. */
+  /** Rows without a dataset: more than MAX_RESULT_ROWS; only those are shown. */
   truncated: boolean;
 }
 
@@ -66,6 +78,8 @@ interface SqlState {
    */
   run: (script: string, base?: number) => Promise<void>;
   cancel: () => void;
+  /** The result was opened in a tab: don't close its dataset on the next run. */
+  markOwned: () => void;
   /** The mounted editor (none while the panel is closed). */
   editor: EditorHandle | null;
   setEditor: (editor: EditorHandle | null) => void;
@@ -111,14 +125,27 @@ export const useSql = create<SqlState>()(
         set({ running: requestId, error: undefined });
         const started = performance.now();
         let table: Table | undefined;
-        for (const st of statements) {
+        let dataset: DatasetInfo | undefined;
+        for (const [i, st] of statements.entries()) {
+          const last = i === statements.length - 1;
           try {
-            table = await runQuery(st.text, {
-              maxRows: MAX_RESULT_ROWS + 1,
-              requestId,
-              group: "sql",
-              session: true,
-            });
+            if (last && returnsRows(st.text)) {
+              // A query: keep all its rows, show the first page now.
+              dataset = await sqlResult(st.text, requestId);
+              if (!isCurrent()) {
+                void closeDataset(dataset.id).catch(() => {});
+                return;
+              }
+              table = await fetchRows(dataset.id, 0, RESULT_PAGE);
+            } else {
+              table = await runQuery(st.text, {
+                // Only the last statement's rows are shown.
+                maxRows: last ? MAX_RESULT_ROWS + 1 : 1,
+                requestId,
+                group: "sql",
+                session: true,
+              });
+            }
           } catch (e) {
             if (!isCurrent()) return;
             const kind = (e as { kind?: string }).kind;
@@ -139,17 +166,26 @@ export const useSql = create<SqlState>()(
           if (!isCurrent()) return;
         }
         const last = statements[statements.length - 1]!;
-        const truncated = table!.numRows > MAX_RESULT_ROWS;
+        const truncated = !dataset && table!.numRows > MAX_RESULT_ROWS;
+        const previous = get().result;
+        if (previous?.dataset && !previous.owned) {
+          void closeDataset(previous.dataset.id).catch(() => {});
+        }
         set({
           running: null,
           result: {
             table: truncated ? table!.slice(0, MAX_RESULT_ROWS) : table!,
+            dataset,
             statement: last.text,
             count: statements.length,
             elapsedMs: Math.round(performance.now() - started),
             truncated,
           },
         });
+      },
+      markOwned: () => {
+        const r = get().result;
+        if (r) set({ result: { ...r, owned: true } });
       },
       cancel: () => {
         const id = get().running;

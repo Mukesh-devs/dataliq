@@ -8,13 +8,21 @@ interface Call {
   args: Record<string, unknown>;
 }
 
+let nextDataset = 1;
+
+/** `answer` gives a statement's rows (or throws); queries become datasets. */
 function backend(answer: (sql: string) => unknown) {
   const calls: Call[] = [];
-  mockIPC((cmd, a) => {
+  mockIPC(async (cmd, a) => {
     const args = a as Record<string, unknown>;
     calls.push({ cmd, args });
     if (cmd === "run_query") return answer(String(args.sql));
-    if (cmd === "cancel_query") return true;
+    if (cmd === "sql_result") {
+      await answer(String(args.sql));
+      return { id: `sql-${nextDataset++}`, rowCount: 1234 };
+    }
+    if (cmd === "fetch_rows") return ipcBytes({ n: [1, 2, 3] });
+    if (cmd === "cancel_query" || cmd === "close_dataset") return true;
     throw new Error(`unexpected ${cmd}`);
   });
   return calls;
@@ -26,19 +34,42 @@ describe("sql store", () => {
   );
   afterEach(() => clearMocks());
 
-  it("runs each statement in order and shows the last one's rows", async () => {
+  it("runs each statement in order; a final query becomes a dataset", async () => {
     const calls = backend((sql) => ipcBytes({ n: [sql.length] }));
     await useSql.getState().run("CREATE TABLE t AS SELECT 1; SELECT * FROM t");
-    expect(calls.map((c) => c.args.sql)).toEqual(["CREATE TABLE t AS SELECT 1", "SELECT * FROM t"]);
+    expect(calls.map((c) => [c.cmd, c.args.sql ?? c.args.datasetId])).toEqual([
+      ["run_query", "CREATE TABLE t AS SELECT 1"],
+      ["sql_result", "SELECT * FROM t"],
+      ["fetch_rows", expect.stringMatching(/^sql-/)],
+    ]);
+    // Earlier statements' rows aren't shown, so only one is fetched.
+    expect((calls[0]!.args.options as { maxRows: number }).maxRows).toBe(1);
     const { result, running } = useSql.getState();
     expect(running).toBeNull();
-    expect(result).toMatchObject({ statement: "SELECT * FROM t", count: 2, truncated: false });
-    expect(result?.table.numRows).toBe(1);
+    expect(result).toMatchObject({
+      statement: "SELECT * FROM t",
+      count: 2,
+      truncated: false,
+      dataset: { rowCount: 1234 },
+    });
+    expect(result?.table.numRows).toBe(3);
   });
 
-  it("shows at most MAX_RESULT_ROWS rows and says there are more", async () => {
+  it("closes the previous result's dataset unless it was opened in a tab", async () => {
+    const calls = backend(() => ipcBytes({ n: [1] }));
+    await useSql.getState().run("SELECT 1");
+    const first = useSql.getState().result!.dataset!.id;
+    await useSql.getState().run("SELECT 2");
+    expect(calls).toContainEqual({ cmd: "close_dataset", args: { datasetId: first } });
+    const second = useSql.getState().result!.dataset!.id;
+    useSql.getState().markOwned();
+    await useSql.getState().run("SELECT 3");
+    expect(calls).not.toContainEqual({ cmd: "close_dataset", args: { datasetId: second } });
+  });
+
+  it("shows other statements' rows, at most MAX_RESULT_ROWS", async () => {
     backend(() => ipcBytes({ n: Array.from({ length: MAX_RESULT_ROWS + 1 }, (_, i) => i) }));
-    await useSql.getState().run("SELECT * FROM range(20000)");
+    await useSql.getState().run("PRAGMA show_tables");
     const result = useSql.getState().result!;
     expect(result.truncated).toBe(true);
     expect(result.table.numRows).toBe(MAX_RESULT_ROWS);
@@ -68,7 +99,7 @@ describe("sql store", () => {
     const calls = backend(() => new Promise((r) => (answer = r)));
     const done = useSql.getState().run("SELECT 1");
     await Promise.resolve();
-    const requestId = (calls[0]?.args.options as { requestId: string }).requestId;
+    const requestId = calls[0]?.args.requestId;
     useSql.getState().cancel();
     expect(calls.at(-1)).toEqual({ cmd: "cancel_query", args: { requestId } });
     answer(ipcBytes({ n: [1] }));

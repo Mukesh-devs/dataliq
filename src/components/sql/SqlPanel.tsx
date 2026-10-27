@@ -1,5 +1,16 @@
-import { CircleAlert, LoaderCircle, Pencil, Play, Square, WandSparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  CircleAlert,
+  LoaderCircle,
+  Pencil,
+  Play,
+  Square,
+  SquareArrowOutUpRight,
+  WandSparkles,
+  X,
+} from "lucide-react";
+import { describeColumns } from "../../lib/arrow";
+import { fetchRows } from "../../lib/files";
+import { useEffect, useMemo, useState } from "react";
 import { formatCount, formatDuration } from "../../lib/format";
 import { modKey } from "../../lib/platform";
 import { useNotice } from "../../stores/notice";
@@ -8,7 +19,7 @@ import { MAX_RESULT_ROWS, MIN_PANEL_HEIGHT, useSql, type SqlTable } from "../../
 import { useTabs } from "../../stores/tabs";
 import { RenameTable } from "./RenameTable";
 import { DataGrid } from "../grid/DataGrid";
-import { StaticRowSource } from "../grid/rowSource";
+import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { Button, IconButton } from "../ui/Button";
 import { SqlEditor } from "./SqlEditor";
 
@@ -30,7 +41,30 @@ export function SqlPanel() {
     formatEditor,
   } = useSql();
   const notice = useNotice((s) => s.show);
-  const source = useMemo(() => (result ? new StaticRowSource(result.table) : null), [result]);
+  // A query's rows page from its dataset; other statements' rows are all here.
+  const dataset = result?.dataset;
+  const table = result?.table;
+  const source = useMemo<RowSource | null>(() => {
+    if (!table) return null;
+    if (!dataset) return new StaticRowSource(table);
+    const first = table;
+    return new PagedRowSource({
+      rowCount: dataset.rowCount,
+      columns: describeColumns(first),
+      fetchPage: (start, count) =>
+        start === 0 && count <= first.numRows
+          ? Promise.resolve(first.slice(0, count))
+          : fetchRows(dataset.id, start, count),
+    });
+  }, [table, dataset]);
+  useEffect(() => () => source?.dispose(), [source]);
+  const openResult = useTabs((s) => s.openResult);
+  const markOwned = useSql((s) => s.markOwned);
+  const openInTab = () => {
+    if (!result?.dataset || result.owned) return;
+    openResult({ dataset: result.dataset, preview: result.table, sql: result.statement });
+    markOwned();
+  };
 
   const formatNow = () => {
     const problem = formatEditor();
@@ -52,13 +86,14 @@ export function SqlPanel() {
     window.addEventListener("pointerup", up);
   };
 
+  const rowCount = result?.dataset?.rowCount ?? result?.table.numRows ?? 0;
   const status = running
     ? "Running…"
     : error
       ? "The query failed"
       : result
-        ? `${result.truncated ? `First ${formatCount(MAX_RESULT_ROWS)}` : formatCount(result.table.numRows)} row${
-            result.table.numRows === 1 ? "" : "s"
+        ? `${result.truncated ? `First ${formatCount(MAX_RESULT_ROWS)}` : formatCount(rowCount)} row${
+            rowCount === 1 ? "" : "s"
           } in ${formatDuration(result.elapsedMs)}${
             result.count > 1 ? ` · ${result.count} statements` : ""
           }`
@@ -93,6 +128,18 @@ export function SqlPanel() {
         {running && (
           <Button size="sm" variant="ghost" onClick={cancel}>
             <Square className="size-3" aria-hidden /> Cancel
+          </Button>
+        )}
+        {result?.dataset && !running && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={openInTab}
+            disabled={result.owned}
+            title="Open the result in a tab to filter, sort, profile and copy it"
+          >
+            <SquareArrowOutUpRight className="size-3" aria-hidden />{" "}
+            {result.owned ? "Opened in a tab" : "Open in tab"}
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={formatNow} title="Format SQL">

@@ -80,10 +80,9 @@ test("query open files as tables with autocomplete, run with Ctrl+Enter", async 
   await expect(editor(page)).toHaveText("SELECT DISTINCT n FROM comma");
   await page.keyboard.press("Control+Enter");
   await expect(panel(page)).toContainText(/2 rows in/);
-  const runs = await invokes(page, "run_query");
-  expect(runs.at(-1)).toMatchObject({
+  expect((await invokes(page, "sql_result")).at(-1)).toMatchObject({
     sql: "SELECT DISTINCT n FROM comma",
-    options: { maxRows: 10_001, group: "sql", session: true },
+    requestId: expect.stringMatching(/^sql-/) as unknown,
   });
 
   // Format SQL, from the panel's button.
@@ -109,11 +108,9 @@ test("errors are shown in words and marked in the editor", async ({ page }) => {
   await expect(panel(page).getByRole("status")).toHaveText("The query failed");
   // Marked at "nope" on the second line (the second statement).
   await expect(page.locator(".cm-lintRange-error")).toHaveText("nope");
-  // Both statements ran, in order.
-  expect((await invokes(page, "run_query")).slice(-2).map((r) => r.sql)).toEqual([
-    "SELECT 1",
-    "SELECT nope FROM comma",
-  ]);
+  // Both statements ran, in order: the first for its effect, the last as a result.
+  expect((await invokes(page, "run_query")).at(-1)?.sql).toBe("SELECT 1");
+  expect((await invokes(page, "sql_result")).at(-1)?.sql).toBe("SELECT nope FROM comma");
 });
 
 test("run just the selection, from the command palette", async ({ page }) => {
@@ -127,7 +124,7 @@ test("run just the selection, from the command palette", async ({ page }) => {
   await page.getByRole("combobox").fill("run sql");
   await page.keyboard.press("Enter");
   await expect(panel(page)).toContainText(/1 row in/);
-  expect((await invokes(page, "run_query")).at(-1)?.sql).toBe("SELECT 42");
+  expect((await invokes(page, "sql_result")).at(-1)?.sql).toBe("SELECT 42");
 });
 
 test("rename a file's table; current_view follows the active view", async ({ page }) => {
@@ -161,4 +158,37 @@ test("rename a file's table; current_view follows the active view", async ({ pag
   await editor(page).click();
   await tables.getByRole("button", { name: "current_view" }).click();
   await expect(editor(page)).toHaveText("current_view");
+});
+
+test("open a result in its own tab: filter, sort and query it again", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("Control+j");
+  await editor(page).click();
+  await page.keyboard.type("SELECT DISTINCT n FROM comma");
+  await page.keyboard.press("Control+Enter");
+  await expect(panel(page)).toContainText(/2 rows in/);
+  await panel(page).getByRole("button", { name: "Open in tab" }).click();
+  await expect(page.getByRole("tab", { name: "Result 1" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("main")).toContainText("SQL result");
+  await expect(page.getByRole("contentinfo").getByRole("status")).toContainText(
+    "2 rows · SQL result",
+  );
+  await expect(panel(page).getByRole("button", { name: /Opened in a tab/ })).toBeDisabled();
+  // The result is a table too.
+  await expect(panel(page).getByRole("list", { name: "Tables" })).toContainText("result_1");
+  // The next run doesn't close the tab's rows.
+  await editor(page).click();
+  await page.keyboard.press("Control+Enter");
+  await expect(panel(page).getByRole("button", { name: "Open in tab" })).toBeEnabled();
+  expect(await invokes(page, "close_dataset")).not.toContainEqual({ datasetId: "sql-1" });
+  // Sorting the result tab opens a view over the result.
+  await page.keyboard.press("Control+k");
+  await page.getByRole("combobox").fill("sort by n desc");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(async () => (await invokes(page, "open_view")).at(-1))
+    .toMatchObject({ datasetId: "sql-1", spec: { sort: [{ column: "n", descending: true }] } });
 });

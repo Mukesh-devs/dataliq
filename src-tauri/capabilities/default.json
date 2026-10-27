@@ -27,6 +27,7 @@
     "allow-column-histograms",
     "allow-view-sql",
     "allow-register-table",
-    "allow-unregister-table"
+    "allow-unregister-table",
+    "allow-sql-result"
   ]
 }

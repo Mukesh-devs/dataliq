@@ -20,6 +20,7 @@ mod perf_preview;
 mod perf_sort;
 mod profile;
 mod sort;
+mod sql_results;
 mod sql_tables;
 mod ui_recordings;
 mod view_sql;

@@ -45,7 +45,8 @@ export interface SniffedCsv {
   timestampFormat: string | null;
 }
 
-export type FileFormat = "csv" | "tsv" | "json" | "ndjson" | "parquet" | "xlsx" | "xls";
+/** "sql": a SQL panel result opened in a tab (no file behind it). */
+export type FileFormat = "csv" | "tsv" | "json" | "ndjson" | "parquet" | "xlsx" | "xls" | "sql";
 export type Compression = "none" | "gzip" | "zstd";
 
 export interface ColumnMeta {

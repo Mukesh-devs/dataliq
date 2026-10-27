@@ -23,6 +23,7 @@ fn main() {
             "view_sql",
             "register_table",
             "unregister_table",
+            "sql_result",
         ]),
     ))
     .expect("failed to run tauri-build");

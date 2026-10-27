@@ -110,7 +110,8 @@ pub fn run() {
             commands::view::column_histograms,
             commands::view::view_sql,
             commands::sql::register_table,
-            commands::sql::unregister_table
+            commands::sql::unregister_table,
+            commands::sql::sql_result
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

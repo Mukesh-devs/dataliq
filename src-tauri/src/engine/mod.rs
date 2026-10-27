@@ -161,7 +161,17 @@ impl Engine {
     /// Runs a statement that returns no rows (e.g. `CREATE TABLE … AS`),
     /// cancellable through `key` like a query.
     pub fn execute_keyed(&self, sql: &str, params: &[Param], key: &RequestKey) -> Result<usize> {
-        let conn = self.connection()?;
+        self.execute_on(&self.connection()?, sql, params, key)
+    }
+
+    /// Like [`Engine::execute_keyed`], on a given connection (e.g. the session).
+    pub fn execute_on(
+        &self,
+        conn: &Connection,
+        sql: &str,
+        params: &[Param],
+        key: &RequestKey,
+    ) -> Result<usize> {
         let _busy = self.busy();
         let guard = self.requests.register(key, conn.interrupt_handle());
         // An interrupt only stops a running statement: check before and after.
@@ -208,8 +218,19 @@ impl Engine {
         max_rows: usize,
         key: &RequestKey,
     ) -> Result<QueryBatches> {
-        // Interrupt an older statement of the group so the lock frees up,
-        // unless a newer statement replaced this one already.
+        self.with_session(key, |conn| {
+            self.query_with(conn, sql, params, max_rows, key)
+        })
+    }
+
+    /// Runs `f` on the SQL panel's session connection, one at a time. An
+    /// older statement of `key`'s group is interrupted first so the session
+    /// frees up, unless a newer one already replaced this request.
+    pub fn with_session<T>(
+        &self,
+        key: &RequestKey,
+        f: impl FnOnce(&Connection) -> Result<T>,
+    ) -> Result<T> {
         if self.requests.claim(key) {
             return Err(AppError::Cancelled);
         }
@@ -217,8 +238,7 @@ impl Engine {
         if session.is_none() {
             *session = Some(self.connection()?);
         }
-        let conn = session.as_ref().expect("session connection just created");
-        self.query_with(conn, sql, params, max_rows, key)
+        f(session.as_ref().expect("session connection just created"))
     }
 
     fn query_with(

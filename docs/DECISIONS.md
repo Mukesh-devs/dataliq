@@ -365,3 +365,21 @@ Markdown/SQL INSERT, keep or exclude rows with this value, sort, profile and
 reload the file (filters kept). The webview's own menu (reload, print,
 inspect) is turned off everywhere except in text fields, which keep
 cut/copy/paste.
+
+## D35 — SQL results are written once, on the session, into the scratch database
+
+A query in the SQL panel can read temp tables and variables of the panel's
+session (D32), which other connections can't see, so its rows can't be
+paged by re-running it elsewhere. The panel's last statement, when it is a
+query (SELECT, WITH, FROM, VALUES, TABLE, DESCRIBE, SHOW, SUMMARIZE, PIVOT),
+is written once on the session connection as
+`CREATE TABLE bv_scratch.main.r_<n> AS SELECT * FROM (<query>)` (DuckDB
+keeps the query's order) and becomes a dataset like a written-out view: the
+grid pages all of its rows, a tab can own it (filters, sort, profiles, copy,
+"Copy view as SQL" over the query), and it is a SQL table itself
+(`result_1`). Error positions are moved back one line to the user's text.
+Writing costs a little more than showing the first rows of a huge
+`SELECT *`, but every result behaves the same; other statements (EXPLAIN,
+PRAGMA, CREATE …) still show their rows as they come, up to 10,000. The
+panel drops its previous result when a new one replaces it, unless that
+result was opened in a tab.

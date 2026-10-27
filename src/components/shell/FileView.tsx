@@ -497,9 +497,15 @@ export function FileView({
         </span>
         {tab.info && (
           <span className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase">
-            {tab.info.format}
-            {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
-            {formatBytes(tab.info.sizeBytes)}
+            {tab.info.format === "sql" ? (
+              "SQL result"
+            ) : (
+              <>
+                {tab.info.format}
+                {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
+                {formatBytes(tab.info.sizeBytes)}
+              </>
+            )}
           </span>
         )}
         <div className="flex-1" />

@@ -3,6 +3,7 @@ import {
   cleanTableName,
   errorOffset,
   errorText,
+  returnsRows,
   splitStatements,
   tableNameProblem,
   uniqueNames,
@@ -84,5 +85,30 @@ describe("table names", () => {
       "people",
       "sales_3",
     ]);
+  });
+});
+
+describe("returnsRows", () => {
+  it("tells queries from other statements", () => {
+    for (const q of [
+      "SELECT 1",
+      "  with t as (select 1) select * from t",
+      "FROM people",
+      "-- top ones\nSELECT * FROM t",
+      "/* x */ (SELECT 1) UNION (SELECT 2)",
+      "DESCRIBE people",
+      "SUMMARIZE people",
+      "values (1), (2)",
+    ])
+      expect(returnsRows(q), q).toBe(true);
+    for (const q of [
+      "CREATE TABLE t AS SELECT 1",
+      "INSERT INTO t SELECT 1",
+      "SET threads = 2",
+      "EXPLAIN SELECT 1",
+      "PRAGMA version",
+      "selection_fn()",
+    ])
+      expect(returnsRows(q), q).toBe(false);
   });
 });

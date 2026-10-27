@@ -1,3 +1,4 @@
+import type { DatasetInfo } from "./files";
 import { call } from "./ipc";
 
 /** One statement of a SQL script and where it starts in the script. */
@@ -152,4 +153,22 @@ export function registerTable(datasetId: string, name: string): Promise<void> {
 
 export function unregisterTable(name: string): Promise<void> {
   return call("unregister_table", { name });
+}
+
+/**
+ * Whether a statement gives rows worth keeping as a result (a query), as
+ * opposed to CREATE, INSERT, SET … Leading comments and parentheses are
+ * skipped. EXPLAIN and PRAGMA rows are shown as they come.
+ */
+export function returnsRows(statement: string): boolean {
+  const head = statement
+    .replace(/^(\s|--[^\n]*(\n|$)|\/\*[\s\S]*?\*\/|\()*/, "")
+    .slice(0, 16)
+    .toUpperCase();
+  return /^(SELECT|WITH|FROM|VALUES|TABLE|DESCRIBE|SHOW|SUMMARIZE|PIVOT|UNPIVOT)\b/.test(head);
+}
+
+/** Runs a query in the panel's session; its rows become a pageable dataset. */
+export function sqlResult(sql: string, requestId: string): Promise<DatasetInfo> {
+  return call("sql_result", { sql, requestId });
 }

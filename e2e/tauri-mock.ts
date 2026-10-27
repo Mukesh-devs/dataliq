@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { tableFromIPC } from "apache-arrow";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -63,7 +64,13 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
   }
   if (options.sql) {
     const sql = options.sql;
-    await page.exposeFunction("__sql", (text: string) => sql(text));
+    // Rows are counted here, where Arrow is available.
+    await page.exposeFunction("__sql", (text: string) => {
+      const out = sql(text);
+      return typeof out === "string"
+        ? { ipc: out, rows: tableFromIPC(Buffer.from(out, "base64")).numRows }
+        : out;
+    });
   }
   if (options.profile) {
     const profile = options.profile;
@@ -85,6 +92,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       w.__invokes = log;
       let nextCallback = 1;
       let nextView = 1;
+      let nextResult = 1;
+      // SQL results by dataset id (Arrow IPC, base64).
+      const sqlResults: Record<string, string> = {};
+      type SqlAnswer = (
+        s: string,
+      ) => Promise<{ ipc: string; rows: number } | { kind: string; message: string }>;
       const listeners: Record<string, number[]> = {};
       const emit = (event: string, payload: unknown) => {
         for (const id of listeners[event] ?? []) {
@@ -109,12 +122,18 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
           const file = recordings.files[String(args.path)];
           switch (cmd) {
             case "run_query": {
-              const sql = w.__sql as
-                ((s: string) => Promise<string | { kind: string; message: string }>) | undefined;
+              const sql = w.__sql as SqlAnswer | undefined;
               if (!sql) return toBuffer(recordings.version);
               const out = await sql(String(args.sql));
-              if (typeof out !== "string") throw out;
-              return toBuffer(out);
+              if (!("ipc" in out)) throw out;
+              return toBuffer(out.ipc);
+            }
+            case "sql_result": {
+              const out = await (w.__sql as SqlAnswer)(String(args.sql));
+              if (!("ipc" in out)) throw out;
+              const id = `sql-${nextResult++}`;
+              sqlResults[id] = out.ipc;
+              return { id, rowCount: out.rows, cached: true };
             }
             case "register_table":
             case "unregister_table":
@@ -171,6 +190,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               };
             }
             case "fetch_rows": {
+              const stored = sqlResults[String(args.datasetId)];
+              if (stored) return toBuffer(stored);
               const fetchRows = w.__fetchRows as (
                 s: number,
                 c: number,

@@ -62,7 +62,8 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     parts.push(`${ing[0]!.toUpperCase()}${ing.slice(1)}…`);
   } else if (tab.info?.dataset) {
     parts.push(`${formatCount(tab.info.dataset.rowCount)} rows`);
-    if (tab.import?.fromCache) parts.push("from cache");
+    if (tab.info.format === "sql") parts.push("SQL result");
+    else if (tab.import?.fromCache) parts.push("from cache");
     else if (tab.info.dataset.cached === false)
       parts.push(tab.info.format === "parquet" ? "queried in place" : "read directly");
     else parts.push(`imported in ${formatDuration(tab.import?.elapsedMs ?? 0)}`);
@@ -241,13 +242,13 @@ export function App() {
         run: shortcuts.toggleProfile,
       },
     );
-    if (activeId)
+    if (active?.path)
       list.push({
         id: "reload-file",
         title: "Reload file (keep filters)",
         group: "File",
         keywords: "refresh",
-        run: () => void reload(activeId),
+        run: () => void reload(active.id),
       });
     list.push({
       id: "toggle-sql",
@@ -309,6 +310,7 @@ export function App() {
   }, [
     shortcuts,
     activeId,
+    active,
     recent,
     openPaths,
     setTheme,
@@ -408,7 +410,7 @@ export function App() {
               key={active.id}
               tab={active}
               onReopen={(o) => void reopen(active.id, o)}
-              onReload={() => void reload(active.id)}
+              onReload={active.path ? () => void reload(active.id) : undefined}
               onCancelImport={() => void cancelImport(active.id)}
               onReadDirect={() => void readDirect(active.id)}
               onViewChange={(v) => void setView(active.id, v)}
