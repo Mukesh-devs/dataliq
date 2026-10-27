@@ -481,3 +481,33 @@ tested, and anything left over.
   again; the palette's "SQL history…" listed it ("just now · 1 row · 29 ms") from
   `sql-history.json` in the app data directory.
 - Left over: none.
+
+### Step 5 — Export everything ✅
+
+- Export the current view (filters, search, sort, shown columns in display order under their
+  display names) or a SQL result to CSV, CSV.gz, TSV, Parquet (zstd), JSON (one array), NDJSON
+  and Excel (D36). Open it with Ctrl+E, the palette ("Export view…"), the Export button in the
+  file toolbar, or Export in the SQL panel.
+- Options: header row, delimiter, quote every value, date and timestamp formats (strftime), the
+  whole view or only the grid's selection (rows and columns); the format and options are
+  remembered. Excel past 1,048,575 rows warns and offers more sheets or the first sheet only.
+- Progress ("Exporting x.parquet… 42%") and "Cancel export" in the status bar; the outcome as a
+  notice ("Exported 1,000 rows to people-export.xlsx in 14 ms"). Files are written as
+  `.partial` and renamed when complete; a cancel or an error leaves nothing behind.
+- Excel cells are typed: numbers, booleans, dates and timestamps (with date formats); integers
+  past 15 digits, dates Excel can't hold and NaN as text; text cut at 32,767 characters; rows
+  streamed from DuckDB into constant-memory sheets.
+- Tested: Rust — every format round-trips a filtered, sorted view with a hidden, a reordered and
+  a renamed column (re-opened as the app opens files, compared row by row with rows computed
+  from the parsed CSV); selected rows and CSV options (no header, `;`, quote all, `%d/%m/%Y`);
+  selected rows equal the grid's pages on a 300,000-row view, sorted and unsorted; cancel of a
+  30M-row CSV and Excel export stops in ~1 ms and leaves no file; missing folder in words;
+  Excel sheet splitting, typed cells and edge values (read back with calamine). Vitest — range
+  merging, suggested names, the dialog (options, selection, save dialog cancelled, Excel
+  warning, failures and cancels in words). Playwright — sorted view without a hidden column to
+  Parquet with progress; a selection to CSV from the toolbar, then cancelled.
+- Smoke (real app, people.csv): sorted by amount ↓, hid `city`, Export → Excel → GTK save
+  dialog → "Exported 1,000 rows to people-export.xlsx in 14 ms"; openpyxl read 1,000 rows plus a
+  bold header in view order, five columns, real dates, NULL as empty. SQL panel
+  `SELECT count(*) AS adults …` → Export → JSON → `[{"adults":797}]`.
+- Left over: none.
