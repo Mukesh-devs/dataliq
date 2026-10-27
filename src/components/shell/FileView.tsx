@@ -1,4 +1,11 @@
-import { CircleAlert, Download, LoaderCircle, SquareTerminal } from "lucide-react";
+import {
+  ChartColumn,
+  CircleAlert,
+  Download,
+  LoaderCircle,
+  SquareTerminal,
+  Table,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
@@ -35,6 +42,8 @@ import { CellMenu, type CellMenuActions } from "../grid/CellMenu";
 import { filterForValue } from "../../lib/cellFilter";
 import { useLayout } from "../../stores/layout";
 import { useExport } from "../../stores/export";
+import { defaultChart, fitChart } from "../../lib/chart";
+import { ChartPanel } from "../chart/ChartPanel";
 import { Button } from "../ui/Button";
 import { ColumnMenu } from "../filters/ColumnMenu";
 import { RenameColumn } from "../filters/RenameColumn";
@@ -314,6 +323,16 @@ export function FileView({
    * Puts the view in the SQL panel as a query over the file's table (fast:
    * no re-reading of the file), ready to edit and run.
    */
+  // Grid or chart; a chart needs the full data (not just the preview).
+  const setMode = useTabs((s) => s.setMode);
+  const setChart = useTabs((s) => s.setChart);
+  const canChart = tab.status === "ready" && !!baseId;
+  const mode = canChart ? (tab.mode ?? "grid") : "grid";
+  const chart = useMemo(
+    () => (tab.chart ? fitChart(tab.chart, columns) : defaultChart(columns)),
+    [tab.chart, columns],
+  );
+  const labelOf = useCallback((c: string) => label(layout, c), [layout]);
   const sqlTable = useSql((s) => s.tables.find((t) => t.tabId === tab.id && !t.current)?.name);
   const loadSql = useSql((s) => s.load);
   const openViewInSql = useCallback(async () => {
@@ -448,6 +467,24 @@ export function FileView({
         run: () => void copySelection(f.format),
       });
     }
+    if (canChart && chart)
+      add(
+        mode === "chart"
+          ? {
+              id: "show-grid",
+              title: "Show the grid",
+              group: "View",
+              keywords: "table rows",
+              run: () => setMode(tab.id, "grid"),
+            }
+          : {
+              id: "show-chart",
+              title: "Show a chart of the view",
+              group: "View",
+              keywords: "chart plot graph bar line histogram scatter",
+              run: () => setMode(tab.id, "chart"),
+            },
+      );
     if (canExport)
       // eslint-disable-next-line react-hooks/refs -- reads the grid's selection when picked
       add({
@@ -535,6 +572,10 @@ export function FileView({
     openExport,
     sqlTable,
     openViewInSql,
+    canChart,
+    chart,
+    mode,
+    setMode,
   ]);
   useRegisterCommands("file", commands);
 
@@ -583,6 +624,33 @@ export function FileView({
           </span>
         )}
         <div className="flex-1" />
+        {canChart && chart && (
+          <div
+            role="radiogroup"
+            aria-label="Show"
+            className="flex items-center rounded-[var(--radius)] border border-border p-0.5"
+          >
+            {(
+              [
+                ["grid", "Grid", Table],
+                ["chart", "Chart", ChartColumn],
+              ] as const
+            ).map(([m, name, Icon]) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(tab.id, m)}
+                className={`flex h-5 items-center gap-1 rounded-[var(--radius-sm)] px-1.5 text-[12px] ${
+                  mode === m ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                <Icon className="size-3.5" aria-hidden /> {name}
+              </button>
+            ))}
+          </div>
+        )}
         {tab.status === "ready" && baseId && sqlTable && (
           <Button
             size="sm"
@@ -716,6 +784,16 @@ export function FileView({
             <p className="text-fg-muted">{tab.error}</p>
           </div>
         </div>
+      ) : mode === "chart" && chart && baseId ? (
+        <ChartPanel
+          tabId={tab.id}
+          datasetId={baseId}
+          view={view}
+          columns={columns}
+          labelOf={labelOf}
+          chart={chart}
+          onChange={(c) => setChart(tab.id, c)}
+        />
       ) : source ? (
         <div className="flex min-h-0 flex-1">
           <DataGrid

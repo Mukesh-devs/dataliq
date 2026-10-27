@@ -42,6 +42,8 @@ export interface MockOptions {
   savePaths?: (string | null)[];
   /** How long `export_view` runs, emitting 50% halfway (default 0). */
   exportMs?: number;
+  /** Result of `chart_data`; runs in Node. Default: three bars. */
+  charts?: (chart: Record<string, unknown>, spec: unknown) => unknown;
 }
 
 /**
@@ -86,6 +88,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     const histograms = options.histograms;
     await page.exposeFunction("__histograms", (columns: string[], spec: unknown) =>
       histograms(columns, spec),
+    );
+  }
+  if (options.charts) {
+    const charts = options.charts;
+    await page.exposeFunction("__charts", (chart: Record<string, unknown>, spec: unknown) =>
+      charts(chart, spec),
     );
   }
   await page.addInitScript(
@@ -175,6 +183,21 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const i = saved.findIndex((q) => q.name === args.name);
               if (i >= 0) saved.splice(i, 1);
               return i >= 0;
+            }
+            case "chart_data": {
+              const charts = w.__charts as
+                ((c: unknown, s: unknown) => Promise<unknown>) | undefined;
+              if (charts) return charts(args.chart, args.spec);
+              return {
+                kind: (args.chart as { kind: string }).kind,
+                xKind: "category",
+                x: ["a", "b", "c"],
+                series: [{ name: "Count", values: [3, 2, 1] }],
+                bins: [],
+                total: 3,
+                truncated: false,
+                elapsedMs: 5,
+              };
             }
             case "plugin:dialog|save":
               return savePaths.length > 0 ? savePaths.shift() : null;

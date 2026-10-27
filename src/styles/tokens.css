@@ -46,6 +46,11 @@
   --match: rgb(250 204 21 / 0.45);
   /* Bars of the small histograms in grid headers. */
   --chart-bar: rgb(79 70 229 / 0.4);
+  /* Chart series, in fixed order (validated for colour-blind separation). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
   /* SQL editor syntax colours. */
   --syntax-keyword: #6d28d9;
   --syntax-string: #047857;
@@ -77,6 +82,10 @@
   --null: #5f5f68;
   --match: rgb(250 204 21 / 0.3);
   --chart-bar: rgb(129 140 248 / 0.45);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
   --syntax-keyword: #c4b5fd;
   --syntax-string: #6ee7b7;
   --syntax-number: #fcd34d;

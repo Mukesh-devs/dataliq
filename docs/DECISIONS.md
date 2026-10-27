@@ -417,3 +417,27 @@ the editor as one undoable change (Ctrl+Z brings the old text back). It is
 not run by itself: a big view written as a result costs time the user
 didn't ask for yet. Tested to give exactly the view's rows through the
 panel's own path (`sql_result`).
+
+## D38 — Charts: aggregated in DuckDB, a Grid | Chart switch per tab
+
+A chart is computed by one query over the view's rows (filters and search;
+sort and shown columns don't change a chart) and only its small result
+reaches the UI: bar, horizontal bar and line group by any column (dates by
+day, week, month or year) with up to four measures (count, sum, average,
+min, max, distinct count); categories keep the 50 largest groups by the
+first measure and say how many there are ("Top 50 of 1,234 groups");
+numbers and dates on the x axis keep their order (up to 10,000 points); a
+histogram reuses the column-profile binning with a chosen bar count; a
+scatter plot takes a repeatable reservoir sample of 5,000 points and says
+so ("5,000 of 50,000,000 points (random sample)"). On 50M cached rows each
+takes 0.09–1.7 s. The plan's layout has no place for charts, so each tab's
+toolbar gets a Grid | Chart switch: the chart takes the grid's place under
+the same filter bar, and each tab keeps its own chart. ECharts is imported
+per chart type (bar, line, scatter, custom for histograms) with the canvas
+renderer, plus the SVG renderer for export. Series colours are the
+data-viz reference palette's first four slots as tokens (`--series-1..4`,
+own steps for dark), checked with its validator against our surfaces:
+all pass except light-mode contrast of slots 3–4, so every chart also has a
+table view of its values. Bars are at most 24 px thick with 4 px rounded
+ends, lines 2 px, one value axis only, legend from two series up, text in
+the text colours.

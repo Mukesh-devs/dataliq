@@ -15,6 +15,7 @@ import {
 } from "../lib/files";
 import { cancelQuery } from "../lib/ipc";
 import { describeColumns } from "../lib/arrow";
+import type { ChartSpec } from "../lib/chart";
 import type { ColumnLayout } from "../lib/layout";
 import { isIdentity, openView, type ViewReady, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
@@ -78,6 +79,10 @@ export interface Tab {
   layout?: ColumnLayout;
   /** Table name chosen for the SQL panel (else one made from the file name). */
   sqlName?: string;
+  /** The grid, or a chart of the view. */
+  mode?: "grid" | "chart";
+  /** The tab's chart (kept while the grid is shown). */
+  chart?: ChartSpec;
 }
 
 interface TabsState {
@@ -121,6 +126,8 @@ interface TabsState {
   openResult: (result: { dataset: DatasetInfo; preview: Table; sql: string }) => string;
   /** Renames the tab's SQL table; undefined goes back to the file's name. */
   setSqlName: (id: string, name: string | undefined) => void;
+  setMode: (id: string, mode: "grid" | "chart") => void;
+  setChart: (id: string, chart: ChartSpec) => void;
 }
 
 let nextId = 1;
@@ -365,6 +372,8 @@ export const useTabs = create<TabsState>()((set, get) => {
       })),
     setLayout: (id, layout) => patch(id, { layout }),
     setSqlName: (id, sqlName) => patch(id, { sqlName }),
+    setMode: (id, mode) => patch(id, { mode }),
+    setChart: (id, chart) => patch(id, { chart }),
     openResult: ({ dataset, preview, sql }) => {
       const id = `tab-${nextId++}`;
       const title = `Result ${nextResult++}`;
