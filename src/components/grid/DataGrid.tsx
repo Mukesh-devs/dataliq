@@ -232,6 +232,8 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           // The menu button has its own handler.
           if (onHeaderMenu && e.localEventX > e.bounds.width - MENU_BUTTON_WIDTH) return;
           e.preventDefault(); // sort instead of selecting the column
+          // Glide selected the column on mouse down; a sort click shouldn't.
+          setSelection(emptySelection);
           onHeaderClick(col, e.shiftKey);
         }}
         onHeaderContextMenu={(col, e) => {

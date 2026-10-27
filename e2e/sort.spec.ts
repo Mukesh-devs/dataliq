@@ -53,6 +53,8 @@ test("clicking headers sorts; Shift adds keys; chips edit the sort", async ({ pa
   await emitEvent(page, "view-ready", { datasetId: "view-1", elapsedMs: 3200 });
   await expect(status).toContainText("1,000 of 1,000 rows · sorted in 3.20 s");
   await expect(gridHeader(page, "name ↑")).toBeAttached();
+  // Sorting doesn't also select the column.
+  await expect(gridHeader(page, "name ↑")).toHaveAttribute("aria-selected", "false");
   await expect(bar.getByRole("button", { name: /Sort by name, ascending/ })).toBeVisible();
 
   // Again: descending.

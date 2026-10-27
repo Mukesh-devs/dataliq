@@ -273,4 +273,8 @@ tested, and anything left over.
   reversed order; Vitest for sort toggling, the column menu, sort chips and the store (view-ready,
   cancelling); Playwright for header click / Shift+click / chips / column menu. Perf: see
   docs/BENCHMARKS.md (filter budget met; full 50M sort 20–37 s in the background, first rows ~1 s).
+- Smoke (real app, people.csv): clicking "amount" twice → "1,000 of 1,000 rows · sorted in 5 ms"
+  with 998.5, 998.18, … at the top, ↓ in the header and an "amount ↓" chip; Shift+click "city"
+  added a second key (↓1 / ↑2, chips "1. amount" "2. city"). Found and fixed: a sort click also
+  selected the column.
 - Left over: none for this step.
