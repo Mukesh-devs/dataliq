@@ -34,6 +34,7 @@ import {
   type ColumnLayout,
 } from "../../lib/layout";
 import { sortMark, type Bin, type SortKey } from "../../lib/view";
+import { toRanges } from "../../lib/exporting";
 import { useAppliedTheme } from "../../stores/appliedTheme";
 import { initialWidth, toGridCell, type CellStyle } from "./cells";
 import { chartColor, gridTheme, matchColor, nullColor, rowHeight } from "./gridTheme";
@@ -66,6 +67,16 @@ export interface DataGridHandle {
    * Null when nothing is selected.
    */
   selected(maxRows: number): SelectedCells | null;
+  /**
+   * The same selection as row ranges (`[start, end)`), for any number of
+   * rows; for export.
+   */
+  selection(): SelectedRanges | null;
+}
+
+export interface SelectedRanges {
+  columns: string[];
+  rows: [number, number][];
 }
 
 export interface SelectedCells {
@@ -390,6 +401,21 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
           (_, i) => range.y + i,
         );
         return { columns: names(cols), rows };
+      },
+      selection(): SelectedRanges | null {
+        const names = (cols: number[]) =>
+          cols.map((c) => nameAt(c)).filter((n): n is string => n !== undefined);
+        const all = shown.map((_, c) => c);
+        if (selection.rows.length > 0) {
+          return { columns: names(all), rows: toRanges(selection.rows) };
+        }
+        if (selection.columns.length > 0) {
+          return { columns: names(selection.columns.toArray()), rows: [[0, source.rowCount]] };
+        }
+        const range = selection.current?.range;
+        if (!range) return null;
+        const cols = Array.from({ length: range.width }, (_, i) => range.x + i);
+        return { columns: names(cols), rows: [[range.y, range.y + range.height]] };
       },
       autoFit(column: string) {
         const src = source.columns.findIndex((c) => c.name === column);

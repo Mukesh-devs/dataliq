@@ -383,3 +383,26 @@ Writing costs a little more than showing the first rows of a huge
 PRAGMA, CREATE …) still show their rows as they come, up to 10,000. The
 panel drops its previous result when a new one replaces it, unless that
 result was opened in a tab.
+
+## D36 — Exports: DuckDB `COPY` for text and Parquet, rust_xlsxwriter for Excel
+
+CSV, CSV.gz, TSV, Parquet (zstd), JSON (one array) and NDJSON are written
+by DuckDB's own `COPY (<view>) TO …` on a raw connection: it streams in
+parallel, reports progress through the same progress bar as imports and
+stops on `duckdb_interrupt`. The view is the same SQL the grid pages (built
+from the ViewSpec with values inlined, since COPY takes no parameters),
+projected to the shown columns in display order under their display names
+(made unique: "total", "total (2)"). Excel files are written with
+rust_xlsxwriter in constant-memory mode from DuckDB's streamed Arrow
+batches (`stream_arrow`, read with `Statement::step` so an interrupt is an
+error, not a panic): numbers, booleans, dates and timestamps as typed
+cells (date serials with a date format), integers past 15 digits, values
+outside Excel's dates and NaN/infinity as text, text cut to Excel's 32,767
+characters. Past 1,048,575 data rows the user chooses more sheets (each
+with the header) or the first sheet only; the outcome says how many rows
+were left out. Every export goes to `<file>.partial` and is renamed when
+complete, so a cancel or an error never leaves half a file or replaces a
+good one. "Selected rows" are view positions (`row_number() OVER ()` over
+the view query, which keeps the order the grid pages; tested against the
+grid on a 300,000-row multi-threaded view, sorted and unsorted). The
+suggested name is `<file>-export.<ext>`, never the open file's own name.

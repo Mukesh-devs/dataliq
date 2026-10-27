@@ -30,6 +30,8 @@ fn main() {
             "saved_queries",
             "save_query",
             "delete_saved_query",
+            "export_view",
+            "cancel_export",
         ]),
     ))
     .expect("failed to run tauri-build");

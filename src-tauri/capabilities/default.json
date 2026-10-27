@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "allow-run-query",
     "allow-cancel-query",
     "allow-fetch-rows",
@@ -34,6 +35,8 @@
     "allow-clear-sql-history",
     "allow-saved-queries",
     "allow-save-query",
-    "allow-delete-saved-query"
+    "allow-delete-saved-query",
+    "allow-export-view",
+    "allow-cancel-export"
   ]
 }

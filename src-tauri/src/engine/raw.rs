@@ -112,6 +112,12 @@ impl RawConnection {
 
     /// Prepares, binds and runs one statement, discarding its result.
     pub fn execute(&self, sql: &str, params: &[Param]) -> Result<()> {
+        self.execute_count(sql, params).map(|_| ())
+    }
+
+    /// Like [`RawConnection::execute`], returning the result's single value
+    /// when it has one (e.g. the rows written by `COPY`), else 0.
+    pub fn execute_count(&self, sql: &str, params: &[Param]) -> Result<i64> {
         let sql = cstring(sql)?;
         unsafe {
             let mut stmt: ffi::duckdb_prepared_statement = ptr::null_mut();
@@ -148,7 +154,13 @@ impl RawConnection {
             let mut result: ffi::duckdb_result = std::mem::zeroed();
             let rc = ffi::duckdb_execute_prepared(stmt, &mut result);
             let outcome = if rc == ffi::duckdb_state_DuckDBSuccess {
-                Ok(())
+                let single = ffi::duckdb_column_count(&mut result) == 1
+                    && ffi::duckdb_row_count(&mut result) == 1;
+                Ok(if single {
+                    ffi::duckdb_value_int64(&mut result, 0, 0)
+                } else {
+                    0
+                })
             } else {
                 Err(error_from(take_error(
                     ffi::duckdb_result_error(&mut result),

@@ -1,4 +1,4 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { CircleAlert, Download, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
@@ -32,6 +32,8 @@ import { ProfilePanel, ProfilePicker } from "../profile/ProfilePanel";
 import { CellMenu, type CellMenuActions } from "../grid/CellMenu";
 import { filterForValue } from "../../lib/cellFilter";
 import { useLayout } from "../../stores/layout";
+import { useExport } from "../../stores/export";
+import { Button } from "../ui/Button";
 import { ColumnMenu } from "../filters/ColumnMenu";
 import { RenameColumn } from "../filters/RenameColumn";
 import {
@@ -292,6 +294,20 @@ export function FileView({
     }
   }, [baseId, readerSql, view, layout, notice]);
 
+  /** Opens the export dialog for the view (and the grid's selection). */
+  const showExport = useExport((s) => s.show);
+  const viewRows = tab.viewState?.dataset?.rowCount ?? tab.info?.dataset?.rowCount;
+  const openExport = useCallback(() => {
+    if (!baseId || viewRows === undefined) return;
+    showExport({
+      datasetId: baseId,
+      spec: { ...view, columns: visible(layout) },
+      labels: layout.labels,
+      title: tab.title,
+      rowCount: viewRows,
+      selection: grid.current?.selection() ?? null,
+    });
+  }, [baseId, viewRows, showExport, view, layout, tab.title]);
   /** A cell's value as shown (null for NULL), from the loaded rows. */
   const cellText = (column: string, row: number): string | null => {
     const i = source?.columns.findIndex((c) => c.name === column) ?? -1;
@@ -329,6 +345,7 @@ export function FileView({
   const running = tab.viewState?.status === "running";
   const sorting = !!tab.viewState?.sorting;
   const importing = tab.import?.status === "running";
+  const canExport = tab.status === "ready" && !!baseId && viewRows !== undefined && !running;
   const commands = useMemo<Command[]>(() => {
     if (tab.status !== "ready" || !source) return [];
     const list: Command[] = [];
@@ -402,6 +419,16 @@ export function FileView({
         run: () => void copySelection(f.format),
       });
     }
+    if (canExport)
+      // eslint-disable-next-line react-hooks/refs -- reads the grid's selection when picked
+      add({
+        id: "export",
+        title: "Export view…",
+        group: "File",
+        shortcut: `${modKey}+E`,
+        keywords: "save csv parquet excel xlsx json download",
+        run: openExport,
+      });
     if (baseId && readerSql)
       add({
         id: "copy-view-sql",
@@ -467,6 +494,8 @@ export function FileView({
     copySelection,
     copyViewSql,
     cancelView,
+    canExport,
+    openExport,
   ]);
   useRegisterCommands("file", commands);
 
@@ -479,6 +508,10 @@ export function FileView({
         e.preventDefault();
         setGoToOpen(true);
       }
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "e" && canExport) {
+        e.preventDefault();
+        openExport();
+      }
       if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f" && searchInput.current) {
         e.preventDefault();
         searchInput.current.focus();
@@ -487,7 +520,7 @@ export function FileView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [source]);
+  }, [source, canExport, openExport]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -509,6 +542,11 @@ export function FileView({
           </span>
         )}
         <div className="flex-1" />
+        {canExport && (
+          <Button size="sm" variant="ghost" onClick={openExport} title={`Export (${modKey}+E)`}>
+            <Download className="size-3.5" aria-hidden /> Export
+          </Button>
+        )}
         {tab.info?.excel && (
           <ExcelSettings
             info={tab.info.excel}

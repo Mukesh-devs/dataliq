@@ -38,6 +38,10 @@ export interface MockOptions {
   imports?: Record<string, { progress: number[]; rows: number; stepMs?: number }>;
   /** Files the app "was started with" (`bigview <files>`). */
   startupFiles?: string[];
+  /** Paths returned by successive "Save" dialogs (null = cancelled). */
+  savePaths?: (string | null)[];
+  /** How long `export_view` runs, emitting 50% halfway (default 0). */
+  exportMs?: number;
 }
 
 /**
@@ -85,7 +89,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     );
   }
   await page.addInitScript(
-    ({ recordings, dialogPaths, datasets, imports, startupFiles }) => {
+    ({ recordings, dialogPaths, datasets, imports, startupFiles, savePaths, exportMs }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
@@ -98,6 +102,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       const saved: { name: string; sql: string; savedAt: number }[] = [];
       // SQL results by dataset id (Arrow IPC, base64).
       const sqlResults: Record<string, string> = {};
+      // Running exports by job id: cancel_export ends them.
+      const exportJobs: Record<string, () => void> = {};
       type SqlAnswer = (
         s: string,
       ) => Promise<{ ipc: string; rows: number } | { kind: string; message: string }>;
@@ -169,6 +175,33 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const i = saved.findIndex((q) => q.name === args.name);
               if (i >= 0) saved.splice(i, 1);
               return i >= 0;
+            }
+            case "plugin:dialog|save":
+              return savePaths.length > 0 ? savePaths.shift() : null;
+            case "export_view": {
+              const request = args.request as { path: string; totalRows?: number };
+              const jobId = String(args.jobId);
+              const cancelled = await new Promise<boolean>((done) => {
+                exportJobs[jobId] = () => done(true);
+                setTimeout(() => {
+                  emit("export-progress", { jobId, percent: 50, elapsedMs: exportMs / 2 });
+                }, exportMs / 2);
+                setTimeout(() => done(false), exportMs);
+              });
+              delete exportJobs[jobId];
+              if (cancelled) throw { kind: "cancelled", message: "Cancelled" };
+              return {
+                path: request.path,
+                rows: request.totalRows ?? 0,
+                sheets: 0,
+                rowsLeftOut: 0,
+                elapsedMs: exportMs,
+              };
+            }
+            case "cancel_export": {
+              const end = exportJobs[String(args.jobId)];
+              end?.();
+              return !!end;
             }
             case "plugin:dialog|open": {
               // The app asks for multiple files; a test may queue a list.
@@ -276,6 +309,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       datasets: options.datasets ?? {},
       imports: options.imports ?? {},
       startupFiles: options.startupFiles ?? [],
+      savePaths: options.savePaths ?? [],
+      exportMs: options.exportMs ?? 0,
     },
   );
 }

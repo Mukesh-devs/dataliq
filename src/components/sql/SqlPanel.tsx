@@ -1,5 +1,6 @@
 import {
   CircleAlert,
+  Download,
   LoaderCircle,
   Pencil,
   Play,
@@ -13,6 +14,7 @@ import { fetchRows } from "../../lib/files";
 import { useEffect, useMemo, useState } from "react";
 import { formatCount, formatDuration } from "../../lib/format";
 import { modKey } from "../../lib/platform";
+import { useExport } from "../../stores/export";
 import { useNotice } from "../../stores/notice";
 import { cleanTableName } from "../../lib/sql";
 import { MAX_RESULT_ROWS, MIN_PANEL_HEIGHT, useSql, type SqlTable } from "../../stores/sql";
@@ -65,6 +67,18 @@ export function SqlPanel() {
     if (!result?.dataset || result.owned) return;
     openResult({ dataset: result.dataset, preview: result.table, sql: result.statement });
     markOwned();
+  };
+
+  const showExport = useExport((s) => s.show);
+  const exportResult = () => {
+    if (!result?.dataset) return;
+    showExport({
+      datasetId: result.dataset.id,
+      spec: { columns: describeColumns(result.table).map((c) => c.name) },
+      labels: {},
+      title: "SQL result",
+      rowCount: result.dataset.rowCount,
+    });
   };
 
   const formatNow = () => {
@@ -141,6 +155,11 @@ export function SqlPanel() {
           >
             <SquareArrowOutUpRight className="size-3" aria-hidden />{" "}
             {result.owned ? "Opened in a tab" : "Open in tab"}
+          </Button>
+        )}
+        {result?.dataset && !running && (
+          <Button size="sm" variant="ghost" onClick={exportResult} title="Export the result">
+            <Download className="size-3" aria-hidden /> Export
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={formatNow} title="Format SQL">

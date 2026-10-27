@@ -11,6 +11,7 @@ mod copy_sql;
 mod csv_sources;
 mod engine_query;
 mod excel_sources;
+mod export;
 mod filters;
 mod import_cache;
 mod json_parquet_sources;

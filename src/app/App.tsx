@@ -1,6 +1,7 @@
 import { FileUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CommandPalette } from "../components/palette/CommandPalette";
+import { ExportDialog } from "../components/export/ExportDialog";
 import { SqlPanel } from "../components/sql/SqlPanel";
 import { EmptyState } from "../components/shell/EmptyState";
 import { FileView } from "../components/shell/FileView";
@@ -25,6 +26,8 @@ import { useNotice } from "../stores/notice";
 import { useSettings, type ThemePreference } from "../stores/settings";
 import { useSql } from "../stores/sql";
 import { useEngine } from "../stores/engine";
+import { useExport } from "../stores/export";
+import { baseName } from "../lib/files";
 import { useRecent } from "../stores/recent";
 import { useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
@@ -124,6 +127,8 @@ export function App() {
   // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
   const [palette, setPalette] = useState<{ query: string } | null>(null);
   const engineVersion = useEngine((s) => s.version);
+  const exportJob = useExport((s) => s.job);
+  const cancelExport = useExport((s) => s.cancel);
   const probeEngine = useEngine((s) => s.probe);
   const loadApp = useApp((s) => s.load);
   const refreshCache = useApp((s) => s.refreshCache);
@@ -446,6 +451,7 @@ export function App() {
               dragging={dragging}
             />
           )}
+          <ExportDialog />
           {sqlOpen && <SqlPanel />}
           {active && dragging && (
             <div
@@ -458,13 +464,21 @@ export function App() {
         </main>
       </div>
       <StatusBar
-        message={statusMessage(active, engineVersion)}
+        message={
+          exportJob
+            ? `Exporting ${baseName(exportJob.path)}…${
+                exportJob.percent != null ? ` ${Math.floor(exportJob.percent)}%` : ""
+              }`
+            : statusMessage(active, engineVersion)
+        }
         action={
-          active?.viewState?.status === "running"
-            ? { label: "Cancel", run: () => cancelView(active.id) }
-            : active?.viewState?.sorting
-              ? { label: "Stop sorting", run: () => cancelView(active.id) }
-              : undefined
+          exportJob
+            ? { label: "Cancel export", run: cancelExport }
+            : active?.viewState?.status === "running"
+              ? { label: "Cancel", run: () => cancelView(active.id) }
+              : active?.viewState?.sorting
+                ? { label: "Stop sorting", run: () => cancelView(active.id) }
+                : undefined
         }
       />
     </div>
