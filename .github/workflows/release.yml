@@ -7,9 +7,16 @@ name: Release
 # - Pushing a tag `vX.Y.Z` (matching the app version) makes the draft release.
 # - Run it by hand to try a release: with "dry run" (the default) everything is
 #   built and checked, and the files are kept as a workflow artifact instead.
+# - A branch push that changes this workflow or its scripts is a dry run too.
 on:
   push:
     tags: ["v*"]
+    # Path filters only apply to branch pushes; tag pushes always run.
+    branches: ["**"]
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/release/**"
+      - "scripts/updater-config.mjs"
   workflow_dispatch:
     inputs:
       tag:
@@ -28,7 +35,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+  # Only a pushed tag (or a run by hand with "dry run" unticked) publishes.
+  DRY_RUN: ${{ github.ref_type != 'tag' && (github.event_name != 'workflow_dispatch' || inputs.dry_run) }}
 
 jobs:
   build:
@@ -61,7 +69,7 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then tag="$GITHUB_REF_NAME"; else tag="${INPUT_TAG:-v$version}"; fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then tag="$GITHUB_REF_NAME"; else tag="${INPUT_TAG:-v$version}"; fi
           if [ "$tag" != "v$version" ]; then
             echo "::error::The tag $tag doesn't match the app version $version (package.json, tauri.conf.json)."
             exit 1
@@ -187,7 +195,7 @@ jobs:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then tag="$GITHUB_REF_NAME"; else tag="${INPUT_TAG:-v$version}"; fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then tag="$GITHUB_REF_NAME"; else tag="${INPUT_TAG:-v$version}"; fi
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "VERSION=$version" >> "$GITHUB_ENV"
           node scripts/release/finish.mjs collected out "$tag" "$GITHUB_REPOSITORY"
