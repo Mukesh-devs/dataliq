@@ -3,6 +3,8 @@ import { isMac } from "../lib/platform";
 
 export interface ShortcutHandlers {
   openFile: () => void;
+  /** Shift+Ctrl+O: a folder (or pattern) of files as one table. */
+  openFolder: () => void;
   closeTab: () => void;
   nextTab: () => void;
   previousTab: () => void;
@@ -33,6 +35,9 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       } else if (mod && !e.shiftKey && key === "o") {
         e.preventDefault();
         handlers.openFile();
+      } else if (mod && e.shiftKey && key === "o") {
+        e.preventDefault();
+        handlers.openFolder();
       } else if (mod && !e.shiftKey && key === "w") {
         e.preventDefault();
         handlers.closeTab();

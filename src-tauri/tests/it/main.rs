@@ -15,6 +15,7 @@ mod engine_query;
 mod excel_sources;
 mod export;
 mod filters;
+mod folders;
 mod import_cache;
 mod json_parquet_sources;
 mod paging;

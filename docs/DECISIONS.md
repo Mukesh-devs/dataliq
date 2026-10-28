@@ -529,3 +529,23 @@ per side; then rows join on the keys alone, without numbering each key's
 occurrences, which sorts both sides. On 50M rows against 50M (5M
 differences) the numbering ran out of the container's disk while
 spilling; without it the comparison takes 14 s (D41).
+
+## D43 — Folders and patterns: an explicit file list, one table, a file column
+
+A folder (the data files directly in it) or a pattern (`logs/*.csv.gz`,
+`data/**/*.parquet`, matched with the `glob` crate) is resolved to an
+explicit, name-ordered list of files, which DuckDB reads together with
+`union_by_name` (a column missing from a file is empty there) and a
+`filename` column holding each row's path relative to the folder (or
+`source_file` when a file already has a `filename` column). Every file's
+format is detected from its contents; the most common format wins, and
+files of other formats and empty files are left out and counted in the
+header's tooltip. Excel workbooks are not combined. The first file is
+sniffed and its CSV settings apply to all; a mix of compressed and plain
+files reads with DuckDB's per-file `auto` compression, and every gzip file
+is checked for damage. The import, the cache (keyed on a digest of every
+file's path, size and modification time, so adding, removing or editing
+any file is a new version), views, SQL and "Copy as SQL" work as for one
+file; a Parquet folder is queried in place. Open it with Open folder
+(Shift+Ctrl+O, the empty window, the macOS File menu), a pattern from the
+palette, by dropping a folder, or with `bigview <folder>`.

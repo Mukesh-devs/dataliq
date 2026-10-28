@@ -47,7 +47,19 @@ export interface SniffedCsv {
 
 /** "sql": a SQL panel result opened in a tab (no file behind it). */
 export type FileFormat = "csv" | "tsv" | "json" | "ndjson" | "parquet" | "xlsx" | "xls" | "sql";
-export type Compression = "none" | "gzip" | "zstd";
+/** "mixed": a folder of some compressed and some plain files. */
+export type Compression = "none" | "gzip" | "zstd" | "mixed";
+
+/** The files a folder or pattern opened together; mirrors `FileList` in Rust. */
+export interface FileList {
+  /** Relative to the folder (at most 500 named). */
+  names: string[];
+  count: number;
+  /** Data files of another format, or empty. */
+  skipped: number;
+  /** The column saying which file a row came from. */
+  column: string;
+}
 
 export interface ColumnMeta {
   name: string;
@@ -100,6 +112,8 @@ export interface SourceInfo {
   columns: ColumnMeta[];
   readerSql: string;
   dataset: DatasetInfo | null;
+  /** A folder or pattern of files read as one table. */
+  files?: FileList | null;
 }
 
 export function openFile(path: string, options: OpenOptions): Promise<SourceInfo> {
@@ -193,6 +207,16 @@ export async function pickFiles(): Promise<string[]> {
   if (picked === null) return [];
   return Array.isArray(picked) ? picked : [picked];
 }
+
+/** A folder to open as one table, from the system dialog (null: cancelled). */
+export async function pickFolder(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const picked = await open({ multiple: false, directory: true });
+  return Array.isArray(picked) ? (picked[0] ?? null) : picked;
+}
+
+/** A path with wildcards: several files opened as one table. */
+export const isPattern = (path: string) => /[*?[]/.test(path);
 
 /** Files passed on the command line when the app started (returned once). */
 export function takeStartupFiles(): Promise<string[]> {

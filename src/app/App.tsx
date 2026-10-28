@@ -8,12 +8,14 @@ import { FileView } from "../components/shell/FileView";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
+import { OpenPattern } from "../components/shell/OpenPattern";
 import {
   onFileDrop,
   onImportProgress,
   onMenu,
   onOpenFiles,
   pickFiles,
+  pickFolder,
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
@@ -165,9 +167,19 @@ export function App() {
     [openPaths],
   );
 
+  const [patternOpen, setPatternOpen] = useState(false);
+  const openFolder = useMemo(
+    () => async () => {
+      const dir = await pickFolder().catch(() => null);
+      if (dir) await openPaths([dir]);
+    },
+    [openPaths],
+  );
+
   const shortcuts = useMemo(
     () => ({
       openFile: () => void openFile(),
+      openFolder: () => void openFolder(),
       closeTab: () => {
         const id = useTabs.getState().activeId;
         if (id) close(id);
@@ -190,7 +202,7 @@ export function App() {
         l.setProfile(!l.profile);
       },
     }),
-    [openFile, close, cycle, setSqlOpen],
+    [openFile, openFolder, close, cycle, setSqlOpen],
   );
   useShortcuts(shortcuts);
 
@@ -203,6 +215,21 @@ export function App() {
         group: "File",
         shortcut: `${modKey}+O`,
         run: shortcuts.openFile,
+      },
+      {
+        id: "open-folder",
+        title: "Open folder as one table…",
+        group: "File",
+        shortcut: `Shift+${modKey}+O`,
+        keywords: "directory many files combine union",
+        run: shortcuts.openFolder,
+      },
+      {
+        id: "open-pattern",
+        title: "Open files matching a pattern…",
+        group: "File",
+        keywords: "glob wildcard folder many files combine union *.csv",
+        run: () => setPatternOpen(true),
       },
     ];
     if (activeId) {
@@ -373,6 +400,7 @@ export function App() {
       () => () =>
         onMenu((id) => {
           if (id === "open-file") shortcuts.openFile();
+          if (id === "open-folder") shortcuts.openFolder();
           if (id === "close-tab") shortcuts.closeTab();
         }),
       [shortcuts],
@@ -426,6 +454,13 @@ export function App() {
               : shortcuts.toggleSql()
         }
       />
+      <OpenPattern
+        // A fresh box each time.
+        key={patternOpen ? "open" : "closed"}
+        open={patternOpen}
+        onOpenChange={setPatternOpen}
+        onOpen={(p) => void openPaths([p])}
+      />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.
         key={palette ? `open:${palette.query}` : "closed"}
@@ -456,6 +491,7 @@ export function App() {
           ) : (
             <EmptyState
               onOpen={() => void openFile()}
+              onOpenFolder={() => void openFolder()}
               recent={recent}
               onOpenRecent={(p) => void openPaths([p])}
               dragging={dragging}

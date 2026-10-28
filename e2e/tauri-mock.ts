@@ -56,6 +56,11 @@ export interface MockOptions {
   comparison?: Record<string, unknown> & { rowCount: number };
   /** Result of `data_quality`. */
   quality?: unknown;
+  /**
+   * Folders and patterns that open like a recorded file (`like`), with
+   * changes to its info (e.g. `files`, `fileName`).
+   */
+  folders?: Record<string, { like: string; info: Record<string, unknown> }>;
 }
 
 /**
@@ -123,6 +128,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       exportMs,
       comparison,
       quality,
+      folders,
     }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
@@ -164,7 +170,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
         },
         invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
           log.push({ cmd, args });
-          const file = recordings.files[String(args.path)];
+          const folder = folders[String(args.path)];
+          const recorded = recordings.files[folder ? folder.like : String(args.path)];
+          const file =
+            recorded && folder
+              ? { ...recorded, info: { ...(recorded.info as object), ...folder.info } }
+              : recorded;
           switch (cmd) {
             case "run_query": {
               const sql = w.__sql as SqlAnswer | undefined;
@@ -400,6 +411,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       exportMs: options.exportMs ?? 0,
       comparison: options.comparison,
       quality: options.quality,
+      folders: options.folders ?? {},
     },
   );
 }

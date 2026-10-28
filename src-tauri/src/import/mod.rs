@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use serde::Serialize;
 
-use crate::cache::{self, Cache, CacheMeta, SourceStamp};
+use crate::cache::{self, Cache, CacheMeta};
 use crate::engine::raw::{Progress, RawConnection};
 use crate::engine::sql::quote_ident;
 use crate::engine::{Dataset, DatasetSource, Engine};
@@ -125,7 +125,9 @@ const DISK_MARGIN: u64 = 1 << 30;
 /// CSV -> 0.96 GB; 100 MB .csv.gz -> 40 MB), so these leave room to spare.
 fn estimate_db_bytes(source: &Source, file_size: u64) -> u64 {
     match source.detected.compression {
-        Compression::Gzip | Compression::Zstd => file_size.saturating_mul(3) / 2,
+        Compression::Gzip | Compression::Zstd | Compression::Mixed => {
+            file_size.saturating_mul(3) / 2
+        }
         Compression::None => file_size / 2,
     }
 }
@@ -143,7 +145,7 @@ pub fn import(
     // Keeps `release_memory` away while the import runs.
     let _busy = engine.busy();
     let started = Instant::now();
-    let stamp = SourceStamp::of(&source.path)?;
+    let stamp = source.stamp()?;
     let key = cache::cache_key(&stamp, &source.options);
     let cache = target.cache;
     let caching = cache.config.enabled;
@@ -218,6 +220,20 @@ pub fn import(
             elapsed_ms: started.elapsed().as_millis() as u64,
         })
     };
+    // Gzip files to check for damage while they are read.
+    let gzipped: Vec<&std::path::Path> = match source.detected.compression {
+        Compression::Gzip => source.files.iter().map(|f| f.as_path()).collect(),
+        // A folder of some compressed files: check the gzip ones.
+        Compression::Mixed => source
+            .files
+            .iter()
+            .filter(|f| {
+                crate::sources::detect::detect(f).is_ok_and(|d| d.compression == Compression::Gzip)
+            })
+            .map(|f| f.as_path())
+            .collect(),
+        _ => Vec::new(),
+    };
     let result: Result<u64> = std::thread::scope(|scope| {
         // Progress reporter for DuckDB readers (Excel reports per batch of rows).
         // Parked rather than sleeping, so it exits as soon as the import ends.
@@ -235,12 +251,14 @@ pub fn import(
             }
         });
         // Gzip integrity check, on another core, alongside DuckDB.
-        let checker = (source.detected.compression == Compression::Gzip).then(|| {
-            scope.spawn(|| match integrity::verify_gzip(&source.path, &done) {
-                Ok(_) => {}
-                Err(_) => {
-                    corrupt.store(true, Ordering::SeqCst);
-                    conn.interrupt();
+        let checker = (!gzipped.is_empty()).then(|| {
+            scope.spawn(|| {
+                for f in &gzipped {
+                    if integrity::verify_gzip(f, &done).is_err() {
+                        corrupt.store(true, Ordering::SeqCst);
+                        conn.interrupt();
+                        return;
+                    }
                 }
             })
         });
@@ -349,7 +367,7 @@ pub fn import(
 
 /// Reads the file directly, without importing (e.g. when disk space is low).
 pub fn open_direct(engine: &Engine, source: &Source) -> Result<Dataset> {
-    let stamp = SourceStamp::of(&source.path)?;
+    let stamp = source.stamp()?;
     let key = format!("direct-{}", cache::cache_key(&stamp, &source.options));
     let (sql, params) = source.reader()?;
     let conn = engine.connection()?;
@@ -373,9 +391,29 @@ pub fn open_direct(engine: &Engine, source: &Source) -> Result<Dataset> {
 /// Opens a Parquet file as a dataset without importing. The row count comes
 /// from the file metadata, so this is instant even for 50M rows.
 pub fn open_in_place(engine: &Engine, source: &Source) -> Result<Dataset> {
-    let stamp = SourceStamp::of(&source.path)?;
+    let stamp = source.stamp()?;
     let key = format!("pq-{}", cache::cache_key(&stamp, &source.options));
     if let Ok(ds) = engine.datasets.get(&key) {
+        return Ok(ds);
+    }
+    if source.is_multi() {
+        // Several files: paged through their reader (row numbers restart per file).
+        let (sql, params) = source.reader()?;
+        let rows: i64 = engine
+            .connection()?
+            .query_row(
+                &format!("SELECT count(*) FROM {sql}"),
+                duckdb::params_from_iter(params.iter()),
+                |r| r.get(0),
+            )
+            .map_err(|e| friendly_error(&e.to_string()))?;
+        let ds = Dataset {
+            id: key,
+            source: DatasetSource::Query { sql, params },
+            row_count: rows as u64,
+            cached: false,
+        };
+        engine.datasets.insert(ds.clone());
         return Ok(ds);
     }
     let path = source.path.to_string_lossy().into_owned();

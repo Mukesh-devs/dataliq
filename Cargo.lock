@@ -484,6 +484,7 @@ dependencies = [
  "dirs",
  "duckdb",
  "flate2",
+ "glob",
  "insta",
  "parking_lot",
  "rust_xlsxwriter",

@@ -725,3 +725,28 @@ tested, and anything left over.
   and the cleaning steps), the steps saved as SQL (Export SQL…, run in plain DuckDB in the
   smoke test), and two file versions compared (`orders_v1.csv` → `orders_v2.csv`).
 - Left over: none.
+
+## v0.6 — Power features
+
+### Step 1 — Open a folder or pattern as one table ✅
+
+- Open folder (Shift+Ctrl+O, the empty window, the macOS File menu), "Open files matching a
+  pattern…" in the palette (`logs/*.csv.gz`, `data/**/*.parquet`), dropping a folder, or
+  `bigview <folder>`: the files are read as one table, columns matched by name, with a
+  `filename` column (relative to the folder; `source_file` if the files have a `filename`).
+- The most common format wins; other formats and empty files are left out and counted in the
+  header tooltip, which lists the files ("CSV · 3 files · mixed"). Plain and `.gz` files mix;
+  every gzip file is checked for damage. Import, cache (a digest of every file's path, size and
+  time), views, SQL and Copy as SQL work as for one file; a Parquet folder is queried in place
+  (D43).
+- Tested: unit tests for folders, patterns across folders, hidden/empty/other files, mixed
+  compression and the errors; integration tests for a CSV folder (union of columns, relative
+  names, mixed .gz, the reader SQL in plain DuckDB), the cache following added and changed
+  files, patterns, NDJSON and Parquet folders, a `filename` column clash; Playwright for Open
+  folder and a pattern from the palette, and the header's file list. The UI recordings gained
+  the new `files` field.
+- Smoke (real app): `bigview sales/` (2024-01.csv, 2024-02.csv.gz, 2024-03.csv with an extra
+  `channel` column, and notes.json) → "CSV · 3 files · mixed · 15.7 KB", 900 rows imported in
+  44 ms, columns `order_id, customer, amount, channel, filename`; sorted by filename the March
+  rows have `channel`, the others are empty; searching `2024-02.csv.gz` → 300 of 900 rows.
+- Left over: none.

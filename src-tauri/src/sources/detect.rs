@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FileFormat {
     Csv,
@@ -25,6 +25,8 @@ pub enum Compression {
     None,
     Gzip,
     Zstd,
+    /// Several files, some compressed and some not: DuckDB tells per file.
+    Mixed,
 }
 
 impl Compression {
@@ -34,6 +36,7 @@ impl Compression {
             Compression::None => "uncompressed",
             Compression::Gzip => "gzip",
             Compression::Zstd => "zstd",
+            Compression::Mixed => "auto_detect",
         }
     }
 
@@ -43,6 +46,7 @@ impl Compression {
             Compression::None => "none",
             Compression::Gzip => "gzip",
             Compression::Zstd => "zstd",
+            Compression::Mixed => "auto",
         }
     }
 }
@@ -59,7 +63,7 @@ const PARQUET_MAGIC: &[u8] = b"PAR1";
 const ZIP_MAGIC: &[u8] = b"PK\x03\x04";
 const OLE_MAGIC: &[u8] = &[0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
 
-fn format_from_ext(ext: &str) -> Option<FileFormat> {
+pub(crate) fn format_from_ext(ext: &str) -> Option<FileFormat> {
     Some(match ext {
         "csv" | "txt" | "dat" => FileFormat::Csv,
         "tsv" | "tab" => FileFormat::Tsv,
@@ -73,7 +77,7 @@ fn format_from_ext(ext: &str) -> Option<FileFormat> {
 }
 
 /// Splits `sales.CSV.gz` into ("csv", Some("gz")), lowercased.
-fn extensions(path: &Path) -> (Option<String>, Option<Compression>) {
+pub(crate) fn extensions(path: &Path) -> (Option<String>, Option<Compression>) {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().to_lowercase())
@@ -171,7 +175,7 @@ pub fn detect(path: &Path) -> io::Result<Detected> {
             let text_head = match compression {
                 Compression::Gzip => gunzip_head(path, 4096),
                 // zstd heads are not sniffed; DuckDB detects the format itself.
-                Compression::Zstd => Vec::new(),
+                Compression::Zstd | Compression::Mixed => Vec::new(),
                 Compression::None => head,
             };
             sniff_text(&text_head)

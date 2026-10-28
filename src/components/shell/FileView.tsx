@@ -129,6 +129,19 @@ const gridAnchor = (): Anchor => ({
 
 const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
 
+/** The files of a folder or pattern, for the header's tooltip. */
+function filesTitle(f: NonNullable<NonNullable<Tab["info"]>["files"]>): string {
+  const more = f.count - f.names.length;
+  return [
+    ...f.names,
+    ...(more > 0 ? [`… and ${formatCount(more)} more`] : []),
+    ...(f.skipped > 0
+      ? [`(${plural(f.skipped, "other file")} left out: another format, or empty)`]
+      : []),
+    `The ${f.column} column says which file each row came from.`,
+  ].join("\n");
+}
+
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
 
 /** The view's rows, else the full dataset (paged from the backend), else the preview. */
@@ -923,7 +936,10 @@ export function FileView({
           {tab.title}
         </span>
         {tab.info && (
-          <span className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase">
+          <span
+            className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase"
+            title={tab.info.files ? filesTitle(tab.info.files) : undefined}
+          >
             {tab.compare ? (
               "Comparison"
             ) : tab.info.format === "sql" ? (
@@ -931,6 +947,7 @@ export function FileView({
             ) : (
               <>
                 {tab.info.format}
+                {tab.info.files && ` · ${plural(tab.info.files.count, "file")}`}
                 {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
                 {formatBytes(tab.info.sizeBytes)}
               </>

@@ -126,6 +126,35 @@ pub fn reader_call_with(
     (sql, params)
 }
 
+/// A list of paths as a DuckDB list literal, `['a', 'b']`.
+pub fn path_list(paths: &[String]) -> String {
+    let items = paths
+        .iter()
+        .map(|p| format!("'{}'", p.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{items}]")
+}
+
+/// Like [`reader_call_with`] over several files, given as a list literal.
+pub fn reader_call_files(
+    function: &str,
+    paths: &[String],
+    format: FileFormat,
+    compression: Compression,
+    opts: &CsvOptions,
+    extra: &[(&'static str, Param)],
+) -> (String, Vec<Param>) {
+    let (sql, mut params) = reader_call_with(function, "", format, compression, opts, extra);
+    params.remove(0);
+    let sql = sql.replacen(
+        &format!("{function}(?"),
+        &format!("{function}({}", path_list(paths)),
+        1,
+    );
+    (sql, params)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

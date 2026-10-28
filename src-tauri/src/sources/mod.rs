@@ -5,6 +5,7 @@ pub mod detect;
 pub mod excel;
 mod friendly;
 pub mod integrity;
+pub mod multi;
 
 use std::path::{Path, PathBuf};
 
@@ -66,20 +67,61 @@ pub struct SourceInfo {
     pub reader_sql: String,
     /// Set once the full data can be paged (after import, or at once for Parquet).
     pub dataset: Option<crate::engine::Dataset>,
+    /// A folder or pattern: its files (relative to its folder, at most
+    /// [`MAX_LISTED_FILES`]), how many there are, how many were left out.
+    pub files: Option<FileList>,
 }
 
-/// A file plus the options to read it: everything needed to build its SQL.
+/// The files a folder or pattern opened together.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileList {
+    pub names: Vec<String>,
+    pub count: usize,
+    /// Data files of another format, or empty.
+    pub skipped: usize,
+    /// The column saying which file a row came from.
+    pub column: String,
+}
+
+/// Files named in [`FileList::names`] (the count is always exact).
+pub const MAX_LISTED_FILES: usize = 500;
+
+/// A file (or a folder or pattern of files) plus the options to read it:
+/// everything needed to build its SQL.
 #[derive(Debug, Clone)]
 pub struct Source {
+    /// What was opened: a file, a folder or a pattern.
     pub path: PathBuf,
     pub detected: Detected,
     pub options: OpenOptions,
+    /// The files read: just `path` for a file.
+    pub files: Vec<PathBuf>,
+    /// A folder or pattern: the folder the files are relative to.
+    pub root: Option<PathBuf>,
+    /// Files of a folder or pattern left out (another format, or empty).
+    pub skipped: usize,
+    /// The column naming each row's file (folders and patterns).
+    pub file_column: String,
 }
 
 impl Source {
     /// Validates the path and options and detects the format. Call
     /// [`Source::resolve_dialect`] before reading CSV files.
     pub fn new(path: &Path, options: OpenOptions) -> Result<Source> {
+        if path.is_dir() || (!path.is_file() && multi::is_pattern(path)) {
+            options.csv.validate().map_err(AppError::Query)?;
+            let set = multi::resolve(path)?;
+            return Ok(Source {
+                path: path.to_path_buf(),
+                detected: set.detected,
+                options,
+                files: set.files,
+                root: Some(set.root),
+                skipped: set.skipped,
+                file_column: "filename".into(),
+            });
+        }
         if !path.is_file() {
             return Err(AppError::Query(format!(
                 "File not found: {}",
@@ -95,11 +137,77 @@ impl Source {
             path: path.to_path_buf(),
             detected,
             options,
+            files: vec![path.to_path_buf()],
+            root: None,
+            skipped: 0,
+            file_column: "filename".into(),
         })
     }
 
+    /// Several files read together (a folder or pattern).
+    pub fn is_multi(&self) -> bool {
+        self.root.is_some()
+    }
+
+    /// The file that is sniffed (the first of a folder).
     fn path_str(&self) -> String {
-        self.path.to_string_lossy().into_owned()
+        self.files[0].to_string_lossy().into_owned()
+    }
+
+    fn file_strs(&self) -> Vec<String> {
+        self.files
+            .iter()
+            .map(|f| f.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    /// Options every multi-file reader takes: the file column, columns
+    /// matched by name.
+    fn multi_options(&self) -> [(&'static str, Param); 2] {
+        [
+            ("filename", Param::Text(self.file_column.clone())),
+            ("union_by_name", Param::Bool(true)),
+        ]
+    }
+
+    /// Wraps a multi-file reader so its file column is relative to the folder.
+    fn relative_files(&self, call: String) -> String {
+        let Some(root) = &self.root else {
+            return call;
+        };
+        let root = root.to_string_lossy();
+        // 1-based, after the folder and its separator (DuckDB counts characters).
+        let from = if root.is_empty() {
+            1
+        } else {
+            root.trim_end_matches(['/', '\\']).chars().count() + 2
+        };
+        let col = crate::engine::sql::quote_ident(&self.file_column);
+        format!("(SELECT * REPLACE (substr({col}, {from}) AS {col}) FROM {call})")
+    }
+
+    /// Every file read, with its size, last change and a digest of the
+    /// list: what the cache key of a folder or pattern is made of.
+    pub fn stamp(&self) -> Result<crate::cache::SourceStamp> {
+        if !self.is_multi() {
+            return crate::cache::SourceStamp::of(&self.path);
+        }
+        let mut parts = Vec::with_capacity(self.files.len());
+        let (mut size, mut modified_ms) = (0u64, 0u64);
+        for f in &self.files {
+            let s = crate::cache::SourceStamp::of(f)?;
+            size += s.size;
+            modified_ms = modified_ms.max(s.modified_ms);
+            parts.push(s);
+        }
+        let root = self.root.as_deref().unwrap_or(&self.path);
+        let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+        Ok(crate::cache::SourceStamp {
+            path: root.join(self.path.file_name().unwrap_or_default()),
+            size,
+            modified_ms,
+            parts: Some(crate::cache::digest_parts(&parts)),
+        })
     }
 
     /// Table expression and parameters, e.g. `read_csv(?, compression = ?)`.
@@ -108,6 +216,9 @@ impl Source {
             format,
             compression,
         } = self.detected;
+        if self.is_multi() {
+            return self.multi_reader();
+        }
         match format {
             FileFormat::Csv | FileFormat::Tsv => Ok(csv::reader_call(
                 "read_csv",
@@ -141,6 +252,58 @@ impl Source {
                 "Excel files can't be read in place. Free up some disk space so the sheet can be imported.".into(),
             )),
         }
+    }
+
+    /// The reader over every file of a folder or pattern.
+    fn multi_reader(&self) -> Result<(String, Vec<Param>)> {
+        let Detected {
+            format,
+            compression,
+        } = self.detected;
+        let files = self.file_strs();
+        let extra = self.multi_options();
+        let (call, params) = match format {
+            FileFormat::Csv | FileFormat::Tsv => csv::reader_call_files(
+                "read_csv",
+                &files,
+                format,
+                compression,
+                &self.options.csv,
+                &extra,
+            ),
+            FileFormat::Json | FileFormat::Ndjson => {
+                let layout = if format == FileFormat::Ndjson {
+                    "newline_delimited"
+                } else {
+                    "auto"
+                };
+                let mut params = vec![
+                    Param::Text(layout.into()),
+                    Param::Text(compression.duckdb_file_compression().into()),
+                ];
+                params.extend(extra.iter().map(|(_, v)| v.clone()));
+                (
+                    format!(
+                        "read_json({}, format = ?, compression = ?, filename = ?, union_by_name = ?)",
+                        csv::path_list(&files)
+                    ),
+                    params,
+                )
+            }
+            FileFormat::Parquet => (
+                format!(
+                    "read_parquet({}, filename = ?, union_by_name = ?)",
+                    csv::path_list(&files)
+                ),
+                extra.iter().map(|(_, v)| v.clone()).collect(),
+            ),
+            FileFormat::Xlsx | FileFormat::Xls => {
+                return Err(AppError::Query(
+                    "Excel workbooks can't be opened together as one table.".into(),
+                ));
+            }
+        };
+        Ok((self.relative_files(call), params))
     }
 
     /// Parquet is already columnar and fast: it is queried in place instead
@@ -282,6 +445,24 @@ impl Source {
     /// delimiter explicitly so the real problem (a bad row) is reported and
     /// "Ignore bad rows" can fix it.
     pub fn resolve_dialect(mut self, engine: &Engine) -> Result<Source> {
+        if self.is_multi() {
+            self = self.resolve_single_dialect(engine)?;
+            // The file column needs a name no file uses (as read from the first).
+            let mut first = self.clone();
+            first.root = None;
+            first.files.truncate(1);
+            let names: Vec<String> = first.columns(engine)?.into_iter().map(|c| c.name).collect();
+            self.file_column = ["filename", "source_file", "bigview_file"]
+                .into_iter()
+                .find(|n| !names.iter().any(|c| c.eq_ignore_ascii_case(n)))
+                .unwrap_or("bigview_source_file")
+                .to_string();
+            return Ok(self);
+        }
+        self.resolve_single_dialect(engine)
+    }
+
+    fn resolve_single_dialect(mut self, engine: &Engine) -> Result<Source> {
         if !self.is_csv() || self.options.csv.delimiter.is_some() {
             return Ok(self);
         }
@@ -355,13 +536,25 @@ impl Source {
                 self.reader_display_sql()?,
             )
         };
+        let files = self.root.as_ref().map(|root| FileList {
+            names: self
+                .files
+                .iter()
+                .take(MAX_LISTED_FILES)
+                .map(|f| multi::relative(root, f))
+                .collect(),
+            count: self.files.len(),
+            skipped: self.skipped,
+            column: self.file_column.clone(),
+        });
+        let mut size_bytes = 0;
+        for f in &self.files {
+            size_bytes += std::fs::metadata(f)?.len();
+        }
         Ok(SourceInfo {
-            file_name: self
-                .path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default(),
-            size_bytes: std::fs::metadata(&self.path)?.len(),
+            file_name: self.display_name(),
+            size_bytes,
+            files,
             format: self.detected.format,
             compression: self.detected.compression,
             sniffed,
@@ -371,6 +564,24 @@ impl Source {
             dataset: None,
             path: self.path.clone(),
         })
+    }
+
+    /// The file's name; for a pattern its last two parts (`logs/*.csv.gz`),
+    /// for a folder its name.
+    pub fn display_name(&self) -> String {
+        let name = |p: &Path| {
+            p.file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| p.to_string_lossy().into_owned())
+        };
+        if self.is_multi() && !self.path.is_dir() {
+            let parent = self.path.parent().map(name).filter(|n| !n.is_empty());
+            return match parent {
+                Some(p) => format!("{p}/{}", name(&self.path)),
+                None => name(&self.path),
+            };
+        }
+        name(&self.path)
     }
 
     /// First `limit` rows read straight from the file, as Arrow IPC bytes.
