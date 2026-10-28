@@ -9,7 +9,7 @@ import {
   Table,
   WandSparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
 import { formatBytes, formatCount, formatValue, plural } from "../../lib/format";
@@ -74,7 +74,6 @@ import { filterForValue } from "../../lib/cellFilter";
 import { useLayout } from "../../stores/layout";
 import { useExport } from "../../stores/export";
 import { defaultChart, fitChart } from "../../lib/chart";
-import { ChartPanel } from "../chart/ChartPanel";
 import { Button } from "../ui/Button";
 import { ColumnMenu } from "../filters/ColumnMenu";
 import { RenameColumn } from "../filters/RenameColumn";
@@ -95,6 +94,11 @@ import { DatabaseSettings } from "../import/DatabaseSettings";
 import { ExcelSettings } from "../import/ExcelSettings";
 import { ImportBar } from "../import/ImportBar";
 import { ImportSettings } from "../import/ImportSettings";
+
+// ECharts is loaded the first time a chart is shown.
+const ChartPanel = lazy(() =>
+  import("../chart/ChartPanel").then((m) => ({ default: m.ChartPanel })),
+);
 
 interface FileViewProps {
   tab: Tab;
@@ -1205,17 +1209,19 @@ export function FileView({
             </div>
           </div>
         ) : mode === "chart" && chart && baseId ? (
-          <ChartPanel
-            tabId={tab.id}
-            datasetId={baseId}
-            view={view}
-            columns={columns}
-            labelOf={labelOf}
-            chart={chart}
-            onChange={(c) => setChart(tab.id, c)}
-            title={tab.title}
-            readerSql={readerSql}
-          />
+          <Suspense fallback={null}>
+            <ChartPanel
+              tabId={tab.id}
+              datasetId={baseId}
+              view={view}
+              columns={columns}
+              labelOf={labelOf}
+              chart={chart}
+              onChange={(c) => setChart(tab.id, c)}
+              title={tab.title}
+              readerSql={readerSql}
+            />
+          </Suspense>
         ) : source ? (
           <div className="flex min-h-0 min-w-0 flex-1">
             <DataGrid

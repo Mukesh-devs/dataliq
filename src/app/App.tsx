@@ -1,10 +1,8 @@
 import { FileUp } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { CommandPalette } from "../components/palette/CommandPalette";
 import { ExportDialog } from "../components/export/ExportDialog";
-import { SqlPanel } from "../components/sql/SqlPanel";
 import { EmptyState } from "../components/shell/EmptyState";
-import { FileView } from "../components/shell/FileView";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
@@ -46,6 +44,15 @@ import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
 import { useSqlTables } from "./useSqlTables";
+
+// Loaded on first use, so the start screen doesn't parse the grid, SQL
+// editor and chart libraries (about 1.5 MB of JavaScript).
+const FileView = lazy(() =>
+  import("../components/shell/FileView").then((m) => ({ default: m.FileView })),
+);
+const SqlPanel = lazy(() =>
+  import("../components/sql/SqlPanel").then((m) => ({ default: m.SqlPanel })),
+);
 
 /** "filtered", "sorted" or "filtered and sorted", for the status bar. */
 function viewVerb(tab: Tab): { ed: string; ing: string } {
@@ -694,16 +701,18 @@ export function App() {
         )}
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
           {active ? (
-            <FileView
-              key={active.id}
-              tab={active}
-              onReopen={(o) => void reopen(active.id, o)}
-              onReload={active.path ? () => void reload(active.id) : undefined}
-              onCancelImport={() => void cancelImport(active.id)}
-              onReadDirect={() => void readDirect(active.id)}
-              onViewChange={(v) => void setView(active.id, v)}
-              onLayoutChange={(l) => setLayout(active.id, l)}
-            />
+            <Suspense fallback={null}>
+              <FileView
+                key={active.id}
+                tab={active}
+                onReopen={(o) => void reopen(active.id, o)}
+                onReload={active.path ? () => void reload(active.id) : undefined}
+                onCancelImport={() => void cancelImport(active.id)}
+                onReadDirect={() => void readDirect(active.id)}
+                onViewChange={(v) => void setView(active.id, v)}
+                onLayoutChange={(l) => setLayout(active.id, l)}
+              />
+            </Suspense>
           ) : (
             <EmptyState
               onOpen={() => void openFile()}
@@ -715,7 +724,11 @@ export function App() {
             />
           )}
           <ExportDialog />
-          {sqlOpen && <SqlPanel />}
+          {sqlOpen && (
+            <Suspense fallback={null}>
+              <SqlPanel />
+            </Suspense>
+          )}
           {active && dragging && (
             <div
               data-testid="drop-overlay"
