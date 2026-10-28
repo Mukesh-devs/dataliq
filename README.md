@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/icon.svg" width="112" alt="DataLiq icon: a drop made of data rows, speeding forward"></p>
+<p align="center"><img src="assets/icon.svg" width="112" alt="DataLiq icon: a database stack with a forward chevron"></p>
 
 # DataLiq
 

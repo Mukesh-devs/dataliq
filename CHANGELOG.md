@@ -21,8 +21,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The app is now called **DataLiq**, with a new icon: a drop made of rows of data, speeding
-  forward. Workspaces are `.dataliq` files, and settings, cache and logs live in the
+- The app is now called **DataLiq**, with a new icon: a database stack with a forward chevron. Workspaces are `.dataliq` files, and settings, cache and logs live in the
   `app.dataliq.desktop` folders (settings from earlier builds start fresh).
 - A column profile of a column where nearly every value differs is 3× faster: its most common
   values are found by an estimate and counted exactly, and the panel says so.

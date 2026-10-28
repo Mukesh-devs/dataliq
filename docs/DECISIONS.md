@@ -780,7 +780,7 @@ The grid itself is a canvas (Glide): it is navigated with the arrow keys and
 exposes its visible cells as an accessible table to screen readers; data
 beyond the visible cells is reached by scrolling, Go to row and SQL.
 
-## D53 — The name is DataLiq, and the icon is a drop of data in flight
+## D53 — The name is DataLiq, and the icon is a database with a forward chevron
 
 The app is called **DataLiq** (data + liquid: data that flows), written with two
 capitals. The name replaces the working title everywhere: the window, menus and
@@ -791,9 +791,11 @@ crate (`dataliq` / `dataliq_lib`), internal SQL names (`dl_` prefix), local
 storage keys and the release variables (`DATALIQ_UPDATER_PUBKEY`). No build has
 been published, so nothing reads the old names.
 
-The icon (`assets/icon.svg`, rendered into every size by `tauri icon`) is a
-streamlined drop moving to the right: its body is five rows of data in a
-cyan-to-violet gradient, and the middle rows stream off its tail as speed lines,
-on a deep navy tile. Data (rows), liquid (the drop) and speed (the streamlined
-shape and trails) in one mark that stays legible at 32 px and in both themes.
-It also appears in Help › About.
+The icon (`assets/icon.svg`, rendered into every size by `tauri icon`) follows
+the current desktop style: bold, flat shapes on a dark graphite tile sized to
+Apple's icon grid. A database stack of three discs in a cyan-to-violet
+gradient says data; an amber chevron pointing forward beside it says fast.
+It stays legible at 32 px and on light and dark backgrounds, and also appears
+in Help › About. It was chosen from three concepts (a "D" with a lightning
+bolt, a table struck by a bolt, this one), after two earlier drafts (a drop
+made of data rows, an arrow made of bars) were set aside at review.

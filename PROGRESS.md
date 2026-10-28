@@ -998,10 +998,12 @@ tested, and anything left over.
   keys, workflows, release scripts and every document. A search of the repository, the
   built binary and the .deb finds no trace of the old name. (Git history and earlier pull
   request titles keep it: history is never rewritten.)
-- New icon (`assets/icon.svg`): a streamlined drop moving right, its body five rows of data in
-  a cyan-to-violet gradient, the middle rows streaming off its tail as speed lines, on a deep
-  navy tile; rendered to every platform size with `tauri icon`, and shown in Help › About and
-  at the top of the README.
+- New icon (`assets/icon.svg`): a database stack in a cyan-to-violet gradient with an amber
+  chevron pointing forward, on a dark graphite tile in the style of current desktop icons;
+  chosen from three drawn concepts (a "D" with a bolt, a table struck by a bolt, this one)
+  after two earlier drafts (a drop of data rows, an arrow of bars) were set aside. Rendered to
+  every platform size with `tauri icon`, and shown in Help › About and at the top of the
+  README.
 - Tested: the full check (Rust tests with the renamed snapshots, Vitest, Playwright, the
   Tauri bundles); the icon checked at 1024, 64 and 32 px on light and dark backgrounds.
 - Smoke (real app, Linux): About shows the icon and "DataLiq 0.6.0"; the data folder is
