@@ -91,6 +91,7 @@ import {
 import { FilterBar } from "../filters/FilterBar";
 import { SearchBox } from "../filters/SearchBox";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
+import { DatabaseSettings } from "../import/DatabaseSettings";
 import { ExcelSettings } from "../import/ExcelSettings";
 import { ImportBar } from "../import/ImportBar";
 import { ImportSettings } from "../import/ImportSettings";
@@ -938,7 +939,7 @@ export function FileView({
         </span>
         {tab.info && (
           <span
-            className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase"
+            className="shrink-0 rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] whitespace-nowrap text-fg-muted uppercase"
             title={tab.info.files ? filesTitle(tab.info.files) : undefined}
           >
             {tab.compare ? (
@@ -1047,6 +1048,12 @@ export function FileView({
           <ExcelSettings
             info={tab.info.excel}
             onChange={(excel) => onReopen({ ...tab.options, excel })}
+          />
+        )}
+        {tab.info?.database && (
+          <DatabaseSettings
+            info={tab.info.database}
+            onChange={(database) => onReopen({ ...tab.options, database })}
           />
         )}
         {showSettings && (

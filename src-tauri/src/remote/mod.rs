@@ -7,9 +7,8 @@
 //! secret key never touches a file. They become a temporary DuckDB secret
 //! for this session.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::engine::Engine;
@@ -161,45 +160,13 @@ pub fn clear_s3() -> Result<()> {
     }
 }
 
-/// httpfs for one engine: where extensions go, and whether it is loaded.
-#[derive(Default)]
-pub struct RemoteState {
-    extension_dir: Mutex<Option<PathBuf>>,
-    loaded: Mutex<bool>,
-}
-
 impl Engine {
-    /// Where httpfs is installed (the app's cache folder). Unset, DuckDB's
-    /// default (`~/.duckdb/extensions`).
-    pub fn set_extension_dir(&self, dir: &Path) {
-        *self.remote.extension_dir.lock() = Some(dir.to_path_buf());
-    }
-
-    /// Installs (the first time) and loads httpfs, and the S3 secret from
+    /// Loads httpfs (installing it the first time) and the S3 secret from
     /// the keychain. Called when a URL is opened, never before.
     pub fn enable_remote(&self) -> Result<()> {
-        let mut loaded = self.remote.loaded.lock();
-        if *loaded {
+        if !self.load_extension("httpfs", "Opening URLs")? {
             return Ok(());
         }
-        let mut setup = String::new();
-        if let Some(dir) = self.remote.extension_dir.lock().as_ref() {
-            std::fs::create_dir_all(dir)?;
-            setup.push_str(&format!(
-                "SET extension_directory = {};\n",
-                literal(&Param::Text(dir.to_string_lossy().into_owned()))
-            ));
-        }
-        setup.push_str("INSTALL httpfs; LOAD httpfs;");
-        self.execute_batch(&setup).map_err(|e| {
-            AppError::Query(format!(
-                "Opening URLs needs DuckDB's httpfs extension, which couldn't be installed. \
-                 Connect to the internet once to download it ({}).",
-                e.to_string().lines().next().unwrap_or_default()
-            ))
-        })?;
-        *loaded = true;
-        drop(loaded);
         // Stored S3 settings apply from the first URL on; a broken keychain
         // only means public files.
         match load_s3() {
@@ -213,7 +180,7 @@ impl Engine {
     /// Makes (or with `None`, drops) the session's S3 secret. Only once
     /// httpfs is loaded; before that the settings wait in the keychain.
     pub fn use_s3(&self, s: Option<&S3Settings>) -> Result<()> {
-        if !*self.remote.loaded.lock() {
+        if !self.remote_enabled() {
             return Ok(());
         }
         match s {
@@ -223,7 +190,7 @@ impl Engine {
     }
 
     pub fn remote_enabled(&self) -> bool {
-        *self.remote.loaded.lock()
+        self.extension_loaded("httpfs")
     }
 }
 

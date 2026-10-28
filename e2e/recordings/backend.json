@@ -21,6 +21,7 @@
           }
         ],
         "compression": "none",
+        "database": null,
         "dataset": null,
         "excel": null,
         "fileName": "comma.csv",
@@ -71,6 +72,7 @@
           }
         ],
         "compression": "none",
+        "database": null,
         "dataset": null,
         "excel": {
           "headerRow": 1,
@@ -108,6 +110,7 @@
           }
         ],
         "compression": "none",
+        "database": null,
         "dataset": null,
         "excel": null,
         "fileName": "nested.json",
@@ -137,6 +140,7 @@
           }
         ],
         "compression": "none",
+        "database": null,
         "dataset": null,
         "excel": null,
         "fileName": "nulls.csv",
@@ -175,6 +179,7 @@
           }
         ],
         "compression": "gzip",
+        "database": null,
         "dataset": null,
         "excel": null,
         "fileName": "quoted.csv.gz",
@@ -217,6 +222,7 @@
           }
         ],
         "compression": "none",
+        "database": null,
         "dataset": null,
         "excel": null,
         "fileName": "semicolon.csv",
@@ -315,6 +321,7 @@
           }
         ],
         "compression": "none",
+        "database": null,
         "dataset": {
           "cached": false,
           "id": "pq-recorded",

@@ -1,6 +1,7 @@
 //! File sources: format detection and the DuckDB reader call for each format.
 
 pub mod csv;
+pub mod database;
 pub mod detect;
 pub mod excel;
 mod friendly;
@@ -12,6 +13,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 pub use csv::CsvOptions;
+pub use database::{DatabaseInfo, DatabaseOptions};
 pub use detect::{Compression, Detected, FileFormat};
 pub use excel::{ExcelInfo, ExcelOptions};
 pub use friendly::friendly_error;
@@ -25,6 +27,7 @@ use crate::error::{AppError, Result};
 pub struct OpenOptions {
     pub csv: CsvOptions,
     pub excel: ExcelOptions,
+    pub database: DatabaseOptions,
 }
 
 /// CSV settings as detected by DuckDB's sniffer, shown in the Import settings popover.
@@ -62,6 +65,8 @@ pub struct SourceInfo {
     pub sniffed: Option<SniffedCsv>,
     /// Sheets and header row (Excel only).
     pub excel: Option<ExcelInfo>,
+    /// Tables, and the one shown (SQLite and DuckDB files).
+    pub database: Option<DatabaseInfo>,
     pub columns: Vec<ColumnMeta>,
     /// The table expression used to read the file, for "Copy as SQL".
     pub reader_sql: String,
@@ -103,6 +108,8 @@ pub struct Source {
     pub skipped: usize,
     /// The column naming each row's file (folders and patterns).
     pub file_column: String,
+    /// A database file, once attached by [`Source::resolve_dialect`].
+    pub db: Option<database::Opened>,
 }
 
 impl Source {
@@ -126,6 +133,11 @@ impl Source {
                         .into(),
                 ));
             }
+            if database::is_database(detected.format) {
+                return Err(AppError::Query(
+                    "Databases can't be read from a URL; download the file and open it.".into(),
+                ));
+            }
             return Ok(Source {
                 path: path.to_path_buf(),
                 detected,
@@ -134,6 +146,7 @@ impl Source {
                 root: None,
                 skipped: 0,
                 file_column: "filename".into(),
+                db: None,
             });
         }
         if path.is_dir() || (!path.is_file() && multi::is_pattern(path)) {
@@ -147,6 +160,7 @@ impl Source {
                 root: Some(set.root),
                 skipped: set.skipped,
                 file_column: "filename".into(),
+                db: None,
             });
         }
         if !path.is_file() {
@@ -168,6 +182,7 @@ impl Source {
             root: None,
             skipped: 0,
             file_column: "filename".into(),
+            db: None,
         })
     }
 
@@ -292,6 +307,10 @@ impl Source {
             FileFormat::Xlsx | FileFormat::Xls => Err(AppError::Query(
                 "Excel files can't be read in place. Free up some disk space so the sheet can be imported.".into(),
             )),
+            FileFormat::Sqlite | FileFormat::Duckdb => match &self.db {
+                Some(db) => Ok((db.relation(), Vec::new())),
+                None => Err(AppError::Internal("the database isn't attached".into())),
+            },
         }
     }
 
@@ -338,23 +357,30 @@ impl Source {
                 ),
                 extra.iter().map(|(_, v)| v.clone()).collect(),
             ),
-            FileFormat::Xlsx | FileFormat::Xls => {
+            FileFormat::Xlsx | FileFormat::Xls | FileFormat::Sqlite | FileFormat::Duckdb => {
                 return Err(AppError::Query(
-                    "Excel workbooks can't be opened together as one table.".into(),
+                    "Excel workbooks and databases can't be opened together as one table.".into(),
                 ));
             }
         };
         Ok((self.relative_files(call), params))
     }
 
-    /// Parquet is already columnar and fast: it is queried in place instead
-    /// of being imported, with the row count read from the file metadata.
+    /// Parquet and DuckDB tables are already columnar and fast: they are
+    /// queried in place instead of being imported.
     pub fn is_queried_in_place(&self) -> bool {
-        self.detected.format == FileFormat::Parquet
+        matches!(
+            self.detected.format,
+            FileFormat::Parquet | FileFormat::Duckdb
+        )
     }
 
     /// Reader SQL with literal values, for display ("Copy as SQL") only.
     pub fn reader_display_sql(&self) -> Result<String> {
+        if let (FileFormat::Sqlite, Some(db)) = (self.detected.format, &self.db) {
+            // Runs in plain DuckDB (with the sqlite extension), no ATTACH needed.
+            return Ok(database::sqlite_scan_sql(&self.path, &db.table));
+        }
         let (sql, params) = self.reader()?;
         Ok(inline_params(&sql, &params))
     }
@@ -490,6 +516,15 @@ impl Source {
             // Opening a URL is what asks for httpfs.
             engine.enable_remote()?;
         }
+        if database::is_database(self.detected.format) {
+            self.db = Some(database::open(
+                engine,
+                &self.path,
+                self.detected.format,
+                &self.options.database,
+            )?);
+            return Ok(self);
+        }
         if self.is_multi() {
             self = self.resolve_single_dialect(engine)?;
             // The file column needs a name no file uses (as read from the first).
@@ -606,6 +641,7 @@ impl Source {
             compression: self.detected.compression,
             sniffed,
             excel,
+            database: self.db.as_ref().map(database::Opened::info),
             columns,
             reader_sql,
             dataset: None,

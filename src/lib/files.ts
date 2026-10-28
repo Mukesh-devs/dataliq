@@ -30,9 +30,34 @@ export interface ExcelInfo {
   headerRow: number;
 }
 
+/** Which table of a SQLite or DuckDB file. Unset = the first table. */
+export interface DatabaseOptions {
+  /** "main" when unset. */
+  schema?: string;
+  table?: string;
+}
+
+export interface DbTable {
+  schema: string;
+  name: string;
+  kind: "table" | "view";
+  /** Known without counting (DuckDB tables only). */
+  rows: number | null;
+}
+
+/** Tables of a database file and the one shown; mirrors `DatabaseInfo` in Rust. */
+export interface DatabaseInfo {
+  tables: DbTable[];
+  schema: string;
+  table: string;
+  /** The name the file is attached under in the SQL panel. */
+  alias: string;
+}
+
 export interface OpenOptions {
   csv?: CsvOptions;
   excel?: ExcelOptions;
+  database?: DatabaseOptions;
 }
 
 export interface SniffedCsv {
@@ -47,7 +72,8 @@ export interface SniffedCsv {
 }
 
 /** "sql": a SQL panel result opened in a tab (no file behind it). */
-export type FileFormat = "csv" | "tsv" | "json" | "ndjson" | "parquet" | "xlsx" | "xls" | "sql";
+export type FileFormat =
+  "csv" | "tsv" | "json" | "ndjson" | "parquet" | "xlsx" | "xls" | "sqlite" | "duckdb" | "sql";
 /** "mixed": a folder of some compressed and some plain files. */
 export type Compression = "none" | "gzip" | "zstd" | "mixed";
 
@@ -110,6 +136,8 @@ export interface SourceInfo {
   compression: Compression;
   sniffed: SniffedCsv | null;
   excel: ExcelInfo | null;
+  /** SQLite and DuckDB files: their tables. */
+  database?: DatabaseInfo | null;
   columns: ColumnMeta[];
   readerSql: string;
   dataset: DatasetInfo | null;
@@ -192,6 +220,12 @@ export const FILE_EXTENSIONS = [
   "parquet",
   "xlsx",
   "xls",
+  "sqlite",
+  "sqlite3",
+  "db",
+  "db3",
+  "duckdb",
+  "ddb",
 ];
 
 /** Shows the native open dialog. Resolves to [] when cancelled. */

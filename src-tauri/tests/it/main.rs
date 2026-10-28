@@ -11,6 +11,7 @@ mod charts;
 mod compare;
 mod copy_sql;
 mod csv_sources;
+mod databases;
 mod engine_query;
 mod excel_sources;
 mod export;

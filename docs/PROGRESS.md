@@ -24,3 +24,28 @@
 - Left over: the container has no Secret Service, so storing S3 settings in a real keychain was
   checked only with the keyring mock and in Playwright; S3 itself was not tested against a live
   bucket.
+
+### Step 3 — SQLite and DuckDB files ✅
+
+- SQLite (`.sqlite`, `.sqlite3`, `.db`, `.db3`) and DuckDB (`.duckdb`, `.ddb`) files open like
+  any file (dialog, drop, `bigview shop.duckdb`), told apart by their header bytes, attached
+  read-only once per session under a name from the file (`Shop Data.duckdb` → `shop_data`),
+  so the SQL panel can join their tables with anything else.
+- A "Table" picker in the header lists tables (DuckDB with row counts), views, and other
+  schemas as `schema.table`; the first table opens. DuckDB tables are queried in place;
+  SQLite tables are imported and cached per table. The sqlite extension installs on first use,
+  as httpfs does (D44); a changed file is attached afresh; a file locked for writing, another
+  DuckDB version, no tables, a database URL or folder are said in words (D45).
+- Buttons no longer shrink or wrap in a crowded header; the file name truncates instead.
+- Tested: unit tests for detection by header (`.db` either way, no extension), attached names,
+  attach error wording; integration tests for a DuckDB file (tables, views, other schema, row
+  counts, in place with a deep page, the SQL name, read-only, a missing table), a SQLite file
+  (types, preview, import, cache per table, `sqlite_scan` Copy-as-SQL in plain DuckDB), a
+  changed SQLite file read again, an empty database and a database URL; Playwright for the
+  picker (labels, SQL name, picking a table in another schema). UI recordings gained
+  `database`.
+- Smoke (real app): `bigview "Shop Data.duckdb" chinook.sqlite` → "DUCKDB · 9.8 MB",
+  customers (97 rows) queried in place; picking orders (2,000,000 rows) → in place, the last
+  page at once; chinook → sqlite extension installed, artists imported in 12 ms; in the SQL
+  panel `chinook.tracks JOIN chinook.artists` with `shop_data.orders` → 4 rows in 25 ms.
+- Left over: none.

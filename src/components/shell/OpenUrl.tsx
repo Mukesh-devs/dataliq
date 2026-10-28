@@ -141,7 +141,6 @@ function S3Form() {
         <Button
           size="sm"
           variant="secondary"
-          className="shrink-0 whitespace-nowrap"
           disabled={!canSave}
           onClick={() =>
             void saveS3Settings({ ...draft, keyId: draft.keyId.trim() }).then(

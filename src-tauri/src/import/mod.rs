@@ -15,7 +15,7 @@ use crate::engine::raw::{Progress, RawConnection};
 use crate::engine::sql::quote_ident;
 use crate::engine::{Dataset, DatasetSource, Engine};
 use crate::error::{AppError, Result};
-use crate::sources::{Compression, Source, excel, friendly_error, integrity};
+use crate::sources::{Compression, FileFormat, Source, excel, friendly_error, integrity};
 
 /// Progress report sent to the UI while an import runs.
 #[derive(Debug, Clone, Serialize)]
@@ -399,8 +399,8 @@ pub fn open_in_place(engine: &Engine, source: &Source) -> Result<Dataset> {
     if let Ok(ds) = engine.datasets.get(&key) {
         return Ok(ds);
     }
-    if source.is_multi() {
-        // Several files: paged through their reader (row numbers restart per file).
+    if source.is_multi() || source.detected.format == FileFormat::Duckdb {
+        // Several files, or a DuckDB table: paged through their reader.
         let (sql, params) = source.reader()?;
         let rows: i64 = engine
             .connection()?

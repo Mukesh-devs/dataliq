@@ -573,3 +573,25 @@ saving with an empty secret keeps the stored one. They become a temporary
 DuckDB secret for the session, so nothing sensitive is written to disk.
 HTTP errors are said in words (404: no file at this address; 401/403:
 refused, with a pointer to the S3 settings).
+
+## D45 — Database files: attached read-only, a table at a time
+
+SQLite (`.sqlite`, `.sqlite3`, `.db`, `.db3`) and DuckDB (`.duckdb`, `.ddb`,
+or a `.db` whose header says DuckDB) files are told apart by their first
+bytes and attached `READ_ONLY` once per session, under a name made from the
+file name (`Shop Data.duckdb` → `shop_data`, with `_2` … when two files
+share a name), so the SQL panel can query any of their tables too. A
+"Table" picker in the header lists tables (with row counts for DuckDB, which
+knows them) and then views, `main` first and other schemas as
+`schema.table`; the first table opens. DuckDB tables are queried in place
+(columnar, fast); SQLite tables are imported and cached like a CSV file,
+each table its own entry, because paging through SQLite from DuckDB is
+slow. A file that changed on disk is detached and attached again. SQLite
+needs DuckDB's sqlite extension, installed on first use like httpfs (D44);
+DuckDB files need nothing. SQLite has no date type, so its dates arrive as
+text (Clean changes the type). "Copy as SQL" gives `sqlite_scan(path,
+table)` for SQLite, which runs in plain DuckDB with the extension; a DuckDB
+table is given by its attached name (`"shop"."main"."orders"`), which
+needs `ATTACH 'path' AS shop (READ_ONLY)` outside BigView. Databases can't
+be combined in a folder or read from a URL. A file another program holds
+open for writing, and one from another DuckDB version, are said in words.
