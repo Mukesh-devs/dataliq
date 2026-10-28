@@ -12,6 +12,7 @@ pub mod import;
 pub mod quality;
 pub mod recipe;
 pub mod remote;
+pub mod sample;
 pub mod settings;
 pub mod sources;
 pub mod sql;
@@ -123,6 +124,7 @@ pub fn run() {
             commands::settings::save_settings,
             commands::app::take_startup_files,
             commands::app::set_native_menu,
+            commands::app::sample_dataset,
             commands::view::open_view,
             commands::view::column_values,
             commands::view::column_profile,

@@ -281,6 +281,11 @@ export async function pickFolder(): Promise<string | null> {
 /** A path with wildcards: several files opened as one table. */
 export const isPattern = (path: string) => /[*?[]/.test(path);
 
+/** The sample dataset's path (written to the app's data folder the first time). */
+export function sampleDataset(): Promise<string> {
+  return call<string>("sample_dataset");
+}
+
 /** Files passed on the command line when the app started (returned once). */
 export function takeStartupFiles(): Promise<string[]> {
   return call<string[]>("take_startup_files");

@@ -353,6 +353,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               w.__settings = next;
               return { settings: next, restartNeeded: next.cacheDir !== null };
             }
+            case "sample_dataset":
+              return "/data/comma.csv";
             case "set_native_menu":
               return null;
             case "cache_info":

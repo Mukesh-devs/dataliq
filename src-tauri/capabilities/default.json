@@ -26,6 +26,7 @@
     "allow-save-settings",
     "allow-take-startup-files",
     "allow-set-native-menu",
+    "allow-sample-dataset",
     "allow-open-view",
     "allow-column-values",
     "allow-column-profile",

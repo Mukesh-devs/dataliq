@@ -1,10 +1,12 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::Once;
 use std::time::Instant;
 
 use parking_lot::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 
+use crate::engine::Engine;
 use crate::error::{AppError, Result};
 
 /// Files passed on the command line at startup, until the UI takes them.
@@ -39,4 +41,22 @@ pub fn set_native_menu(app: tauri::AppHandle, menus: Vec<crate::menu::NativeMenu
             .map_err(|e| AppError::Internal(format!("menu: {e}")))?;
     }
     Ok(())
+}
+
+/// The sample dataset's path, written to the app's data folder the first
+/// time (see `sample`).
+#[tauri::command]
+pub async fn sample_dataset(
+    app: tauri::AppHandle,
+    engine: State<'_, Arc<Engine>>,
+) -> Result<PathBuf> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Internal(format!("data folder: {e}")))?
+        .join("samples");
+    let engine = Arc::clone(&engine);
+    tauri::async_runtime::spawn_blocking(move || crate::sample::sample_dataset(&engine, &dir))
+        .await
+        .map_err(|e| AppError::Internal(format!("sample: {e}")))?
 }

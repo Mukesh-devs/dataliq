@@ -4,8 +4,9 @@ import { modKey } from "../../lib/platform";
 import { allCommands, useCommands } from "../../stores/commands";
 import { useEngine } from "../../stores/engine";
 import { Button } from "../ui/Button";
+import { TipSteps } from "./Tips";
 
-export type HelpTopic = "about" | "shortcuts";
+export type HelpTopic = "about" | "shortcuts" | "tips";
 
 /** Shortcuts that aren't commands: what the mouse and the grid do. */
 const GESTURES: [string, string][] = [
@@ -62,23 +63,35 @@ function About() {
   );
 }
 
-/** Help › Keyboard shortcuts and Help › About. */
+const LABELS: Record<HelpTopic, string> = {
+  about: "About BigView",
+  shortcuts: "Keyboard shortcuts",
+  tips: "Getting-started tips",
+};
+
+/** Help › Show getting-started tips, Keyboard shortcuts and About. */
 export function HelpDialog({ topic, onClose }: { topic: HelpTopic | null; onClose: () => void }) {
   return (
     <Popover.Root open={topic !== null} onOpenChange={(o) => !o && onClose()}>
       <Popover.Anchor className="absolute top-2 left-1/2" />
       <Popover.Portal>
         <Popover.Content
-          aria-label={topic === "about" ? "About BigView" : "Keyboard shortcuts"}
+          aria-label={LABELS[topic ?? "shortcuts"]}
           sideOffset={4}
           className="z-50 flex max-h-[calc(100vh-96px)] w-[min(30rem,calc(100vw-32px))] flex-col gap-3 overflow-y-auto rounded-[var(--radius-lg)] border border-border bg-bg p-4 text-[13px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
         >
-          {topic === "about" ? <About /> : <Shortcuts />}
-          <div className="flex justify-end">
-            <Button size="sm" variant="secondary" onClick={onClose}>
-              Close
-            </Button>
-          </div>
+          {topic === "tips" ? (
+            <TipSteps onDone={onClose} />
+          ) : (
+            <>
+              {topic === "about" ? <About /> : <Shortcuts />}
+              <div className="flex justify-end">
+                <Button size="sm" variant="secondary" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

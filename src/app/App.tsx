@@ -22,6 +22,7 @@ import {
   onOpenFiles,
   pickFiles,
   pickFolder,
+  sampleDataset,
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
@@ -237,6 +238,18 @@ export function App() {
       if (dir) await openPaths([dir]);
     },
     [openPaths],
+  );
+  const openSample = useMemo(
+    () => async () => {
+      try {
+        await openPaths([await sampleDataset()]);
+      } catch (err) {
+        notice(
+          `Couldn't make the sample dataset: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    },
+    [openPaths, notice],
   );
 
   const shortcuts = useMemo(
@@ -514,6 +527,20 @@ export function App() {
         run: shortcuts.commandPalette,
       },
       {
+        id: "open-sample",
+        title: "Open the sample dataset",
+        group: "Help",
+        keywords: "example demo try orders",
+        run: () => void openSample(),
+      },
+      {
+        id: "show-tips",
+        title: "Show getting-started tips",
+        group: "Help",
+        keywords: "onboarding help intro",
+        run: () => setHelp("tips"),
+      },
+      {
         id: "keyboard-shortcuts",
         title: "Keyboard shortcuts",
         group: "Help",
@@ -539,6 +566,7 @@ export function App() {
     return list;
   }, [
     shortcuts,
+    openSample,
     activeId,
     active,
     recent,
@@ -669,6 +697,7 @@ export function App() {
             <EmptyState
               onOpen={() => void openFile()}
               onOpenFolder={() => void openFolder()}
+              onOpenSample={() => void openSample()}
               recent={recent}
               onOpenRecent={(p) => void openPaths([p])}
               dragging={dragging}

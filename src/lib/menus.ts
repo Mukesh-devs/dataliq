@@ -123,6 +123,9 @@ export const MENUS: MenuSpec[] = [
   {
     label: "Help",
     items: [
+      { command: "show-tips", label: "Show getting-started tips" },
+      { command: "open-sample", label: "Open the sample dataset" },
+      sep,
       { command: "keyboard-shortcuts", label: "Keyboard shortcuts" },
       { command: "about", label: "About BigView" },
     ],

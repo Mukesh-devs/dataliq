@@ -29,6 +29,7 @@ mod profile;
 mod quality;
 mod recipes;
 mod remote;
+mod sample;
 mod sort;
 mod sql_results;
 mod sql_tables;

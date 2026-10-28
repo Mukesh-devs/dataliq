@@ -19,6 +19,7 @@ fn main() {
             "save_settings",
             "take_startup_files",
             "set_native_menu",
+            "sample_dataset",
             "open_view",
             "column_values",
             "column_profile",
