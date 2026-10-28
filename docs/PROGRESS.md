@@ -99,6 +99,10 @@
 - Smoke (real app, Linux): `sales_50m.parquet` opened in place; the profile of `order_ts` lists
   timestamps seen twice, then once, with "Nearly every value is different: … found by an
   estimate (counts are exact)", in 3.1 s straight from the 0.8 GB Parquet (not cached).
+- Second Budgets run after the fixes: column stats under 3 s on all three OSes (2.56–2.91 s),
+  no gzip panic on Windows; two Windows numbers over by under 10 % on the 4-vCPU runner
+  (every page of a two-key sort readable after 10.5 s; distinct customers per country 2.29 s),
+  documented in docs/BENCHMARKS.md.
 - Left over: cold start, idle memory and frame rate can't be measured on the hosted Windows and
   macOS runners (no desktop session); installer sizes per OS come with the release workflow.
 
@@ -150,3 +154,30 @@
 - Smoke (real app, Linux): tips and sample link on the start screen; the sample written
   (3.2 MB) and opened: 50,000 rows imported in 423 ms; Help › Show getting-started tips over
   an open file.
+
+### Step 4 — Auto-update ✅
+
+- Tauri's updater plugin (2.14.0), wrapped in our own commands: `update_status`,
+  `check_update` (version, date and notes from the manifest) and `install_update` (download
+  with progress events, signature check, install, restart). Help › Check for updates shows
+  the latest version, a newer one with its notes and "Install and restart", the download's
+  progress, or what went wrong in words with Try again.
+- At startup the app checks quietly at most once a day (Settings › Updates, on by default)
+  and opens the dialog only when there is a newer version; it never installs by itself.
+- Signed manifests (D51): the release build adds the public key and the manifest URL
+  (`latest.json` of the latest GitHub release) through a config overlay written by
+  `scripts/updater-config.mjs`, signs its update bundles with the private key from a secret,
+  and requires the signature to name the announced version (no downgrade by a doctored
+  manifest). Other builds have no updater and say so. docs/RELEASING.md says how to make and
+  store the keys (the publisher's; nothing secret is in the repository).
+- Tested: Vitest for the update store (not set up, latest, newer, failed check, daily startup
+  check, silent when offline, install progress and failure); Playwright for the dialog in
+  each state, the startup prompt, Later not asking again that day, install progress, and the
+  setting turned off.
+- Smoke (real app, Linux): a debug AppImage built with the overlay and a throwaway key (in the
+  scratchpad only) — the bundler wrote a `.sig` naming version 0.6.0; a local manifest
+  announcing 9.9.9 was found at startup with its notes; installing it downloaded the bundle
+  and refused it: "The update was signed for version 0.6.0 but the update endpoint announced
+  version 9.9.9…", with the app still running. The normal build says it can't update itself.
+- Left over: a full install-and-restart needs two signed releases; it is tried with the release
+  workflow (step 7).

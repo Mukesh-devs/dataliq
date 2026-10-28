@@ -12,6 +12,7 @@ import { OpenPattern } from "../components/shell/OpenPattern";
 import { OpenUrl } from "../components/shell/OpenUrl";
 import { HelpDialog, type HelpTopic } from "../components/shell/HelpDialog";
 import { MenuBar } from "../components/shell/MenuBar";
+import { UpdateDialog } from "../components/shell/UpdateDialog";
 import { SettingsDialog } from "../components/settings/SettingsDialog";
 import { call } from "../lib/ipc";
 import { MENUS, resolveMenus, toNative } from "../lib/menus";
@@ -32,6 +33,7 @@ import { useApp } from "../stores/app";
 import { allCommands, useCommands, useRegisterCommands, type Command } from "../stores/commands";
 import { useLayout } from "../stores/layout";
 import { useNotice } from "../stores/notice";
+import { useUpdate } from "../stores/update";
 import { useWorkspace } from "../stores/workspace";
 import { isWorkspacePath } from "../lib/workspace";
 import { useSettings, type ThemePreference } from "../stores/settings";
@@ -209,6 +211,7 @@ export function App() {
   useEffect(() => {
     void probeEngine();
     void loadApp();
+    if (useSettings.getState().checkUpdates) void useUpdate.getState().autoCheck();
     // `bigview file.csv` at startup.
     void takeStartupFiles()
       .then((paths) => {
@@ -541,6 +544,13 @@ export function App() {
         run: () => setHelp("tips"),
       },
       {
+        id: "check-updates",
+        title: "Check for updates",
+        group: "Help",
+        keywords: "new version upgrade install",
+        run: () => void useUpdate.getState().check(),
+      },
+      {
         id: "keyboard-shortcuts",
         title: "Keyboard shortcuts",
         group: "Help",
@@ -666,6 +676,7 @@ export function App() {
       {isMac && <AppMenus />}
       <SettingsDialog />
       <HelpDialog topic={help} onClose={() => setHelp(null)} />
+      <UpdateDialog />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.
         key={palette ? `open:${palette.query}` : "closed"}

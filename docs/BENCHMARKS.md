@@ -427,8 +427,27 @@ and `windows-latest` (4 vCPU, 16 GB), `macos-latest` (Apple silicon). Run
 ¹ Peak memory comes from Linux's `VmHWM`; the test reports none elsewhere. DuckDB's own memory
 limit (half of RAM by default, D48) bounds the engine on every OS.
 
-The sort row predates the row-order bridge (ae4470e, "every page readable"); its per-OS number
-comes with the next Budgets run.
+**Second run** ([40699638818](https://github.com/mukesh-dsnl/dataliq/actions/runs/40699638818),
+on b632bc2, with the row-order bridge and the estimated top values):
+
+| Flow | Budget | Linux | Windows | macOS¹ |
+| --- | --- | --- | --- | --- |
+| Sort 50M rows: every page readable (by customer / by date, price) | < 10 s | 9.1 / 6.2 s | 9.6 / **10.5 s** | 7.1 / 3.7 s |
+| Column stats, slowest column (`order_ts`, 39.5M distinct) | < 3 s | 2.69 s | 2.56 s | 2.91 s |
+| Chart aggregation, slowest (distinct customers per country) | < 2 s | 1.91 s | **2.29 s** | 1.50 s |
+| Full import of a 5 GB .csv.gz | report | 122.7 s | 147.5 s | 134.2 s |
+
+¹ A smaller macOS runner this time (DuckDB limit 3,584 MiB, i.e. 7 GB of RAM), slower than in
+the first run.
+
+The Windows gzip import ran without the zlib-rs panic. Column stats now meet the budget on every
+OS. Two Windows numbers are over by under 10 %, on a 4-vCPU runner in the dev profile (the
+budgets are for an 8-core laptop): every page of a two-key sort readable after 10.5 s (the
+first and last pages are there in 1.05 s, and any page in the middle in about 1 s while the
+order is written), and `count(DISTINCT customer)` per country in 2.29 s (1.97 s in the first
+run). Both are a single DuckDB pass already (a parallel sort, and a grouped distinct
+aggregate), so they scale with cores; documented rather than approximated, since a chart of
+distinct counts must be exact.
 
 **Missed: column stats of `order_ts`** (39.5M distinct timestamps) on the 4-vCPU Linux and Windows
 runners. Of its 3–4 s, the most common values took 3.3 s here: counting every value means one

@@ -353,6 +353,22 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               w.__settings = next;
               return { settings: next, restartNeeded: next.cacheDir !== null };
             }
+            case "update_status":
+              return (
+                (w.__update as { status?: unknown } | undefined)?.status ?? {
+                  configured: false,
+                  currentVersion: "0.6.0",
+                }
+              );
+            case "check_update": {
+              const update = w.__update as { info?: unknown; error?: string } | undefined;
+              if (update?.error) throw { kind: "query", message: update.error };
+              return update?.info ?? null;
+            }
+            case "install_update":
+              // The real app downloads, installs and restarts: it never answers.
+              emit("update-progress", { downloaded: 6_000_000, total: 12_000_000 });
+              return new Promise(() => {});
             case "sample_dataset":
               return "/data/comma.csv";
             case "set_native_menu":

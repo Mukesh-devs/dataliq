@@ -34,7 +34,11 @@ pub fn run() {
     let started = std::time::Instant::now();
     let cwd = std::env::current_dir().unwrap_or_default();
     let startup = cli::files_from_args(&std::env::args().collect::<Vec<_>>(), &cwd);
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    // The release workflow adds the updater's key and manifest URL to the
+    // config (D51); without them the plugin would fail to start.
+    let updates = context.config().plugins.0.contains_key("updater");
+    let builder = tauri::Builder::default()
         // Must be registered first: a second launch forwards its files here
         // and exits.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
@@ -47,7 +51,17 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+    let builder = if updates {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
+    builder
+        .manage(commands::update::UpdateState {
+            configured: updates,
+            pending: parking_lot::Mutex::new(None),
+        })
         .manage(commands::app::StartupFiles {
             files: parking_lot::Mutex::new(startup),
             started,
@@ -125,6 +139,9 @@ pub fn run() {
             commands::app::take_startup_files,
             commands::app::set_native_menu,
             commands::app::sample_dataset,
+            commands::update::update_status,
+            commands::update::check_update,
+            commands::update::install_update,
             commands::view::open_view,
             commands::view::column_values,
             commands::view::column_profile,
@@ -158,7 +175,7 @@ pub fn run() {
             commands::workspace::save_workspace,
             commands::workspace::load_workspace
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building BigView")
         .run(|app, event| match event {
             tauri::RunEvent::Exit => {

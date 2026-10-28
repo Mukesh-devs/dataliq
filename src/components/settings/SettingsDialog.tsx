@@ -127,6 +127,7 @@ interface Draft {
   theme: ThemePreference;
   density: Density;
   headerCharts: boolean;
+  checkUpdates: boolean;
   exportDefaults: ExportDefaults;
 }
 
@@ -150,6 +151,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
           theme: ui.theme,
           density: ui.density,
           headerCharts: ui.headerCharts,
+          checkUpdates: ui.checkUpdates,
           exportDefaults,
         }
       : null,
@@ -177,6 +179,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
       ui.setTheme(draft.theme);
       ui.setDensity(draft.density);
       ui.setHeaderCharts(draft.headerCharts);
+      ui.setCheckUpdates(draft.checkUpdates);
       setExportDefaults(draft.exportDefaults);
       void refreshCache();
       notice(
@@ -363,6 +366,21 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
             />
             Header row with the column names
           </label>
+        </Section>
+
+        <Section title="Updates">
+          <label className="flex items-center gap-2 text-fg">
+            <input
+              type="checkbox"
+              checked={draft.checkUpdates}
+              onChange={(e) => setDraft({ ...draft, checkUpdates: e.target.checked })}
+            />
+            Check for a new version when BigView starts (once a day at most)
+          </label>
+          <p className="text-[12px] text-fg-muted">
+            Only the version number is asked for; your files never leave this computer. Help › Check
+            for updates works either way.
+          </p>
         </Section>
 
         <Section title="File types">
