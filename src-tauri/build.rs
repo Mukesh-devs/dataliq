@@ -46,6 +46,8 @@ fn main() {
             "get_s3_settings",
             "save_s3_settings",
             "clear_s3_settings",
+            "save_workspace",
+            "load_workspace",
         ]),
     ))
     .expect("failed to run tauri-build");

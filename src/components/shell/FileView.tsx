@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
-import { formatBytes, formatCount, formatValue } from "../../lib/format";
+import { formatBytes, formatCount, formatValue, plural } from "../../lib/format";
 import { isUrl } from "../../lib/remote";
 import { COPY_FORMATS, formatRows, quoteIdent, tableName, type CopyFormat } from "../../lib/copyAs";
 import { formatSql } from "../../lib/sqlFormat";
@@ -128,8 +128,6 @@ const gridAnchor = (): Anchor => ({
     return new DOMRect((r?.x ?? 0) + 60, r?.y ?? 0, 1, 32);
   },
 });
-
-const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
 
 /** The files of a folder or pattern, for the header's tooltip. */
 function filesTitle(f: NonNullable<NonNullable<Tab["info"]>["files"]>): string {

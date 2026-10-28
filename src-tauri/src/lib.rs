@@ -16,6 +16,7 @@ pub mod settings;
 pub mod sources;
 pub mod sql;
 pub mod view;
+pub mod workspace;
 
 mod logging;
 #[cfg(target_os = "macos")]
@@ -145,7 +146,9 @@ pub fn run() {
             commands::quality::data_quality,
             commands::remote::get_s3_settings,
             commands::remote::save_s3_settings,
-            commands::remote::clear_s3_settings
+            commands::remote::clear_s3_settings,
+            commands::workspace::save_workspace,
+            commands::workspace::load_workspace
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

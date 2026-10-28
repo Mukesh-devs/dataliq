@@ -49,3 +49,27 @@
   page at once; chinook → sqlite extension installed, artists imported in 12 ms; in the SQL
   panel `chinook.tracks JOIN chinook.artists` with `shop_data.orders` → 4 rows in 25 ms.
 - Left over: none.
+
+### Step 4 — Workspaces ✅
+
+- "Save workspace" (Ctrl/Cmd+S) and "Save workspace as…" (Shift) write a `.bigview` file:
+  every file tab with its import settings, filters, sort and search, column layout, SQL name,
+  chart, recipe and open side panel; the SQL panel's text, height and state; the side panels.
+  Comparison and SQL result tabs are left out and counted in the notice. Save writes the same
+  file again.
+- "Open workspace…" (palette), or a `.bigview` file from the dialog, drop, recent files or
+  `bigview work.bigview`, replaces the open tabs; each file reopens (from the cache when
+  unchanged) and its view and recipe apply once its data is there. Files inside the
+  workspace's folder are also saved by their path from there, so a moved project finds them
+  (D46).
+- `plural` is shared from `lib/format` instead of three local copies.
+- Tested: unit tests for saving (relative paths, URLs, the format), loading a moved folder,
+  missing files, other formats, newer versions and a bad active tab; Vitest for what a tab
+  saves and a save/open round trip through the stores (views and recipes reapplied, the SQL
+  text back, replaced tabs released); Playwright for Ctrl+S with the save dialog and opening
+  from the palette (tabs, active tab, search, SQL text).
+- Smoke (real app): people.csv searched for "Paris" plus chinook.sqlite, the SQL panel open →
+  Ctrl+S suggested `people.bigview`, saved as `proj/work.bigview` with `data/…` relative
+  paths; the folder moved to `proj-moved`, then `bigview proj-moved/work.bigview` → both tabs
+  from the new place, "167 of 1,000 rows · filtered", the SQL text and panel back.
+- Left over: none.

@@ -12,3 +12,4 @@ pub mod recipe;
 pub mod remote;
 pub mod sql;
 pub mod view;
+pub mod workspace;

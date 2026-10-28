@@ -30,6 +30,7 @@ import {
   type RecipeStep,
 } from "../lib/recipe";
 import { isIdentity, openView, type ViewReady, type ViewSpec } from "../lib/view";
+import type { SavedTab } from "../lib/workspace";
 import { useRecent } from "./recent";
 
 export type TabStatus = "loading" | "ready" | "error";
@@ -235,6 +236,12 @@ interface TabsState {
   redoRecipe: (id: string) => Promise<void>;
   setRecipeOpen: (id: string, open: boolean) => void;
   setQualityOpen: (id: string, open: boolean) => void;
+  /**
+   * Replaces every tab with a workspace's: each file opens with what was
+   * set on it (import settings, view, layout, recipe, chart), which apply
+   * as soon as its data is there.
+   */
+  restore: (saved: SavedTab[], active: number | null) => Promise<void>;
 }
 
 let nextId = 1;
@@ -726,6 +733,28 @@ export const useTabs = create<TabsState>()((set, get) => {
       } else if (vs.sorting) {
         void get().setView(id, { ...tab.view, sort: [] });
       }
+    },
+    restore: async (saved, active) => {
+      for (const tab of get().tabs) release(tab);
+      const tabs: Tab[] = saved.map((t) => ({
+        id: `tab-${nextId++}`,
+        title: baseName(t.path),
+        path: t.path,
+        options: t.options ?? {},
+        status: "loading",
+        view: t.view,
+        viewState: t.view ? { status: "waiting", requestId: "" } : undefined,
+        layout: t.layout,
+        recipe: t.recipe?.length ? t.recipe : undefined,
+        recipeState: hasEffect(t.recipe) ? { status: "waiting", requestId: "" } : undefined,
+        chart: t.chart,
+        mode: t.mode,
+        sqlName: t.sqlName,
+        recipeOpen: t.recipeOpen,
+        qualityOpen: t.qualityOpen,
+      }));
+      set({ tabs, activeId: tabs[active ?? 0]?.id ?? tabs.at(-1)?.id ?? null });
+      await Promise.all(tabs.map((t) => load(t.id, t.path, t.options)));
     },
     close: (id) => {
       const tab = find(id);

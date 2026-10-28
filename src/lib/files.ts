@@ -226,6 +226,8 @@ export const FILE_EXTENSIONS = [
   "db3",
   "duckdb",
   "ddb",
+  // Workspaces (open the tabs they saved).
+  "bigview",
 ];
 
 /** Shows the native open dialog. Resolves to [] when cancelled. */

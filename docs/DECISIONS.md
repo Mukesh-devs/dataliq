@@ -595,3 +595,23 @@ table is given by its attached name (`"shop"."main"."orders"`), which
 needs `ATTACH 'path' AS shop (READ_ONLY)` outside BigView. Databases can't
 be combined in a folder or read from a URL. A file another program holds
 open for writing, and one from another DuckDB version, are said in words.
+
+## D46 — Workspaces: a `.bigview` file of tabs, opened in place of the tabs
+
+"Save workspace" (Ctrl/Cmd+S; "Save workspace as…" with Shift) writes the
+open tabs, the SQL panel (text, open, height) and the side panels to a
+`.bigview` JSON file (`format: bigview-workspace`, `version: 1`). For each
+tab it keeps the file and only what was set on it: import settings (CSV
+options, Excel sheet, database table), filters, sort and search, column
+layout, SQL table name, chart and mode, recipe, and which side panel was
+open. Comparison and SQL result tabs have no file behind them and are left
+out (the notice says how many). The backend owns the file and its paths
+and passes each tab's settings through unread, so new tab settings need no
+backend change. Every file is stored by absolute path and, when inside the
+workspace's folder, by its path from there: a moved or shared project
+folder finds its files again. Opening a workspace (palette, file dialog,
+drop, recent files, `bigview work.bigview`) replaces the open tabs, since a
+workspace is a whole working state; each file opens as usual (from the
+cache when unchanged) and its view and recipe apply when its data is ready,
+the way a reload does. A missing file's tab says it is missing. Save writes
+the same file again; data files are never touched.

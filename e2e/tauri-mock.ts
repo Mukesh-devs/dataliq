@@ -395,6 +395,18 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };
               return toBuffer(file.preview);
+            // Workspace files, kept in memory by path.
+            case "save_workspace": {
+              const files = (w.__workspaces ??= {}) as Record<string, unknown>;
+              files[String(args.path)] = JSON.parse(JSON.stringify(args.workspace));
+              return null;
+            }
+            case "load_workspace": {
+              const files = (w.__workspaces ?? {}) as Record<string, unknown>;
+              const ws = files[String(args.path)];
+              if (!ws) throw { kind: "io", message: `File not found: ${String(args.path)}` };
+              return ws;
+            }
             // The keychain: settings kept in memory, the secret never returned.
             case "get_s3_settings": {
               const stored = w.__s3 as Record<string, unknown> | undefined;

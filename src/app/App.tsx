@@ -26,6 +26,8 @@ import { useApp } from "../stores/app";
 import { useRegisterCommands, type Command } from "../stores/commands";
 import { useLayout } from "../stores/layout";
 import { useNotice } from "../stores/notice";
+import { useWorkspace } from "../stores/workspace";
+import { isWorkspacePath } from "../lib/workspace";
 import { useSettings, type ThemePreference } from "../stores/settings";
 import { useSql } from "../stores/sql";
 import { useEngine } from "../stores/engine";
@@ -116,7 +118,7 @@ export function App() {
     tabs,
     activeId,
     setActive,
-    openPaths,
+    openPaths: openFiles,
     reopen,
     reload,
     cancelImport,
@@ -152,6 +154,19 @@ export function App() {
   const recent = useRecent((s) => s.files);
   const [dragging, setDragging] = useState(false);
   const active = tabs.find((t) => t.id === activeId);
+  const openWorkspace = useWorkspace((s) => s.open);
+  const pickWorkspace = useWorkspace((s) => s.pickAndOpen);
+  const saveWorkspace = useWorkspace((s) => s.save);
+  // Files open in tabs; a workspace file replaces the tabs with its own.
+  const openPaths = useMemo(
+    () => async (paths: string[]) => {
+      const files = paths.filter((p) => !isWorkspacePath(p));
+      const ws = paths.filter(isWorkspacePath).at(-1);
+      if (ws) await openWorkspace(ws);
+      if (files.length > 0) await openFiles(files);
+    },
+    [openFiles, openWorkspace],
+  );
 
   useEffect(() => {
     void probeEngine();
@@ -195,6 +210,8 @@ export function App() {
       previousTab: () => cycle(-1),
       commandPalette: () => setPalette({ query: "" }),
       copyAs: () => setPalette({ query: "Copy " }),
+      saveWorkspace: () => void saveWorkspace(),
+      saveWorkspaceAs: () => void saveWorkspace(true),
       toggleSql: () => {
         const open = !useSql.getState().open;
         setSqlOpen(open);
@@ -209,7 +226,7 @@ export function App() {
         l.setProfile(!l.profile);
       },
     }),
-    [openFile, openFolder, close, cycle, setSqlOpen],
+    [openFile, openFolder, close, cycle, setSqlOpen, saveWorkspace],
   );
   useShortcuts(shortcuts);
 
@@ -237,6 +254,29 @@ export function App() {
         group: "File",
         keywords: "glob wildcard folder many files combine union *.csv",
         run: () => setPatternOpen(true),
+      },
+      {
+        id: "open-workspace",
+        title: "Open workspace…",
+        group: "File",
+        keywords: "project session restore tabs load",
+        run: () => void pickWorkspace(),
+      },
+      {
+        id: "save-workspace",
+        title: "Save workspace",
+        group: "File",
+        shortcut: `${modKey}+S`,
+        keywords: "project session tabs keep store",
+        run: shortcuts.saveWorkspace,
+      },
+      {
+        id: "save-workspace-as",
+        title: "Save workspace as…",
+        group: "File",
+        shortcut: `Shift+${modKey}+S`,
+        keywords: "project session tabs keep store copy",
+        run: shortcuts.saveWorkspaceAs,
       },
       {
         id: "open-url",
@@ -409,6 +449,7 @@ export function App() {
     runEditor,
     formatEditor,
     notice,
+    pickWorkspace,
   ]);
   useRegisterCommands("app", commands);
 

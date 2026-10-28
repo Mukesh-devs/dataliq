@@ -51,6 +51,8 @@
     "allow-data-quality",
     "allow-get-s3-settings",
     "allow-save-s3-settings",
-    "allow-clear-s3-settings"
+    "allow-clear-s3-settings",
+    "allow-save-workspace",
+    "allow-load-workspace"
   ]
 }
