@@ -3,6 +3,8 @@ import { isMac } from "../lib/platform";
 
 export interface ShortcutHandlers {
   openFile: () => void;
+  /** Shift+Ctrl+O: a folder (or pattern) of files as one table. */
+  openFolder: () => void;
   closeTab: () => void;
   nextTab: () => void;
   previousTab: () => void;
@@ -12,6 +14,8 @@ export interface ShortcutHandlers {
   copyAs: () => void;
   /** Ctrl+J. */
   toggleSql: () => void;
+  saveWorkspace: () => void;
+  saveWorkspaceAs: () => void;
   /** Ctrl+B: left sidebar; Ctrl+Alt+B: right panel (column profile). */
   toggleSidebar: () => void;
   toggleProfile: () => void;
@@ -33,6 +37,9 @@ export function useShortcuts(handlers: ShortcutHandlers) {
       } else if (mod && !e.shiftKey && key === "o") {
         e.preventDefault();
         handlers.openFile();
+      } else if (mod && e.shiftKey && key === "o") {
+        e.preventDefault();
+        handlers.openFolder();
       } else if (mod && !e.shiftKey && key === "w") {
         e.preventDefault();
         handlers.closeTab();
@@ -43,6 +50,10 @@ export function useShortcuts(handlers: ShortcutHandlers) {
         e.preventDefault();
         if (e.altKey) handlers.toggleProfile();
         else handlers.toggleSidebar();
+      } else if (mod && key === "s") {
+        e.preventDefault();
+        if (e.shiftKey) handlers.saveWorkspaceAs();
+        else handlers.saveWorkspace();
       } else if (mod && !e.shiftKey && key === "j") {
         e.preventDefault();
         handlers.toggleSql();

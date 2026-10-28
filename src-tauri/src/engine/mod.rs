@@ -3,6 +3,7 @@
 
 mod cancel;
 pub mod datasets;
+mod extensions;
 mod ipc;
 mod param;
 pub mod raw;
@@ -99,6 +100,10 @@ pub struct Engine {
     /// The SQL panel's own connection, so temp tables and `SET` last from
     /// one statement to the next. Created on first use.
     session: Mutex<Option<Connection>>,
+    /// httpfs, loaded only when a URL is opened.
+    pub(crate) extensions: extensions::ExtensionState,
+    /// Database files attached this session (SQLite, DuckDB).
+    pub(crate) attached: crate::sources::database::Attached,
     /// The database handle; declared last so it is closed after `root`.
     raw: raw::RawDb,
 }
@@ -114,7 +119,8 @@ impl Engine {
                 "temp_directory",
                 cfg.temp_dir.to_string_lossy().into_owned(),
             ),
-            // Fully offline: json/parquet are compiled in; never download extensions.
+            // Offline by default: json/parquet are compiled in, and the others
+            // are installed only when a file needs them (see `extensions`).
             ("autoload_known_extensions", "false".to_string()),
             ("autoinstall_known_extensions", "false".to_string()),
         ];
@@ -133,6 +139,8 @@ impl Engine {
             temp_dir: cfg.temp_dir.clone(),
             requests: RequestRegistry::default(),
             datasets: Datasets::default(),
+            extensions: extensions::ExtensionState::default(),
+            attached: Default::default(),
             raw,
         })
     }

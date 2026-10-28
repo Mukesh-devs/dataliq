@@ -1,4 +1,4 @@
-import { Clock, FileUp } from "lucide-react";
+import { Clock, FileUp, FolderOpen } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Button } from "../ui/Button";
 import { Kbd } from "../ui/Kbd";
@@ -10,6 +10,8 @@ export interface RecentFile {
 
 interface EmptyStateProps {
   onOpen: () => void;
+  /** A folder of files as one table. */
+  onOpenFolder?: () => void;
   recent: RecentFile[];
   onOpenRecent: (path: string) => void;
   /** True while a file is being dragged over the window. */
@@ -17,7 +19,13 @@ interface EmptyStateProps {
 }
 
 /** Shown when no file is open: a large drop zone plus recent files. */
-export function EmptyState({ onOpen, recent, onOpenRecent, dragging = false }: EmptyStateProps) {
+export function EmptyState({
+  onOpen,
+  onOpenFolder,
+  recent,
+  onOpenRecent,
+  dragging = false,
+}: EmptyStateProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
       <div
@@ -34,12 +42,20 @@ export function EmptyState({ onOpen, recent, onOpenRecent, dragging = false }: E
         <div className="flex flex-col gap-1">
           <h1 className="text-lg font-semibold text-fg">Drop a CSV, Parquet, JSON or Excel file</h1>
           <p className="text-fg-muted">
-            Compressed .gz files work too. Nothing is uploaded; everything stays on your computer.
+            Compressed .gz files work too, and a whole folder of them opens as one table. Nothing is
+            uploaded; everything stays on your computer.
           </p>
         </div>
-        <Button variant="primary" onClick={onOpen}>
-          Open file <Kbd shortcut="Mod+O" tone="onAccent" />
-        </Button>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant="primary" onClick={onOpen}>
+            Open file <Kbd shortcut="Mod+O" tone="onAccent" />
+          </Button>
+          {onOpenFolder && (
+            <Button variant="secondary" onClick={onOpenFolder}>
+              <FolderOpen className="size-4" aria-hidden /> Open folder
+            </Button>
+          )}
+        </div>
       </div>
 
       <section aria-labelledby="recent-heading" className="w-full max-w-xl">

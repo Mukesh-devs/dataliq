@@ -28,6 +28,11 @@ pub struct SourceStamp {
     pub path: PathBuf,
     pub size: u64,
     pub modified_ms: u64,
+    /// Several files (a folder or pattern): a digest of each one's path,
+    /// size and last change, so adding, removing or editing any of them
+    /// is a new version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parts: Option<String>,
 }
 
 impl SourceStamp {
@@ -44,8 +49,24 @@ impl SourceStamp {
             path: abs,
             size: meta.len(),
             modified_ms,
+            parts: None,
         })
     }
+}
+
+/// A digest of several files' stamps (see [`SourceStamp::parts`]).
+pub fn digest_parts(parts: &[SourceStamp]) -> String {
+    let mut h = Sha256::new();
+    for p in parts {
+        h.update(p.path.to_string_lossy().as_bytes());
+        h.update(b"\0");
+        h.update(p.size.to_le_bytes());
+        h.update(p.modified_ms.to_le_bytes());
+    }
+    h.finalize()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// Stable cache key for a file version + import options.
@@ -58,6 +79,10 @@ pub fn cache_key(stamp: &SourceStamp, options: &OpenOptions) -> String {
     h.update(b"\0");
     h.update(stamp.size.to_le_bytes());
     h.update(stamp.modified_ms.to_le_bytes());
+    if let Some(parts) = &stamp.parts {
+        h.update(b"parts\0");
+        h.update(parts.as_bytes());
+    }
     h.update(serde_json::to_vec(options).unwrap_or_default());
     h.finalize()[..16]
         .iter()
@@ -255,6 +280,7 @@ mod tests {
             path: "/data/a.csv".into(),
             size,
             modified_ms,
+            parts: None,
         }
     }
 

@@ -56,6 +56,11 @@ export interface MockOptions {
   comparison?: Record<string, unknown> & { rowCount: number };
   /** Result of `data_quality`. */
   quality?: unknown;
+  /**
+   * Folders, patterns and URLs that open like a recorded file (`like`),
+   * with changes to its info (e.g. `files`, `fileName`).
+   */
+  folders?: Record<string, { like: string; info: Record<string, unknown> }>;
 }
 
 /**
@@ -123,6 +128,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       exportMs,
       comparison,
       quality,
+      folders,
     }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
@@ -164,7 +170,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
         },
         invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
           log.push({ cmd, args });
-          const file = recordings.files[String(args.path)];
+          const folder = folders[String(args.path)];
+          const recorded = recordings.files[folder ? folder.like : String(args.path)];
+          const file =
+            recorded && folder
+              ? { ...recorded, info: { ...(recorded.info as object), ...folder.info } }
+              : recorded;
           switch (cmd) {
             case "run_query": {
               const sql = w.__sql as SqlAnswer | undefined;
@@ -384,6 +395,35 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };
               return toBuffer(file.preview);
+            // Workspace files, kept in memory by path.
+            case "save_workspace": {
+              const files = (w.__workspaces ??= {}) as Record<string, unknown>;
+              files[String(args.path)] = JSON.parse(JSON.stringify(args.workspace));
+              return null;
+            }
+            case "load_workspace": {
+              const files = (w.__workspaces ?? {}) as Record<string, unknown>;
+              const ws = files[String(args.path)];
+              if (!ws) throw { kind: "io", message: `File not found: ${String(args.path)}` };
+              return ws;
+            }
+            // The keychain: settings kept in memory, the secret never returned.
+            case "get_s3_settings": {
+              const stored = w.__s3 as Record<string, unknown> | undefined;
+              if (!stored) return null;
+              const summary = { ...stored };
+              delete summary.secret;
+              return summary;
+            }
+            case "save_s3_settings": {
+              const next = args.settings as { secret: string };
+              const prev = w.__s3 as { secret: string } | undefined;
+              w.__s3 = { ...next, secret: next.secret || prev?.secret || "" };
+              return null;
+            }
+            case "clear_s3_settings":
+              delete w.__s3;
+              return null;
             default:
               throw { kind: "internal", message: `unmocked command ${cmd}` };
           }
@@ -400,6 +440,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       exportMs: options.exportMs ?? 0,
       comparison: options.comparison,
       quality: options.quality,
+      folders: options.folders ?? {},
     },
   );
 }

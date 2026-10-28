@@ -1,6 +1,6 @@
 [package]
 name = "bigview"
-version = "0.5.0"
+version = "0.6.0"
 description = "Open huge tabular files instantly"
 authors = ["BigView contributors"]
 license = "MIT"
@@ -16,6 +16,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.7.2", features = [] }
 
 [dependencies]
+glob = "=0.3.4"
+keyring = { version = "=3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 tauri = { version = "=2.12.3", features = [] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

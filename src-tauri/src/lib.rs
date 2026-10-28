@@ -11,10 +11,12 @@ pub mod export;
 pub mod import;
 pub mod quality;
 pub mod recipe;
+pub mod remote;
 pub mod settings;
 pub mod sources;
 pub mod sql;
 pub mod view;
+pub mod workspace;
 
 mod logging;
 #[cfg(target_os = "macos")]
@@ -74,6 +76,8 @@ pub fn run() {
             );
             engine::remove_stale_scratch(&cfg.temp_dir);
             let engine = Engine::open_in_memory(&cfg)?;
+            // httpfs, when a URL is first opened, goes next to the cache.
+            engine.set_extension_dir(&paths.app_cache_dir()?.join("duckdb-extensions"));
             app.manage(Arc::new(engine));
 
             let cache_dir = match &settings.cache_dir {
@@ -139,7 +143,12 @@ pub fn run() {
             commands::recipe::save_recipe_script,
             commands::compare::compare_files,
             commands::compare::compare_sql,
-            commands::quality::data_quality
+            commands::quality::data_quality,
+            commands::remote::get_s3_settings,
+            commands::remote::save_s3_settings,
+            commands::remote::clear_s3_settings,
+            commands::workspace::save_workspace,
+            commands::workspace::load_workspace
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

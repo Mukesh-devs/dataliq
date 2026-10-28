@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FileFormat {
     Csv,
@@ -17,6 +17,8 @@ pub enum FileFormat {
     Parquet,
     Xlsx,
     Xls,
+    Sqlite,
+    Duckdb,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -25,6 +27,8 @@ pub enum Compression {
     None,
     Gzip,
     Zstd,
+    /// Several files, some compressed and some not: DuckDB tells per file.
+    Mixed,
 }
 
 impl Compression {
@@ -34,6 +38,7 @@ impl Compression {
             Compression::None => "uncompressed",
             Compression::Gzip => "gzip",
             Compression::Zstd => "zstd",
+            Compression::Mixed => "auto_detect",
         }
     }
 
@@ -43,6 +48,7 @@ impl Compression {
             Compression::None => "none",
             Compression::Gzip => "gzip",
             Compression::Zstd => "zstd",
+            Compression::Mixed => "auto",
         }
     }
 }
@@ -58,8 +64,11 @@ const ZSTD_MAGIC: &[u8] = &[0x28, 0xb5, 0x2f, 0xfd];
 const PARQUET_MAGIC: &[u8] = b"PAR1";
 const ZIP_MAGIC: &[u8] = b"PK\x03\x04";
 const OLE_MAGIC: &[u8] = &[0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
+/// A DuckDB file: an 8-byte checksum, then `DUCK`.
+const DUCKDB_MAGIC: &[u8] = b"DUCK";
 
-fn format_from_ext(ext: &str) -> Option<FileFormat> {
+pub(crate) fn format_from_ext(ext: &str) -> Option<FileFormat> {
     Some(match ext {
         "csv" | "txt" | "dat" => FileFormat::Csv,
         "tsv" | "tab" => FileFormat::Tsv,
@@ -68,12 +77,16 @@ fn format_from_ext(ext: &str) -> Option<FileFormat> {
         "parquet" | "pq" => FileFormat::Parquet,
         "xlsx" | "xlsm" => FileFormat::Xlsx,
         "xls" => FileFormat::Xls,
+        "sqlite" | "sqlite3" | "db3" => FileFormat::Sqlite,
+        "duckdb" | "ddb" => FileFormat::Duckdb,
+        // Either; the bytes decide.
+        "db" => FileFormat::Sqlite,
         _ => return None,
     })
 }
 
 /// Splits `sales.CSV.gz` into ("csv", Some("gz")), lowercased.
-fn extensions(path: &Path) -> (Option<String>, Option<Compression>) {
+pub(crate) fn extensions(path: &Path) -> (Option<String>, Option<Compression>) {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().to_lowercase())
@@ -126,6 +139,16 @@ fn gunzip_head(path: &Path, n: usize) -> Vec<u8> {
     buf
 }
 
+/// The format a file name says (`sales.csv.gz`), for files that can't be
+/// read first (URLs).
+pub fn detect_from_name(name: &str) -> Option<Detected> {
+    let (ext, compression) = extensions(Path::new(name));
+    Some(Detected {
+        format: format_from_ext(ext.as_deref()?)?,
+        compression: compression.unwrap_or(Compression::None),
+    })
+}
+
 /// Detects the format of a file. Magic bytes win over a wrong extension.
 pub fn detect(path: &Path) -> io::Result<Detected> {
     let head = read_head(path, 4096)?;
@@ -150,6 +173,18 @@ pub fn detect(path: &Path) -> io::Result<Detected> {
                 compression,
             });
         }
+        if head.starts_with(SQLITE_MAGIC) {
+            return Ok(Detected {
+                format: FileFormat::Sqlite,
+                compression,
+            });
+        }
+        if head.get(8..12) == Some(DUCKDB_MAGIC) {
+            return Ok(Detected {
+                format: FileFormat::Duckdb,
+                compression,
+            });
+        }
         if head.starts_with(OLE_MAGIC) {
             return Ok(Detected {
                 format: FileFormat::Xls,
@@ -167,11 +202,18 @@ pub fn detect(path: &Path) -> io::Result<Detected> {
     let format = match ext_format {
         // Binary formats are never compressed with an outer .gz in practice;
         // trust content sniffing if the extension claims one but bytes disagree.
-        Some(FileFormat::Parquet | FileFormat::Xlsx | FileFormat::Xls) | None => {
+        Some(
+            FileFormat::Parquet
+            | FileFormat::Xlsx
+            | FileFormat::Xls
+            | FileFormat::Sqlite
+            | FileFormat::Duckdb,
+        )
+        | None => {
             let text_head = match compression {
                 Compression::Gzip => gunzip_head(path, 4096),
                 // zstd heads are not sniffed; DuckDB detects the format itself.
-                Compression::Zstd => Vec::new(),
+                Compression::Zstd | Compression::Mixed => Vec::new(),
                 Compression::None => head,
             };
             sniff_text(&text_head)
@@ -223,6 +265,30 @@ mod tests {
             (Some("tsv".into()), None)
         );
         assert_eq!(extensions(Path::new("noext")), (None, None));
+    }
+
+    #[test]
+    fn databases_by_their_header() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path();
+        let mut sqlite = b"SQLite format 3\0".to_vec();
+        sqlite.resize(100, 0);
+        assert_eq!(
+            detect(&write(p, "shop.db", &sqlite)).unwrap(),
+            d(FileFormat::Sqlite, Compression::None)
+        );
+        let mut duck = vec![0u8; 8];
+        duck.extend_from_slice(b"DUCK");
+        duck.resize(64, 0);
+        // A .db that is a DuckDB file, and a DuckDB file with no extension.
+        assert_eq!(
+            detect(&write(p, "shop2.db", &duck)).unwrap(),
+            d(FileFormat::Duckdb, Compression::None)
+        );
+        assert_eq!(
+            detect(&write(p, "warehouse", &duck)).unwrap(),
+            d(FileFormat::Duckdb, Compression::None)
+        );
     }
 
     #[test]

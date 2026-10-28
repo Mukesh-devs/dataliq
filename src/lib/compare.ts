@@ -1,5 +1,5 @@
 import type { ColumnMeta, DatasetInfo } from "./files";
-import { formatCount } from "./format";
+import { plural } from "./format";
 import { call } from "./ipc";
 
 /** Mirrors `Comparison` in src-tauri/src/compare/mod.rs. */
@@ -76,8 +76,6 @@ export function suggestKeys(left: ColumnMeta[], right: ColumnMeta[]): string[] {
   const keyish = common.filter((c) => KEYISH.test(c));
   return keyish.length ? keyish.slice(0, 1) : common.slice(0, 1);
 }
-
-const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
 
 /** Notes about what the comparison could not match one to one. */
 export function compareNotes(c: Comparison): string[] {

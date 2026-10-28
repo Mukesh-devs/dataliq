@@ -8,12 +8,15 @@ import { FileView } from "../components/shell/FileView";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
+import { OpenPattern } from "../components/shell/OpenPattern";
+import { OpenUrl } from "../components/shell/OpenUrl";
 import {
   onFileDrop,
   onImportProgress,
   onMenu,
   onOpenFiles,
   pickFiles,
+  pickFolder,
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
@@ -23,6 +26,8 @@ import { useApp } from "../stores/app";
 import { useRegisterCommands, type Command } from "../stores/commands";
 import { useLayout } from "../stores/layout";
 import { useNotice } from "../stores/notice";
+import { useWorkspace } from "../stores/workspace";
+import { isWorkspacePath } from "../lib/workspace";
 import { useSettings, type ThemePreference } from "../stores/settings";
 import { useSql } from "../stores/sql";
 import { useEngine } from "../stores/engine";
@@ -78,7 +83,11 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     else if (tab.info.format === "sql") parts.push("SQL result");
     else if (tab.import?.fromCache) parts.push("from cache");
     else if (tab.info.dataset.cached === false)
-      parts.push(tab.info.format === "parquet" ? "queried in place" : "read directly");
+      parts.push(
+        tab.info.format === "parquet" || tab.info.format === "duckdb"
+          ? "queried in place"
+          : "read directly",
+      );
     else parts.push(`imported in ${formatDuration(tab.import?.elapsedMs ?? 0)}`);
   } else if (tab.preview) {
     parts.push(`${formatCount(tab.preview.numRows)} preview rows`);
@@ -109,7 +118,7 @@ export function App() {
     tabs,
     activeId,
     setActive,
-    openPaths,
+    openPaths: openFiles,
     reopen,
     reload,
     cancelImport,
@@ -145,6 +154,19 @@ export function App() {
   const recent = useRecent((s) => s.files);
   const [dragging, setDragging] = useState(false);
   const active = tabs.find((t) => t.id === activeId);
+  const openWorkspace = useWorkspace((s) => s.open);
+  const pickWorkspace = useWorkspace((s) => s.pickAndOpen);
+  const saveWorkspace = useWorkspace((s) => s.save);
+  // Files open in tabs; a workspace file replaces the tabs with its own.
+  const openPaths = useMemo(
+    () => async (paths: string[]) => {
+      const files = paths.filter((p) => !isWorkspacePath(p));
+      const ws = paths.filter(isWorkspacePath).at(-1);
+      if (ws) await openWorkspace(ws);
+      if (files.length > 0) await openFiles(files);
+    },
+    [openFiles, openWorkspace],
+  );
 
   useEffect(() => {
     void probeEngine();
@@ -165,9 +187,21 @@ export function App() {
     [openPaths],
   );
 
+  const [patternOpen, setPatternOpen] = useState(false);
+  // Open URL, and whether it starts on the S3 settings.
+  const [urlOpen, setUrlOpen] = useState<{ s3: boolean } | null>(null);
+  const openFolder = useMemo(
+    () => async () => {
+      const dir = await pickFolder().catch(() => null);
+      if (dir) await openPaths([dir]);
+    },
+    [openPaths],
+  );
+
   const shortcuts = useMemo(
     () => ({
       openFile: () => void openFile(),
+      openFolder: () => void openFolder(),
       closeTab: () => {
         const id = useTabs.getState().activeId;
         if (id) close(id);
@@ -176,6 +210,8 @@ export function App() {
       previousTab: () => cycle(-1),
       commandPalette: () => setPalette({ query: "" }),
       copyAs: () => setPalette({ query: "Copy " }),
+      saveWorkspace: () => void saveWorkspace(),
+      saveWorkspaceAs: () => void saveWorkspace(true),
       toggleSql: () => {
         const open = !useSql.getState().open;
         setSqlOpen(open);
@@ -190,7 +226,7 @@ export function App() {
         l.setProfile(!l.profile);
       },
     }),
-    [openFile, close, cycle, setSqlOpen],
+    [openFile, openFolder, close, cycle, setSqlOpen, saveWorkspace],
   );
   useShortcuts(shortcuts);
 
@@ -203,6 +239,58 @@ export function App() {
         group: "File",
         shortcut: `${modKey}+O`,
         run: shortcuts.openFile,
+      },
+      {
+        id: "open-folder",
+        title: "Open folder as one table…",
+        group: "File",
+        shortcut: `Shift+${modKey}+O`,
+        keywords: "directory many files combine union",
+        run: shortcuts.openFolder,
+      },
+      {
+        id: "open-pattern",
+        title: "Open files matching a pattern…",
+        group: "File",
+        keywords: "glob wildcard folder many files combine union *.csv",
+        run: () => setPatternOpen(true),
+      },
+      {
+        id: "open-workspace",
+        title: "Open workspace…",
+        group: "File",
+        keywords: "project session restore tabs load",
+        run: () => void pickWorkspace(),
+      },
+      {
+        id: "save-workspace",
+        title: "Save workspace",
+        group: "File",
+        shortcut: `${modKey}+S`,
+        keywords: "project session tabs keep store",
+        run: shortcuts.saveWorkspace,
+      },
+      {
+        id: "save-workspace-as",
+        title: "Save workspace as…",
+        group: "File",
+        shortcut: `Shift+${modKey}+S`,
+        keywords: "project session tabs keep store copy",
+        run: shortcuts.saveWorkspaceAs,
+      },
+      {
+        id: "open-url",
+        title: "Open URL…",
+        group: "File",
+        keywords: "http https web download s3 bucket remote cloud",
+        run: () => setUrlOpen({ s3: false }),
+      },
+      {
+        id: "s3-settings",
+        title: "S3 settings…",
+        group: "File",
+        keywords: "aws minio r2 credentials keychain bucket remote cloud",
+        run: () => setUrlOpen({ s3: true }),
       },
     ];
     if (activeId) {
@@ -361,6 +449,7 @@ export function App() {
     runEditor,
     formatEditor,
     notice,
+    pickWorkspace,
   ]);
   useRegisterCommands("app", commands);
 
@@ -373,6 +462,7 @@ export function App() {
       () => () =>
         onMenu((id) => {
           if (id === "open-file") shortcuts.openFile();
+          if (id === "open-folder") shortcuts.openFolder();
           if (id === "close-tab") shortcuts.closeTab();
         }),
       [shortcuts],
@@ -426,6 +516,20 @@ export function App() {
               : shortcuts.toggleSql()
         }
       />
+      <OpenPattern
+        // A fresh box each time.
+        key={patternOpen ? "open" : "closed"}
+        open={patternOpen}
+        onOpenChange={setPatternOpen}
+        onOpen={(p) => void openPaths([p])}
+      />
+      <OpenUrl
+        key={urlOpen ? `open:${urlOpen.s3}` : "closed"}
+        open={urlOpen !== null}
+        onOpenChange={(o) => !o && setUrlOpen(null)}
+        showS3={urlOpen?.s3}
+        onOpen={(u) => void openPaths([u])}
+      />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.
         key={palette ? `open:${palette.query}` : "closed"}
@@ -456,6 +560,7 @@ export function App() {
           ) : (
             <EmptyState
               onOpen={() => void openFile()}
+              onOpenFolder={() => void openFolder()}
               recent={recent}
               onOpenRecent={(p) => void openPaths([p])}
               dragging={dragging}

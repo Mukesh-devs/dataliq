@@ -341,3 +341,55 @@ importing or paging; the guard against the CI runner's baseline passes (all with
 | import_100k_xlsx | 1,957 ms | 1,646 ms |
 | reopen_cached_100mb_csv | 1.5 ms | 1.0 ms |
 | page_1m_parquet | 11.9 ms | 9.8 ms |
+
+## v0.6 — folders, databases and URLs (linux-dev)
+
+`cargo test -p bigview --test it perf_sources -- --ignored --nocapture --test-threads=1` (dev
+profile), through the calls the app makes when opening each kind of source. Measured on a
+fresh container (the machine changed since v0.5.0; see the small suite below).
+
+| Flow | Time |
+| --- | --- |
+| Folder of 200 small `.csv.gz` files (1M rows, one header): opened, columns and first rows | 0.28 s |
+| The same folder with every file sniffed (columns matched by name) | 4.53 s |
+| The same folder imported | 0.9 s |
+| Folder of 10 × 100 MB `.csv.gz` (21.3M rows): opened, first rows | 1.78 s |
+| The same folder imported (one such file alone: 4.0 s) | 19.8 s |
+| DuckDB file, 50M rows (0.85 GB): attached, tables listed, first page | 0.03 s |
+| Its page in the middle / at the end (queried in place) | 0.014 s / 0.025 s |
+| Its filter `country contains 'an'` (25M rows) / sort by `unit_price` desc: first page | 0.08 s / 0.65 s |
+| SQLite file, 1M rows (85 MB): attached, listed, first rows | 0.05 s |
+| The same table imported into the cache | 2.2 s |
+| Parquet over HTTP (1M rows, local server): httpfs loaded, first page | 0.11 s (6 requests) |
+| Its page in the middle | 0.031 s (2 requests) |
+
+**Budget: first rows < 1 s** — met for databases, URLs and folders whose files share a header.
+Matching columns by name made DuckDB sniff every file (4.5 s for 200 files, and the app binds
+the reader more than once while opening); folders of one header now use the first file's
+dialect and types and fall back to sniffing every file only when an import needs it (D43). Ten
+100 MB `.csv.gz` files take as long to open as one of them does (sniffing a gzipped file
+dominates), and import in parallel: 2× faster than one after another.
+
+
+### Small suite at v0.6.0
+
+`pnpm bench` on the CI runner (Bench workflow, ubuntu-22.04), against the baseline that runner
+recorded at v0.1.0. The guard passes (all within 30 %). This container restarted on another host
+since v0.5.0, so local numbers (best of 5: 286 ms for CSV first rows, against 261 ms at v0.5.0)
+are not comparable to earlier ones; the runner is the steady reference.
+
+| Flow | Baseline | v0.6.0 | Change |
+| --- | --- | --- | --- |
+| first_rows_100mb_csv | 216 ms | 233 ms | +8 % |
+| first_rows_100mb_csv_gz | 1,243 ms | 1,078 ms | −13 % |
+| first_rows_100mb_ndjson_gz | 354 ms | 312 ms | −12 % |
+| first_rows_100k_xlsx | 52 ms | 65 ms | +27 % |
+| import_100mb_csv | 1,456 ms | 1,438 ms | −1 % |
+| import_100mb_csv_gz | 3,437 ms | 3,275 ms | −5 % |
+| import_100mb_ndjson_gz | 2,975 ms | 2,826 ms | −5 % |
+| import_100k_xlsx | 1,403 ms | 1,731 ms | +23 % |
+| reopen_cached_100mb_csv | 0.85 ms | 1.08 ms | +27 % |
+| page_1m_parquet | 7.8 ms | 8.6 ms | +10 % |
+
+v0.6 doesn't change the Excel path; the two Excel flows are the closest to the guard and are
+on the v1.0 performance pass's list.

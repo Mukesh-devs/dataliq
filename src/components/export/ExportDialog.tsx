@@ -9,7 +9,7 @@ import {
   rangeRows,
   type ExportFormat,
 } from "../../lib/exporting";
-import { formatCount } from "../../lib/format";
+import { formatCount, plural } from "../../lib/format";
 import { optionsFor, useExport, type ExportDefaults, type ExportTarget } from "../../stores/export";
 import { useNotice } from "../../stores/notice";
 import { Button } from "../ui/Button";
@@ -38,8 +38,6 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
     </label>
   );
 }
-
-const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
 
 /** "Export…" (Ctrl+E): the view or a SQL result to a file in any format. */
 export function ExportDialog() {

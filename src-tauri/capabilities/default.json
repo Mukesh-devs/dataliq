@@ -48,6 +48,11 @@
     "allow-save-recipe-script",
     "allow-compare-files",
     "allow-compare-sql",
-    "allow-data-quality"
+    "allow-data-quality",
+    "allow-get-s3-settings",
+    "allow-save-s3-settings",
+    "allow-clear-s3-settings",
+    "allow-save-workspace",
+    "allow-load-workspace"
   ]
 }

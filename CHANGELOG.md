@@ -6,7 +6,34 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-10-28
+## [0.6.0] - 2026-10-28
+
+Power features: many files as one table, files from the web and S3, SQLite and DuckDB
+databases, and workspaces that bring a whole session back.
+
+### Added
+
+- Open a folder (Shift+Ctrl+O, the empty window, a drop, `bigview <folder>`) or a pattern such
+  as `logs/*.csv.gz` or `data/**/*.parquet` as one table: columns matched by name, a
+  `filename` column saying where each row came from, plain and gzipped files mixed, other
+  formats left out and listed. Folders whose files share a header open as fast as one file.
+- Open URL…: `https://` and `s3://` CSV, TSV, JSON and Parquet files (Parquet read in place, a
+  page at a time). DuckDB's httpfs extension downloads on first use, so the app stays offline
+  until then. S3 settings (key, secret, region, endpoint, URL style) live in the system
+  keychain. Files from a URL are not cached.
+- SQLite and DuckDB database files open read-only with a Table picker (views and other
+  schemas included); DuckDB tables are queried in place, SQLite tables imported. Each file is
+  also a database in the SQL panel (`SELECT * FROM shop.orders`), so files can be joined.
+- Workspaces: Save workspace (Ctrl+S) keeps every tab's file, import settings, filters, sort,
+  search, column layout, chart and recipe, plus the SQL panel; Open workspace (or opening a
+  `.bigview` file) brings them back, finding the files again when the project folder moved.
+
+### Changed
+
+- Toolbar buttons keep their labels on one line in a crowded header; the file name shortens
+  instead.
+
+ - 2026-10-28
 
 Clean, compare, quality: fix a messy file without touching it, compare two versions, and see
 what is wrong with a file at a glance.
@@ -153,7 +180,9 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.1.0...v0.2.0

@@ -12,7 +12,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
-import { formatBytes, formatCount, formatValue } from "../../lib/format";
+import { formatBytes, formatCount, formatValue, plural } from "../../lib/format";
+import { isUrl } from "../../lib/remote";
 import { COPY_FORMATS, formatRows, quoteIdent, tableName, type CopyFormat } from "../../lib/copyAs";
 import { formatSql } from "../../lib/sqlFormat";
 import { useSql } from "../../stores/sql";
@@ -90,6 +91,7 @@ import {
 import { FilterBar } from "../filters/FilterBar";
 import { SearchBox } from "../filters/SearchBox";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
+import { DatabaseSettings } from "../import/DatabaseSettings";
 import { ExcelSettings } from "../import/ExcelSettings";
 import { ImportBar } from "../import/ImportBar";
 import { ImportSettings } from "../import/ImportSettings";
@@ -127,7 +129,18 @@ const gridAnchor = (): Anchor => ({
   },
 });
 
-const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
+/** The files of a folder or pattern, for the header's tooltip. */
+function filesTitle(f: NonNullable<NonNullable<Tab["info"]>["files"]>): string {
+  const more = f.count - f.names.length;
+  return [
+    ...f.names,
+    ...(more > 0 ? [`… and ${formatCount(more)} more`] : []),
+    ...(f.skipped > 0
+      ? [`(${plural(f.skipped, "other file")} left out: another format, or empty)`]
+      : []),
+    `The ${f.column} column says which file each row came from.`,
+  ].join("\n");
+}
 
 const isCsv = (tab: Tab) => tab.info?.format === "csv" || tab.info?.format === "tsv";
 
@@ -903,13 +916,27 @@ export function FileView({
         void (e.shiftKey ? redoRecipe(tab.id) : undoRecipe(tab.id));
       }
       if (mod && key === "f" && searchInput.current) {
-        // At once, so the next key typed goes in; again after the grid's
-        // frame if it took the focus back (keeping what was typed).
-        searchInput.current.focus();
-        searchInput.current.select();
-        afterGrid(() => {
-          if (document.activeElement !== searchInput.current) searchInput.current?.focus();
-        });
+        // At once, so the next key typed goes in. If the grid then takes
+        // the focus (a frame after a click), it goes straight back in the
+        // same event, before another key can land in the grid.
+        e.preventDefault();
+        const input = searchInput.current;
+        input.focus();
+        input.select();
+        const stop = () => {
+          document.removeEventListener("focusin", reclaim, true);
+          document.removeEventListener("pointerdown", stop, true);
+        };
+        function reclaim(ev: FocusEvent) {
+          const target = ev.target as Element | null;
+          if (!target?.closest?.('[data-testid="data-grid"]')) return;
+          stop();
+          input.focus();
+        }
+        document.addEventListener("focusin", reclaim, true);
+        // A click by the user means they want the focus elsewhere.
+        document.addEventListener("pointerdown", stop, true);
+        setTimeout(stop, 1000);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -923,7 +950,10 @@ export function FileView({
           {tab.title}
         </span>
         {tab.info && (
-          <span className="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] text-fg-muted uppercase">
+          <span
+            className="shrink-0 rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-px text-[11px] whitespace-nowrap text-fg-muted uppercase"
+            title={tab.info.files ? filesTitle(tab.info.files) : undefined}
+          >
             {tab.compare ? (
               "Comparison"
             ) : tab.info.format === "sql" ? (
@@ -931,8 +961,9 @@ export function FileView({
             ) : (
               <>
                 {tab.info.format}
+                {tab.info.files && ` · ${plural(tab.info.files.count, "file")}`}
                 {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
-                {formatBytes(tab.info.sizeBytes)}
+                {isUrl(tab.path) ? "remote" : formatBytes(tab.info.sizeBytes)}
               </>
             )}
           </span>
@@ -1031,6 +1062,12 @@ export function FileView({
             onChange={(excel) => onReopen({ ...tab.options, excel })}
           />
         )}
+        {tab.info?.database && (
+          <DatabaseSettings
+            info={tab.info.database}
+            onChange={(database) => onReopen({ ...tab.options, database })}
+          />
+        )}
         {showSettings && (
           <ImportSettings
             options={tab.options.csv ?? {}}
@@ -1042,7 +1079,8 @@ export function FileView({
       {tab.import && tab.status === "ready" && (
         <ImportBar
           state={tab.import}
-          quiet={(tab.info?.sizeBytes ?? 0) < smallFileBytes(settings)}
+          // A URL's size isn't known up front: always show the progress.
+          quiet={!isUrl(tab.path) && (tab.info?.sizeBytes ?? 0) < smallFileBytes(settings)}
           onCancel={() => onCancelImport?.()}
           onReadDirect={() => onReadDirect?.()}
           onRetry={() => onReopen(tab.options)}

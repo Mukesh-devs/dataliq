@@ -228,10 +228,14 @@ fn closing_a_view_drops_its_table() {
 #[test]
 fn a_newer_sort_cancels_an_older_one_in_the_same_group() {
     let fx = fx();
-    // A table big enough that sorting it takes a while.
+    // A table big enough that the older view takes a while: its filter
+    // has to look at every one of the 10M rows (a sort alone only keeps
+    // the top rows, which a fast machine finishes before the newer view
+    // can cancel it).
     fx.engine
         .execute_batch(
-            "CREATE TABLE big AS SELECT range AS id, hash(range) AS h FROM range(10000000)",
+            "CREATE TABLE big AS SELECT range AS id, hash(range) AS h, \
+             CAST(range AS VARCHAR) AS t FROM range(10000000)",
         )
         .unwrap();
     fx.engine.datasets.insert(bigview_lib::engine::Dataset {
@@ -249,6 +253,13 @@ fn a_newer_sort_cancels_an_older_one_in_the_same_group() {
                 group: Some("view:tab-1".into()),
             };
             let spec = ViewSpec {
+                filters: vec![Filter {
+                    column: "t".into(),
+                    op: FilterOp::Regex {
+                        pattern: "7.*3.*1".into(),
+                    },
+                    not: false,
+                }],
                 sort: vec![key("h", true)],
                 ..ViewSpec::default()
             };

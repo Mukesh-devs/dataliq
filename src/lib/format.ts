@@ -91,6 +91,9 @@ export function formatCount(n: number): string {
   return Math.round(n).toLocaleString("en-US");
 }
 
+/** `3 files`, `1 file`, `1,200 rows`. */
+export const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
+
 /** Human-readable byte size, e.g. "5.2 GB". */
 export function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];

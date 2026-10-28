@@ -529,3 +529,100 @@ per side; then rows join on the keys alone, without numbering each key's
 occurrences, which sorts both sides. On 50M rows against 50M (5M
 differences) the numbering ran out of the container's disk while
 spilling; without it the comparison takes 14 s (D41).
+
+## D43 — Folders and patterns: an explicit file list, one table, a file column
+
+A folder (the data files directly in it) or a pattern (`logs/*.csv.gz`,
+`data/**/*.parquet`, matched with the `glob` crate) is resolved to an
+explicit, name-ordered list of files, which DuckDB reads together with
+`union_by_name` (a column missing from a file is empty there) and a
+`filename` column holding each row's path relative to the folder (or
+`source_file` when a file already has a `filename` column). Every file's
+format is detected from its contents; the most common format wins, and
+files of other formats and empty files are left out and counted in the
+header's tooltip. Excel workbooks are not combined. The first file is
+sniffed and its CSV settings apply to all; a mix of compressed and plain
+files reads with DuckDB's per-file `auto` compression, and every gzip file
+is checked for damage. The import, the cache (keyed on a digest of every
+file's path, size and modification time, so adding, removing or editing
+any file is a new version), views, SQL and "Copy as SQL" work as for one
+file; a Parquet folder is queried in place. Open it with Open folder
+(Shift+Ctrl+O, the empty window, the macOS File menu), a pattern from the
+palette, by dropping a folder, or with `bigview <folder>`.
+
+Matching columns by name makes DuckDB sniff every file, which costs
+seconds for a large folder (200 small `.csv.gz` files: 4.5 s before the
+first rows, and the app binds the reader more than once). So when every
+CSV file starts with the same header line (read cheaply in Rust, through
+gzip, after any skipped lines), the files are read with the first file's
+dialect and types (`files_to_sniff = 1`, no `union_by_name`): 0.28 s for
+the same folder. If a later file's values then don't fit those types
+(text in a number column), the import reads the folder again with every
+file sniffed, so the result is the same either way; only that rare import
+takes longer.
+
+## D44 — URLs: httpfs on demand, not cached, credentials in the keychain
+
+`https://`, `http://` and `s3://` files open like local ones (Open URL… in
+the palette, or `bigview <url>`), read by DuckDB's httpfs extension. The
+app stays offline by default (the engine turns off DuckDB's extension autoloading and
+autoinstalling): httpfs is installed once into the app's cache folder
+(`duckdb-extensions`) and loaded only when the first URL is opened, with a
+plain message when there is no internet to fetch it. The plan asked for
+httpfs to be bundled; the `duckdb` crate can build in json and parquet
+(and icu, autocomplete) but has no httpfs feature, so the signed extension
+is downloaded from DuckDB on first use instead. That one download is the
+only network access the app makes on its own behalf. The format comes from
+the URL's file name (no query), since there is no file to sniff; Excel URLs
+are refused. Parquet is queried in place in byte ranges, a page at a time;
+CSV and JSON import into the session as usual but are never cached, because
+the server's copy can change without a size or date we can trust. S3
+settings (key ID, secret, region, endpoint, URL style, HTTPS) are one
+keychain entry (`keyring`: macOS Keychain, Windows Credential Manager,
+Secret Service on Linux); the UI is shown everything but the secret, and
+saving with an empty secret keeps the stored one. They become a temporary
+DuckDB secret for the session, so nothing sensitive is written to disk.
+HTTP errors are said in words (404: no file at this address; 401/403:
+refused, with a pointer to the S3 settings).
+
+## D45 — Database files: attached read-only, a table at a time
+
+SQLite (`.sqlite`, `.sqlite3`, `.db`, `.db3`) and DuckDB (`.duckdb`, `.ddb`,
+or a `.db` whose header says DuckDB) files are told apart by their first
+bytes and attached `READ_ONLY` once per session, under a name made from the
+file name (`Shop Data.duckdb` → `shop_data`, with `_2` … when two files
+share a name), so the SQL panel can query any of their tables too. A
+"Table" picker in the header lists tables (with row counts for DuckDB, which
+knows them) and then views, `main` first and other schemas as
+`schema.table`; the first table opens. DuckDB tables are queried in place
+(columnar, fast); SQLite tables are imported and cached like a CSV file,
+each table its own entry, because paging through SQLite from DuckDB is
+slow. A file that changed on disk is detached and attached again. SQLite
+needs DuckDB's sqlite extension, installed on first use like httpfs (D44);
+DuckDB files need nothing. SQLite has no date type, so its dates arrive as
+text (Clean changes the type). "Copy as SQL" gives `sqlite_scan(path,
+table)` for SQLite, which runs in plain DuckDB with the extension; a DuckDB
+table is given by its attached name (`"shop"."main"."orders"`), which
+needs `ATTACH 'path' AS shop (READ_ONLY)` outside BigView. Databases can't
+be combined in a folder or read from a URL. A file another program holds
+open for writing, and one from another DuckDB version, are said in words.
+
+## D46 — Workspaces: a `.bigview` file of tabs, opened in place of the tabs
+
+"Save workspace" (Ctrl/Cmd+S; "Save workspace as…" with Shift) writes the
+open tabs, the SQL panel (text, open, height) and the side panels to a
+`.bigview` JSON file (`format: bigview-workspace`, `version: 1`). For each
+tab it keeps the file and only what was set on it: import settings (CSV
+options, Excel sheet, database table), filters, sort and search, column
+layout, SQL table name, chart and mode, recipe, and which side panel was
+open. Comparison and SQL result tabs have no file behind them and are left
+out (the notice says how many). The backend owns the file and its paths
+and passes each tab's settings through unread, so new tab settings need no
+backend change. Every file is stored by absolute path and, when inside the
+workspace's folder, by its path from there: a moved or shared project
+folder finds its files again. Opening a workspace (palette, file dialog,
+drop, recent files, `bigview work.bigview`) replaces the open tabs, since a
+workspace is a whole working state; each file opens as usual (from the
+cache when unchanged) and its view and recipe apply when its data is ready,
+the way a reload does. A missing file's tab says it is missing. Save writes
+the same file again; data files are never touched.
