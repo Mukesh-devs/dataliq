@@ -916,13 +916,27 @@ export function FileView({
         void (e.shiftKey ? redoRecipe(tab.id) : undoRecipe(tab.id));
       }
       if (mod && key === "f" && searchInput.current) {
-        // At once, so the next key typed goes in; again after the grid's
-        // frame if it took the focus back (keeping what was typed).
-        searchInput.current.focus();
-        searchInput.current.select();
-        afterGrid(() => {
-          if (document.activeElement !== searchInput.current) searchInput.current?.focus();
-        });
+        // At once, so the next key typed goes in. If the grid then takes
+        // the focus (a frame after a click), it goes straight back in the
+        // same event, before another key can land in the grid.
+        e.preventDefault();
+        const input = searchInput.current;
+        input.focus();
+        input.select();
+        const stop = () => {
+          document.removeEventListener("focusin", reclaim, true);
+          document.removeEventListener("pointerdown", stop, true);
+        };
+        function reclaim(ev: FocusEvent) {
+          const target = ev.target as Element | null;
+          if (!target?.closest?.('[data-testid="data-grid"]')) return;
+          stop();
+          input.focus();
+        }
+        document.addEventListener("focusin", reclaim, true);
+        // A click by the user means they want the focus elsewhere.
+        document.addEventListener("pointerdown", stop, true);
+        setTimeout(stop, 1000);
       }
     };
     window.addEventListener("keydown", onKey);
