@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-28
+
+DataLiq 1.0: a new name and icon, a menu bar and settings, first-run tips and a sample
+dataset, updates from signed releases, accessibility to WCAG 2.2 AA, every performance budget
+measured on Windows, macOS and Linux, and installers built for all three by a release
+workflow.
+
 ### Added
 
 - A menu bar with every action (File, Edit, View, Data, Help) on every OS, recent files and
@@ -18,10 +25,14 @@ All notable changes to this project are documented here. The format follows
 - Updates from signed GitHub releases: Help › Check for updates, and a quiet daily check at
   startup that asks before installing anything.
 - Every budget measured on Windows, macOS and Linux (docs/BENCHMARKS.md).
+- Installers for Windows (setup and MSI), macOS (one universal disk image) and Linux
+  (AppImage, .deb, .rpm), built by a release workflow into draft GitHub releases with SHA-256
+  checksums.
 
 ### Changed
 
-- The app is now called **DataLiq**, with a new icon: a database stack with a forward chevron. Workspaces are `.dataliq` files, and settings, cache and logs live in the
+- The app is now called **DataLiq**, with a new icon: a database stack with a forward
+  chevron. Workspaces are `.dataliq` files, and settings, cache and logs live in the
   `app.dataliq.desktop` folders (settings from earlier builds start fresh).
 - A column profile of a column where nearly every value differs is 3× faster: its most common
   values are found by an estimate and counted exactly, and the panel says so.
@@ -208,7 +219,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.3.0...v0.4.0

@@ -10,7 +10,7 @@ compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
 and no account.
 
-**Status:** v1.0 — see [CHANGELOG.md](CHANGELOG.md) for what's in each version,
+**Status:** v1.0.0 — see [CHANGELOG.md](CHANGELOG.md) for what's in each version,
 [PROGRESS.md](PROGRESS.md) for how each step was built and tested, and
 [docs/DECISIONS.md](docs/DECISIONS.md) for why things are the way they are.
 
