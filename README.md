@@ -23,6 +23,13 @@ _Screenshots coming soon._
   Nested JSON values expand into pretty-printed JSON.
 - Parquet is queried in place: a 50M-row file opens in under 0.1 s.
 - Excel `.xlsx` and `.xls` with a sheet picker and header row choice.
+- SQLite and DuckDB databases, read-only, with a table picker; DuckDB tables
+  are queried in place, and every database can be queried and joined in the
+  SQL panel.
+- A folder or a pattern (`logs/*.csv.gz`, `data/**/*.parquet`) opens as one
+  table, columns matched by name, with a `filename` column.
+- **Open URL** for files on the web or in S3 (credentials in the system
+  keychain); the extension it needs downloads only when you first use it.
 - Delimiter, header, quoting and types are detected automatically; override
   them in **Import settings** (delimiter, header, quote, encoding, skip rows,
   date format, ignore bad rows).
@@ -73,6 +80,9 @@ _Screenshots coming soon._
 - **Data quality** warnings: mostly empty columns, stray spaces, mixed types,
   inconsistent date formats, outliers and duplicate rows, each one showing
   exactly the affected rows and, where it can, fixing them with one click.
+- **Workspaces** (Ctrl+S): save the open tabs with their filters, layout,
+  charts and recipes, and the SQL panel, as a `.bigview` file and open it
+  again later, even after moving the project folder.
 - Light and dark themes that follow your OS.
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
@@ -85,6 +95,8 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Action | Shortcut |
 | --- | --- |
 | Open file | Ctrl+O |
+| Open folder as one table | Shift+Ctrl+O |
+| Save workspace / Save as | Ctrl+S / Shift+Ctrl+S |
 | Command palette | Ctrl+K |
 | Find in data | Ctrl+F |
 | Close tab | Ctrl+W |
@@ -108,7 +120,8 @@ random pages anywhere in 50M rows in under 25 ms. On 50M rows: a filter
 shows its first rows and count in 0.1–0.8 s, a sort its first and last rows in
 about 1 s, a column profile takes 0.4–2.8 s, a chart 0.1–1.7 s, an export
 to Parquet 7.6 s, a cleaning recipe its first page in 0.15 s, a data quality
-check 6.5 s, and comparing it with a 50M-row edited copy 14 s.
+check 6.5 s, and comparing it with a 50M-row edited copy 14 s. A 50M-row DuckDB
+database opens in 0.03 s, and a folder of 200 `.csv.gz` files in 0.3 s.
 
 ## Installing
 

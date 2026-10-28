@@ -341,3 +341,32 @@ importing or paging; the guard against the CI runner's baseline passes (all with
 | import_100k_xlsx | 1,957 ms | 1,646 ms |
 | reopen_cached_100mb_csv | 1.5 ms | 1.0 ms |
 | page_1m_parquet | 11.9 ms | 9.8 ms |
+
+## v0.6 — folders, databases and URLs (linux-dev)
+
+`cargo test -p bigview --test it perf_sources -- --ignored --nocapture --test-threads=1` (dev
+profile), through the calls the app makes when opening each kind of source. Measured on a
+fresh container (the machine changed since v0.5.0; see the small suite below).
+
+| Flow | Time |
+| --- | --- |
+| Folder of 200 small `.csv.gz` files (1M rows, one header): opened, columns and first rows | 0.28 s |
+| The same folder with every file sniffed (columns matched by name) | 4.53 s |
+| The same folder imported | 0.9 s |
+| Folder of 10 × 100 MB `.csv.gz` (21.3M rows): opened, first rows | 1.78 s |
+| The same folder imported (one such file alone: 4.0 s) | 19.8 s |
+| DuckDB file, 50M rows (0.85 GB): attached, tables listed, first page | 0.03 s |
+| Its page in the middle / at the end (queried in place) | 0.014 s / 0.025 s |
+| Its filter `country contains 'an'` (25M rows) / sort by `unit_price` desc: first page | 0.08 s / 0.65 s |
+| SQLite file, 1M rows (85 MB): attached, listed, first rows | 0.05 s |
+| The same table imported into the cache | 2.2 s |
+| Parquet over HTTP (1M rows, local server): httpfs loaded, first page | 0.11 s (6 requests) |
+| Its page in the middle | 0.031 s (2 requests) |
+
+**Budget: first rows < 1 s** — met for databases, URLs and folders whose files share a header.
+Matching columns by name made DuckDB sniff every file (4.5 s for 200 files, and the app binds
+the reader more than once while opening); folders of one header now use the first file's
+dialect and types and fall back to sniffing every file only when an import needs it (D43). Ten
+100 MB `.csv.gz` files take as long to open as one of them does (sniffing a gzipped file
+dominates), and import in parallel: 2× faster than one after another.
+
