@@ -36,6 +36,8 @@ workflow.
   `app.dataliq.desktop` folders (settings from earlier builds start fresh).
 - A column profile of a column where nearly every value differs is 3× faster: its most common
   values are found by an estimate and counted exactly, and the panel says so.
+- The window is ready faster (under 0.95 s on Linux): the grid, SQL editor and charts load the
+  first time they are shown.
 - Colours meet WCAG 2.2 AA contrast in both themes; focus is visible everywhere; the tab bar
   works with arrows, Home/End and Delete; the SQL editor lets go of the keyboard with Escape
   then Tab; small buttons are at least 24 px.

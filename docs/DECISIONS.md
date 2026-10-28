@@ -799,3 +799,18 @@ It stays legible at 32 px and on light and dark backgrounds, and also appears
 in Help › About. It was chosen from three concepts (a "D" with a lightning
 bolt, a table struck by a bolt, this one), after two earlier drafts (a drop
 made of data rows, an arrow made of bars) were set aside at review.
+
+## D54 — The grid, SQL editor and charts load on first use
+
+By 1.0 the UI was one 2.2 MB JavaScript bundle (Glide, CodeMirror, ECharts,
+Arrow), and parsing it at startup pushed "UI ready" to 1.05–1.43 s against
+the 1 s budget. `FileView` (grid), `SqlPanel` (CodeMirror) and `ChartPanel`
+(ECharts) are now `React.lazy` chunks behind `Suspense` with no fallback (the
+area stays empty for the few milliseconds the chunk takes from disk). The
+start screen loads a 681 kB bundle and is ready in 0.89–0.93 s. No
+prefetching: the chunks come from the app's own files, not the network.
+
+Anything that reaches into a lazily mounted component must wait for it:
+the SQL store's `focusEditor` (Ctrl+J) and `load` call the editor once it
+has registered itself, not on the next tick.
+

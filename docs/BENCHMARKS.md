@@ -45,9 +45,9 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Full import of a 1M-row .xlsx | — | 14.9 s, peak RSS 419 MB | v0.1 step 9 |
 | Reopen a cached file | < 1 s | 1–2 ms | v0.1 step 7 |
 | Peak memory while importing 5 GB | < DuckDB limit + 300 MB (8,045 + 300 MiB) | 1.9 GB (CSV), 3.2 GB (.csv.gz) | v0.1 step 7 |
-| App cold start to usable window (release) | < 1 s | window mapped 0.13 s, UI ready 0.87 s | v0.1.0 |
-| Idle memory, whole app incl. webview (release) | < 200 MB | 241 MiB PSS, of which 77 MiB private — see below | v0.1.0 |
-| Installer size (Linux) | < 40 MB | .deb 19.4 MB, .rpm 19.4 MB, .AppImage 92.5 MB — see below | v0.1.0 |
+| App cold start to usable window (release) | < 1 s | window mapped 0.09–0.11 s, UI ready 0.89–0.93 s | v1.0.0 |
+| Idle memory, whole app incl. webview (release) | < 200 MB | 407 MiB PSS, 195 MiB private, of which ~115 MiB software-GL buffers (no GPU) — see v1.0.0 | v1.0.0 |
+| Installer size | < 40 MB | Windows setup 13.9 MiB, MSI 18.9 MiB; macOS universal .dmg 37.2 MiB; .deb / .rpm 22.3 MiB; .AppImage 95.1 MiB (D24) | v1.0.0 |
 | Grid scroll, 50M rows (Chromium, mocked backend) | ~60 fps, no blank page > 100 ms | 60 fps; page wait p95 42 ms / max 51 ms (fast scroll), p95 56 / max 77 ms (fling) | v0.1.0 |
 | Simple filter on 50M rows (first rows + count) | < 2 s | 0.06–0.79 s | v0.2 step 3 |
 | Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
@@ -465,8 +465,8 @@ now build zlib-rs without overflow checks too. The import also ignored the panic
 thread's result was dropped): it is now logged as an error.
 
 Not measurable on the hosted runners (no desktop session): cold start, idle memory and grid
-frame rate on Windows and macOS, measured on Linux at v0.1.0. Installer sizes per OS are
-recorded with the release workflow (v1.0 step 7).
+frame rate on Windows and macOS (measured on Linux, see v1.0.0 below). Installer sizes per OS
+are in the same section.
 
 ### Small suite on three OSes
 
@@ -493,3 +493,44 @@ libraries are unchanged since v0.1.0, and on this run every Linux flow, Excel in
 30–39 % *under* the same baseline: hosted runners of one label differ by about a third from
 run to run. A guard failure is therefore re-run once before it is investigated.
 
+## v1.0.0 — the release build (linux-dev)
+
+Measured on the release build of 1.0.0 as at v0.1.0: Xvfb with software rendering, 5 runs.
+
+**Startup**: window mapped after 0.09–0.11 s; UI ready (`frontend ready`) after
+**0.89–0.93 s**. The first measurement of 1.0.0 missed the budget (1.05–1.43 s): the start
+screen parsed one 2.2 MB bundle holding the grid (Glide), the SQL editor (CodeMirror), the
+charts (ECharts) and Arrow. They are now chunks loaded the first time a file, the SQL panel or a
+chart is shown (D54); the first bundle is 681 kB, and opening a file loads its chunk in well
+under the 1 s of the first rows.
+
+**Idle memory** (no file open, PSS over the three processes):
+
+| Process | PSS | of which private (anonymous) |
+| --- | --- | --- |
+| dataliq (Rust + DuckDB + GTK) | 117 MiB | 29 MiB |
+| WebKitWebProcess (UI) | 266 MiB | 159 MiB |
+| WebKitNetworkProcess | 23 MiB | 7 MiB |
+| **Total** | **407 MiB** | **195 MiB** |
+
+The UI process grew since v0.1.0 (36 MiB private) because of how WebKitGTK draws on a
+display without a GPU: with its DMA-BUF renderer turned off (`WEBKIT_DISABLE_DMABUF_RENDERER=1`)
+the same process holds **46 MiB** private. The ~115 MiB difference is frame buffers that
+llvmpipe (software GL) keeps in ordinary memory; with a GPU driver they live in the GPU's
+memory. Our own code adds ~10 MiB over v0.1.0 (a larger UI). The renderer stays on, since
+turning it off would also take the GPU path away from real desktops. Windows (WebView2) and
+macOS (WKWebView) can't be measured on hosted runners (no desktop session).
+
+**Installer sizes** (release build, as `tauri build` prints them; Windows and macOS from release
+dry run [40731722788](https://github.com/mukesh-dsnl/dataliq/actions/runs/40731722788) on 1.0.0):
+
+| OS | Installer | Size |
+| --- | --- | --- |
+| Windows | `DataLiq_1.0.0_x64-setup.exe` | 13.9 MiB |
+| Windows | `DataLiq_1.0.0_x64_en-US.msi` | 18.9 MiB |
+| macOS | `DataLiq_1.0.0_universal.dmg` (Apple silicon and Intel) | 37.2 MiB |
+| Linux | `.deb` / `.rpm` | 22.3 MiB (23.4 MB) each |
+| Linux | `.AppImage` | 95.1 MiB, bundles WebKitGTK and GStreamer (D24) |
+
+Every installer but the AppImage is under the 40 MB budget; the macOS image holds two complete
+builds (arm64 and x86_64). The release workflow prints every file's size.

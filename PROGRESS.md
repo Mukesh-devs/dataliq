@@ -1031,3 +1031,28 @@ tested, and anything left over.
 - Left over: the first real release needs the tag pushed by the repository owner (tag pushes
   are not possible from this session), and the update keys and optional Apple secrets added as
   described in docs/RELEASING.md.
+
+### v1.0.0 release ✅
+
+- Version test list: all Rust tests (243, plus 29 on-demand perf tests), Vitest (282)
+  and the release-script tests (node:test), Playwright (70, including axe checks and the
+  keyboard-only walkthrough), Tauri debug build; CI green on Windows, macOS and Linux plus
+  Playwright; release dry run on the three OSes.
+- Release build on Linux (docs/BENCHMARKS.md, v1.0.0): `.deb` / `.rpm` 22.3 MiB, `.AppImage`
+  95.1 MiB; from the release dry run, Windows setup 13.9 MiB and MSI 18.9 MiB, macOS universal
+  disk image 37.2 MiB.
+- Found when re-measuring: UI ready had grown to 1.05–1.43 s (budget 1 s), because the start
+  screen parsed one 2.2 MB bundle. The grid, SQL editor and charts now load on first use (D54):
+  a 681 kB first bundle, UI ready in 0.89–0.93 s. Ctrl+J then focused the editor before its
+  chunk had loaded; the SQL store now waits for the editor to mount (unit test and the two
+  e2e flows that caught it).
+- Idle memory 407 MiB PSS / 195 MiB private: ~115 MiB of it is WebKitGTK's software-GL frame
+  buffers on this GPU-less display (46 MiB private for the UI with the DMA-BUF renderer off),
+  documented rather than worked around.
+- Smoke (release build): open `dates.csv` (grid), Ctrl+J and run `SELECT 42 AS answer` (SQL
+  panel, focus in the editor), "Show a chart of the view" from the palette (chart); no errors
+  in the log. Help › About shows the new icon.
+- Tag `v1.0.0` (local). Publishing needs the tag pushed and, for updates, the signing key
+  secrets and `DATALIQ_UPDATER_PUBKEY` (docs/RELEASING.md).
+- Left over: cold start, idle memory and frame rate on Windows and macOS need a desktop
+  session; Windows and macOS installers are unsigned until the certificates are added.
