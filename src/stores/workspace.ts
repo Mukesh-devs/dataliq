@@ -27,6 +27,8 @@ interface WorkspaceState {
   pickAndOpen: () => Promise<void>;
   /** Replaces the open tabs, SQL text and panels with the workspace's. */
   open: (path: string) => Promise<void>;
+  /** Closes every tab and forgets the workspace file (Save asks where). */
+  startNew: () => void;
 }
 
 /** What is on screen now, as a workspace. */
@@ -68,6 +70,10 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     } catch (err) {
       notice(`Couldn't save the workspace: ${errorText(err)}`);
     }
+  },
+  startNew: () => {
+    void useTabs.getState().restore([], null);
+    set({ path: null });
   },
   pickAndOpen: async () => {
     const path = await pickWorkspaceOpen().catch(() => null);

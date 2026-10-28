@@ -6,6 +6,7 @@
 //! cancelled or failed import never leaves a broken entry.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -119,27 +120,34 @@ pub fn now_ms() -> u64 {
 }
 
 pub struct Cache {
-    pub config: CacheConfig,
+    dir: PathBuf,
+    /// Changed from Settings while the app runs (see [`Cache::set_limits`]).
+    enabled: AtomicBool,
+    max_bytes: AtomicU64,
 }
 
 impl Cache {
     pub fn new(config: CacheConfig) -> Result<Cache> {
         std::fs::create_dir_all(&config.dir)?;
-        let cache = Cache { config };
+        let cache = Cache {
+            dir: config.dir,
+            enabled: AtomicBool::new(config.enabled),
+            max_bytes: AtomicU64::new(config.max_bytes),
+        };
         cache.remove_partials();
         Ok(cache)
     }
 
     pub fn db_path(&self, key: &str) -> PathBuf {
-        self.config.dir.join(format!("{key}.duckdb"))
+        self.dir.join(format!("{key}.duckdb"))
     }
 
     pub fn partial_path(&self, key: &str) -> PathBuf {
-        self.config.dir.join(format!("{key}.duckdb.partial"))
+        self.dir.join(format!("{key}.duckdb.partial"))
     }
 
     fn meta_path(&self, key: &str) -> PathBuf {
-        self.config.dir.join(format!("{key}.json"))
+        self.dir.join(format!("{key}.json"))
     }
 
     /// A complete cache entry for `key`, if any.
@@ -181,7 +189,7 @@ impl Cache {
     }
 
     fn remove_partials(&self) {
-        if let Ok(rd) = std::fs::read_dir(&self.config.dir) {
+        if let Ok(rd) = std::fs::read_dir(&self.dir) {
             for e in rd.flatten() {
                 let name = e.file_name().to_string_lossy().into_owned();
                 if name.contains(".duckdb.partial") {
@@ -193,7 +201,7 @@ impl Cache {
 
     fn entries(&self) -> Vec<(CacheMeta, u64)> {
         let mut out = Vec::new();
-        if let Ok(rd) = std::fs::read_dir(&self.config.dir) {
+        if let Ok(rd) = std::fs::read_dir(&self.dir) {
             for e in rd.flatten() {
                 let name = e.file_name().to_string_lossy().into_owned();
                 if let Some(key) = name.strip_suffix(".duckdb") {
@@ -207,12 +215,31 @@ impl Cache {
         out
     }
 
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// Whether imports are kept between sessions.
+    pub fn enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn max_bytes(&self) -> u64 {
+        self.max_bytes.load(Ordering::Relaxed)
+    }
+
+    /// New limits from Settings; a smaller size applies at the next cleanup.
+    pub fn set_limits(&self, enabled: bool, max_bytes: u64) {
+        self.enabled.store(enabled, Ordering::Relaxed);
+        self.max_bytes.store(max_bytes, Ordering::Relaxed);
+    }
+
     pub fn info(&self) -> CacheInfo {
         let entries = self.entries();
         CacheInfo {
-            dir: self.config.dir.clone(),
-            enabled: self.config.enabled,
-            max_bytes: self.config.max_bytes,
+            dir: self.dir.clone(),
+            enabled: self.enabled(),
+            max_bytes: self.max_bytes(),
             used_bytes: entries.iter().map(|(_, b)| b).sum(),
             entries: entries.len(),
         }
@@ -233,7 +260,7 @@ impl Cache {
         entries.sort_by_key(|(m, _)| m.last_used_ms);
         let mut removed = Vec::new();
         for (meta, bytes) in entries {
-            if used <= self.config.max_bytes {
+            if used <= self.max_bytes() {
                 break;
             }
             if keep.contains(&meta.key) {
@@ -335,7 +362,12 @@ mod tests {
         assert!(!cache.partial_path("k2").exists());
         // Leftover partials from a crash are removed at startup.
         std::fs::write(cache.partial_path("k3"), b"x").unwrap();
-        let cache = Cache::new(cache.config.clone()).unwrap();
+        let cache = Cache::new(CacheConfig {
+            dir: cache.dir().to_path_buf(),
+            max_bytes: cache.max_bytes(),
+            enabled: cache.enabled(),
+        })
+        .unwrap();
         assert!(!cache.partial_path("k3").exists());
         assert_eq!(cache.info().entries, 1);
     }

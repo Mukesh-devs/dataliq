@@ -350,6 +350,17 @@ impl Engine {
         Ok(true)
     }
 
+    /// New memory and thread limits from Settings, for every connection.
+    pub fn set_limits(&self, memory_limit_bytes: u64, threads: Option<u32>) -> Result<()> {
+        let mib = (memory_limit_bytes / (1024 * 1024)).max(1);
+        let threads = threads
+            .map(|t| t.max(1) as usize)
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()));
+        self.execute_batch(&format!(
+            "SET memory_limit = '{mib}MiB'; SET threads = {threads};"
+        ))
+    }
+
     /// Marks work in progress for [`Engine::release_memory`] until dropped.
     /// Nesting is fine: the exclusive side is only ever tried, never waited for.
     pub fn busy(&self) -> parking_lot::RwLockReadGuard<'_, ()> {

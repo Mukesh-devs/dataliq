@@ -5,6 +5,8 @@ use std::time::Instant;
 use parking_lot::Mutex;
 use tauri::State;
 
+use crate::error::{AppError, Result};
+
 /// Files passed on the command line at startup, until the UI takes them.
 pub struct StartupFiles {
     pub files: Mutex<Vec<PathBuf>>,
@@ -24,4 +26,17 @@ pub fn take_startup_files(startup: State<'_, StartupFiles>) -> Vec<PathBuf> {
         );
     });
     std::mem::take(&mut *startup.files.lock())
+}
+
+/// Replaces the macOS menu bar with the frontend's menus (see `menu`).
+/// Elsewhere the menus are drawn in the window; nothing to do.
+#[tauri::command]
+pub fn set_native_menu(app: tauri::AppHandle, menus: Vec<crate::menu::NativeMenu>) -> Result<()> {
+    if cfg!(target_os = "macos") {
+        let menu = crate::menu::build(&app, &menus)
+            .map_err(|e| AppError::Internal(format!("menu: {e}")))?;
+        app.set_menu(menu)
+            .map_err(|e| AppError::Internal(format!("menu: {e}")))?;
+    }
+    Ok(())
 }

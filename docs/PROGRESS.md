@@ -73,3 +73,33 @@
   paths; the folder moved to `proj-moved`, then `bigview proj-moved/work.bigview` → both tabs
   from the new place, "167 of 1,000 rows · filtered", the SQL text and panel back.
 - Left over: none.
+
+## v1.0 — Polish and release
+
+### Step 2 — Settings screen and menu bar ✅
+
+- A menu bar (File, Edit, View, Data, Help) on every OS, made of the palette's commands: each
+  item runs the same command, shows its shortcut, and is disabled while it can't be used.
+  File: New workspace (Ctrl+N), Open file / folder / pattern / URL, Open recent (files of the
+  same name told apart by folder; Clear recent files), Open / Save / Save as workspace, Export,
+  Reload, Settings, Close tab, Exit. On Windows and Linux it's drawn at the start of the tab
+  row (Alt or F10 focuses it); on macOS the native menu bar is built from the same list with
+  the app, text editing and Window menus (D47, replacing D22).
+- Settings (Ctrl+, / File › Settings… / ⌘, on macOS): theme, density, column histograms;
+  memory limit and worker threads (applied at once), temporary folder; cache on/off and size
+  (at once) and location (after a restart); quiet-import size; export defaults; how to make
+  BigView the default app. Values are checked by the backend and explained in words (D48).
+- File associations in the installers (CSV/TSV, JSON/NDJSON, Parquet, Excel, SQLite, DuckDB,
+  `.bigview`); on macOS files opened from the Finder arrive as an event and open like the
+  command line. Help › Keyboard shortcuts (from the commands themselves) and About.
+- Tested: unit tests for settings validation, live memory/thread limits; Vitest for the menus
+  (titles, disabled items, separators, recent files and duplicates, macOS differences and
+  native shortcuts); Playwright for the menu bar (disabled Export, File › Open file, Open
+  recent, View › Theme › Dark, Alt and arrows, Help › Keyboard shortcuts) and Settings (a
+  refused value in words, saving and reopening, density applied, restart notice).
+- Smoke (real app, Linux): the File menu and Open recent; Settings showed 16 GB → 8,045 MB
+  automatic and 4 cores; a memory limit of 0 → "The memory limit must be at least 256 MB.";
+  4096 and Compact → saved to settings.json, rows compact, and in the SQL panel
+  `current_setting('memory_limit')` = 4.0 GiB without a restart.
+- Left over: the macOS native menu and the Finder open event are compiled and checked by the
+  macOS CI job but not tried on a Mac.

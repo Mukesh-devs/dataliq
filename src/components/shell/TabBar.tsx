@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Command,
   LoaderCircle,
@@ -24,6 +25,8 @@ interface TabBarProps {
   /** Which panels are shown, and toggling them (top right of the window). */
   panels?: { left: boolean; right: boolean; bottom: boolean };
   onTogglePanel?: (panel: "left" | "right" | "bottom") => void;
+  /** The menu bar, first in the row (Windows and Linux). */
+  menu?: ReactNode;
 }
 
 const PANELS = [
@@ -41,9 +44,16 @@ export function TabBar({
   onCommands,
   panels,
   onTogglePanel,
+  menu,
 }: TabBarProps) {
   return (
     <header className="flex h-[var(--chrome-height)] shrink-0 items-center gap-1 border-b border-border bg-surface pr-2 pl-2">
+      {menu && (
+        <>
+          {menu}
+          <div className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
+        </>
+      )}
       <div role="tablist" aria-label="Open files" className="flex min-w-0 items-center gap-0.5">
         {tabs.map((tab) => {
           const busy = tab.status === "loading" || tab.import?.status === "running";

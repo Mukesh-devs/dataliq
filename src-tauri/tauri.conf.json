@@ -38,7 +38,82 @@
       "icons/icon.ico"
     ],
     "linux": {
-      "deb": { "depends": [] }
-    }
+      "deb": {
+        "depends": []
+      }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "csv",
+          "tsv",
+          "tab"
+        ],
+        "name": "Delimited text data",
+        "description": "Comma- or tab-separated data",
+        "role": "Viewer",
+        "mimeType": "text/csv"
+      },
+      {
+        "ext": [
+          "json",
+          "ndjson",
+          "jsonl"
+        ],
+        "name": "JSON data",
+        "description": "JSON or newline-delimited JSON data",
+        "role": "Viewer",
+        "mimeType": "application/json"
+      },
+      {
+        "ext": [
+          "parquet"
+        ],
+        "name": "Parquet data",
+        "description": "Apache Parquet data",
+        "role": "Viewer",
+        "mimeType": "application/vnd.apache.parquet"
+      },
+      {
+        "ext": [
+          "xlsx",
+          "xls"
+        ],
+        "name": "Excel workbook",
+        "description": "Excel workbook",
+        "role": "Viewer",
+        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      },
+      {
+        "ext": [
+          "sqlite",
+          "sqlite3",
+          "db3"
+        ],
+        "name": "SQLite database",
+        "description": "SQLite database",
+        "role": "Viewer",
+        "mimeType": "application/vnd.sqlite3"
+      },
+      {
+        "ext": [
+          "duckdb",
+          "ddb"
+        ],
+        "name": "DuckDB database",
+        "description": "DuckDB database",
+        "role": "Viewer",
+        "mimeType": "application/x-duckdb"
+      },
+      {
+        "ext": [
+          "bigview"
+        ],
+        "name": "BigView workspace",
+        "description": "BigView workspace: open tabs, views and SQL",
+        "role": "Editor",
+        "mimeType": "application/x-bigview-workspace"
+      }
+    ]
   }
 }

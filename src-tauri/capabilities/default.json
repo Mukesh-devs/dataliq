@@ -7,6 +7,7 @@
   ],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
     "dialog:allow-open",
     "dialog:allow-save",
     "allow-run-query",
@@ -21,7 +22,10 @@
     "allow-cache-info",
     "allow-clear-cache",
     "allow-get-settings",
+    "allow-settings-info",
+    "allow-save-settings",
     "allow-take-startup-files",
+    "allow-set-native-menu",
     "allow-open-view",
     "allow-column-values",
     "allow-column-profile",

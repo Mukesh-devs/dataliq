@@ -323,7 +323,38 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             case "take_startup_files":
               return startupFiles.splice(0);
             case "get_settings":
-              return { memoryLimitMb: null, cacheEnabled: true, cacheMaxGb: 20, smallFileMb: 0 };
+              return (
+                w.__settings ?? {
+                  memoryLimitMb: null,
+                  tempDir: null,
+                  threads: null,
+                  cacheEnabled: true,
+                  cacheMaxGb: 20,
+                  cacheDir: null,
+                  smallFileMb: 0,
+                }
+              );
+            case "settings_info":
+              return {
+                totalMemoryMb: 16384,
+                defaultMemoryLimitMb: 8192,
+                cores: 8,
+                defaultCacheDir: "/home/me/.cache/bigview/datasets",
+                defaultTempDir: "/tmp/bigview-spill",
+                settingsFile: "/home/me/.config/bigview/settings.json",
+              };
+            case "save_settings": {
+              const next = args.settings as {
+                memoryLimitMb: number | null;
+                cacheDir: string | null;
+              };
+              if (next.memoryLimitMb !== null && next.memoryLimitMb < 256)
+                throw { kind: "query", message: "The memory limit must be at least 256 MB." };
+              w.__settings = next;
+              return { settings: next, restartNeeded: next.cacheDir !== null };
+            }
+            case "set_native_menu":
+              return null;
             case "cache_info":
               return {
                 dir: "/cache",

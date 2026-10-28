@@ -19,8 +19,7 @@ pub mod view;
 pub mod workspace;
 
 mod logging;
-#[cfg(target_os = "macos")]
-mod menu;
+pub mod menu;
 
 use std::sync::Arc;
 
@@ -100,7 +99,11 @@ pub fn run() {
                 paths.app_data_dir()?,
             )));
             app.manage(Arc::new(export::Exports::default()));
-            app.manage(settings);
+            app.manage(commands::settings::SettingsState {
+                path: settings_path,
+                current: parking_lot::RwLock::new(settings.clone()),
+                started: settings,
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -115,8 +118,11 @@ pub fn run() {
             commands::import::close_dataset,
             commands::import::cache_info,
             commands::import::clear_cache,
-            commands::import::get_settings,
+            commands::settings::get_settings,
+            commands::settings::settings_info,
+            commands::settings::save_settings,
             commands::app::take_startup_files,
+            commands::app::set_native_menu,
             commands::view::open_view,
             commands::view::column_values,
             commands::view::column_profile,
@@ -152,12 +158,28 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
+        .run(|app, event| match event {
+            tauri::RunEvent::Exit => {
                 // Uncached imports are session-only.
                 if let Some(state) = app.try_state::<Arc<commands::import::ImportState>>() {
                     let _ = std::fs::remove_dir_all(&state.temp_dir);
                 }
             }
+            // macOS hands files opened from the Finder (file associations)
+            // to the running app as an event, not as arguments.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => {
+                let files: Vec<std::path::PathBuf> =
+                    urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
+                if let Some(startup) = app.try_state::<commands::app::StartupFiles>() {
+                    // Before the UI has asked for them: with the startup files.
+                    if !startup.ready.is_completed() {
+                        startup.files.lock().extend(files);
+                        return;
+                    }
+                }
+                let _ = app.emit("open-files", files);
+            }
+            _ => {}
         });
 }

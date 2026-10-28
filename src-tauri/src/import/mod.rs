@@ -180,7 +180,7 @@ fn import_once(
     let key = cache::cache_key(&stamp, &source.options);
     let cache = target.cache;
     // Files on the web may change without notice: imported for this session only.
-    let caching = cache.config.enabled && !source.is_remote();
+    let caching = cache.enabled() && !source.is_remote();
 
     // Already open in this session.
     if let Ok(ds) = engine.datasets.get(&key) {
@@ -204,7 +204,7 @@ fn import_once(
     }
 
     let dir = if caching {
-        cache.config.dir.clone()
+        cache.dir().to_path_buf()
     } else {
         target.temp_dir.clone()
     };

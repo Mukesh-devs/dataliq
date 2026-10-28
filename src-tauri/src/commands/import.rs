@@ -7,7 +7,6 @@ use crate::cache::{Cache, CacheInfo};
 use crate::engine::{Dataset, Engine};
 use crate::error::{AppError, Result};
 use crate::import::{self, ImportOutcome, ImportTarget, Imports};
-use crate::settings::Settings;
 use crate::sources::{OpenOptions, Source};
 
 /// Shared state for imports.
@@ -96,9 +95,4 @@ pub fn clear_cache(
 ) -> CacheInfo {
     state.cache.clear(&engine.datasets.ids());
     state.cache.info()
-}
-
-#[tauri::command]
-pub fn get_settings(settings: State<'_, Settings>) -> Settings {
-    settings.inner().clone()
 }

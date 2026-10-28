@@ -87,8 +87,37 @@ impl Settings {
     }
 }
 
+impl Settings {
+    /// Checks values a person typed in the Settings screen.
+    pub fn validate(&self) -> Result<()> {
+        let bad = |m: &str| Err(AppError::Query(m.to_string()));
+        if let Some(mb) = self.memory_limit_mb {
+            if mb < 256 {
+                return bad("The memory limit must be at least 256 MB.");
+            }
+            if mb > total_memory_bytes() / (1024 * 1024) {
+                return bad("The memory limit can't be more than this computer's memory.");
+            }
+        }
+        if self.threads == Some(0) {
+            return bad("Use at least one thread.");
+        }
+        if self.cache_max_gb == 0 {
+            return bad("The cache needs at least 1 GB.");
+        }
+        Ok(())
+    }
+}
+
+/// This computer's memory in bytes.
+pub fn total_memory_bytes() -> u64 {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_memory();
+    sys.total_memory()
+}
+
 /// 50% of physical RAM (at least 1 GiB).
-fn default_memory_limit_bytes() -> u64 {
+pub fn default_memory_limit_bytes() -> u64 {
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
     (sys.total_memory() / 2).max(1024 * 1024 * 1024)
@@ -152,5 +181,41 @@ mod tests {
             ..Settings::default()
         };
         assert_eq!(s.memory_limit_bytes(), 512 * 1024 * 1024);
+    }
+
+    #[test]
+    fn typed_values_are_checked() {
+        let ok = Settings::default();
+        assert!(ok.validate().is_ok());
+        let low = Settings {
+            memory_limit_mb: Some(100),
+            ..Settings::default()
+        };
+        assert!(
+            low.validate()
+                .unwrap_err()
+                .to_string()
+                .contains("at least 256 MB")
+        );
+        let huge = Settings {
+            memory_limit_mb: Some(u64::MAX / (1 << 20)),
+            ..Settings::default()
+        };
+        assert!(
+            huge.validate()
+                .unwrap_err()
+                .to_string()
+                .contains("more than")
+        );
+        let no_threads = Settings {
+            threads: Some(0),
+            ..Settings::default()
+        };
+        assert!(no_threads.validate().is_err());
+        let no_cache = Settings {
+            cache_max_gb: 0,
+            ..Settings::default()
+        };
+        assert!(no_cache.validate().is_err());
     }
 }

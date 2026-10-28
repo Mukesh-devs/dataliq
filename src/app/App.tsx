@@ -10,6 +10,11 @@ import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
 import { OpenPattern } from "../components/shell/OpenPattern";
 import { OpenUrl } from "../components/shell/OpenUrl";
+import { HelpDialog, type HelpTopic } from "../components/shell/HelpDialog";
+import { MenuBar } from "../components/shell/MenuBar";
+import { SettingsDialog } from "../components/settings/SettingsDialog";
+import { call } from "../lib/ipc";
+import { MENUS, resolveMenus, toNative } from "../lib/menus";
 import {
   onFileDrop,
   onImportProgress,
@@ -20,10 +25,10 @@ import {
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
-import { modKey } from "../lib/platform";
+import { isMac, modKey } from "../lib/platform";
 import { onViewReady } from "../lib/view";
 import { useApp } from "../stores/app";
-import { useRegisterCommands, type Command } from "../stores/commands";
+import { allCommands, useCommands, useRegisterCommands, type Command } from "../stores/commands";
 import { useLayout } from "../stores/layout";
 import { useNotice } from "../stores/notice";
 import { useWorkspace } from "../stores/workspace";
@@ -113,6 +118,38 @@ function useSubscription(subscribe: () => Promise<() => void>) {
   }, [subscribe]);
 }
 
+/** Runs a registered command by id: what a menu item does. */
+function runCommand(id: string) {
+  allCommands(useCommands.getState().sources)
+    .find((c) => c.id === id)
+    ?.run();
+}
+
+/**
+ * The menus, following the commands there are right now and the recent
+ * files: drawn in the window on Windows and Linux, sent to the native menu
+ * bar on macOS. Its own component, so only it re-renders when the commands
+ * change (commands are registered while rendering the rest of the app).
+ */
+function AppMenus() {
+  const sources = useCommands((s) => s.sources);
+  const recent = useRecent((s) => s.files);
+  const menus = useMemo(
+    () => resolveMenus(MENUS, allCommands(sources), recent, isMac),
+    [sources, recent],
+  );
+  useEffect(() => {
+    if (!isMac) return;
+    // Commands change in bursts (a file opening registers many): once settled.
+    const timer = setTimeout(
+      () => void call("set_native_menu", { menus: toNative(menus) }).catch(() => {}),
+      150,
+    );
+    return () => clearTimeout(timer);
+  }, [menus]);
+  return isMac ? null : <MenuBar menus={menus} onRun={runCommand} />;
+}
+
 export function App() {
   const {
     tabs,
@@ -188,6 +225,10 @@ export function App() {
   );
 
   const [patternOpen, setPatternOpen] = useState(false);
+  const [help, setHelp] = useState<HelpTopic | null>(null);
+  const setSettingsOpen = useApp((s) => s.setSettingsOpen);
+  const startNewWorkspace = useWorkspace((s) => s.startNew);
+  const clearRecent = useRecent((s) => s.clear);
   // Open URL, and whether it starts on the S3 settings.
   const [urlOpen, setUrlOpen] = useState<{ s3: boolean } | null>(null);
   const openFolder = useMemo(
@@ -212,6 +253,8 @@ export function App() {
       copyAs: () => setPalette({ query: "Copy " }),
       saveWorkspace: () => void saveWorkspace(),
       saveWorkspaceAs: () => void saveWorkspace(true),
+      newWorkspace: startNewWorkspace,
+      settings: () => setSettingsOpen(true),
       toggleSql: () => {
         const open = !useSql.getState().open;
         setSqlOpen(open);
@@ -226,13 +269,30 @@ export function App() {
         l.setProfile(!l.profile);
       },
     }),
-    [openFile, openFolder, close, cycle, setSqlOpen, saveWorkspace],
+    [
+      openFile,
+      openFolder,
+      close,
+      cycle,
+      setSqlOpen,
+      saveWorkspace,
+      startNewWorkspace,
+      setSettingsOpen,
+    ],
   );
   useShortcuts(shortcuts);
 
   // App-wide commands; the open file adds its own (FileView).
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [
+      {
+        id: "new-workspace",
+        title: "New workspace",
+        group: "File",
+        shortcut: `${modKey}+N`,
+        keywords: "close all tabs start fresh empty",
+        run: shortcuts.newWorkspace,
+      },
       {
         id: "open-file",
         title: "Open file…",
@@ -327,6 +387,14 @@ export function App() {
         run: () => void openPaths([file.path]),
       });
     }
+    if (recent.length > 0)
+      list.push({
+        id: "clear-recent",
+        title: "Clear recent files",
+        group: "File",
+        keywords: "history forget",
+        run: clearRecent,
+      });
     list.push(
       {
         id: "toggle-sidebar",
@@ -429,7 +497,45 @@ export function App() {
         group: "App",
         run: () => void clearCache(),
       },
+      {
+        id: "settings",
+        title: "Settings…",
+        group: "App",
+        shortcut: `${modKey}+,`,
+        keywords: "preferences options memory cache theme density export",
+        run: shortcuts.settings,
+      },
+      {
+        id: "command-palette",
+        title: "Command palette…",
+        group: "App",
+        shortcut: `${modKey}+K`,
+        keywords: "actions search commands",
+        run: shortcuts.commandPalette,
+      },
+      {
+        id: "keyboard-shortcuts",
+        title: "Keyboard shortcuts",
+        group: "Help",
+        keywords: "keys hotkeys",
+        run: () => setHelp("shortcuts"),
+      },
+      {
+        id: "about",
+        title: "About BigView",
+        group: "Help",
+        keywords: "version",
+        run: () => setHelp("about"),
+      },
     );
+    if (!isMac)
+      list.push({
+        id: "exit",
+        title: "Exit",
+        group: "App",
+        keywords: "quit close app",
+        run: () => void import("@tauri-apps/api/window").then((w) => w.getCurrentWindow().close()),
+      });
     return list;
   }, [
     shortcuts,
@@ -450,6 +556,7 @@ export function App() {
     formatEditor,
     notice,
     pickWorkspace,
+    clearRecent,
   ]);
   useRegisterCommands("app", commands);
 
@@ -460,12 +567,9 @@ export function App() {
   useSubscription(
     useMemo(
       () => () =>
-        onMenu((id) => {
-          if (id === "open-file") shortcuts.openFile();
-          if (id === "open-folder") shortcuts.openFolder();
-          if (id === "close-tab") shortcuts.closeTab();
-        }),
-      [shortcuts],
+        // The native macOS menu: every item is a command (see `MENUS`).
+        onMenu(runCommand),
+      [],
     ),
   );
   useSubscription(
@@ -507,6 +611,7 @@ export function App() {
         onClose={close}
         onOpen={() => void openFile()}
         onCommands={() => setPalette({ query: "" })}
+        menu={isMac ? undefined : <AppMenus />}
         panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
         onTogglePanel={(panel) =>
           panel === "left"
@@ -530,6 +635,9 @@ export function App() {
         showS3={urlOpen?.s3}
         onOpen={(u) => void openPaths([u])}
       />
+      {isMac && <AppMenus />}
+      <SettingsDialog />
+      <HelpDialog topic={help} onClose={() => setHelp(null)} />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.
         key={palette ? `open:${palette.query}` : "closed"}

@@ -83,6 +83,9 @@ _Screenshots coming soon._
 - **Workspaces** (Ctrl+S): save the open tabs with their filters, layout,
   charts and recipes, and the SQL panel, as a `.bigview` file and open it
   again later, even after moving the project folder.
+- A **menu bar** with every action (File, Edit, View, Data, Help), recent
+  files and workspaces; **Settings** (Ctrl+,) for theme, density, memory,
+  threads, the cache's size and folder, and export defaults.
 - Light and dark themes that follow your OS.
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
@@ -94,6 +97,8 @@ Use Cmd on macOS, Ctrl elsewhere.
 
 | Action | Shortcut |
 | --- | --- |
+| Menu bar (Windows, Linux) | Alt or F10 |
+| New workspace | Ctrl+N |
 | Open file | Ctrl+O |
 | Open folder as one table | Shift+Ctrl+O |
 | Save workspace / Save as | Ctrl+S / Shift+Ctrl+S |
@@ -110,6 +115,7 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Run SQL (or the selection) | Ctrl+Enter |
 | Show / hide the sidebar | Ctrl+B |
 | Show / hide the column profile | Ctrl+Alt+B |
+| Settings | Ctrl+, |
 
 ## Performance
 

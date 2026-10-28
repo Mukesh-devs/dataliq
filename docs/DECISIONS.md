@@ -178,6 +178,8 @@ written by `scripts/make_xls.py` (xlwt), since no Rust crate writes BIFF8.
 
 ## D22 — Native menu on macOS only
 
+_Replaced by D47 (v1.0): every OS has a menu bar now._
+
 macOS apps are expected to have a menu bar (and it provides Copy/Paste in
 text fields), so BigView installs the standard menu plus File > Open… /
 Close Tab there. On Windows and Linux a menu bar would add a row of chrome
@@ -634,3 +636,52 @@ workspace is a whole working state; each file opens as usual (from the
 cache when unchanged) and its view and recipe apply when its data is ready,
 the way a reload does. A missing file's tab says it is missing. Save writes
 the same file again; data files are never touched.
+
+## D47 — A menu bar on every OS, made of the palette's commands
+
+D22 left Windows and Linux without a menu bar; people looking for Open,
+Save workspace or Recent files expect one. The menus (File, Edit, View,
+Data, Help) are a list of command ids (`src/lib/menus.ts`): each item runs
+the same command as the palette and the keyboard, shows its title and
+shortcut, and is disabled while the command isn't available (Export with
+no file open), so the menus keep their shape. File has New workspace
+(Ctrl+N: closes the tabs and forgets the workspace file; a viewer has no
+"new file"), the open commands, Open recent (with Clear recent files),
+Open / Save / Save as workspace, Export, Settings, Close tab and Exit.
+
+On Windows and Linux the menus are drawn in the window, at the start of
+the tab row (no extra row of chrome), with Radix's menubar: Alt alone or
+F10 moves the focus to it, arrows and Enter work as in native menus. A
+native menu there would register its shortcuts with the window and take
+keys like Ctrl+F or Ctrl+E from the web view, whose handlers depend on
+focus and timing (D-grid focus fixes). On macOS the menu bar is native
+and built by the backend from the same list (`set_native_menu`), plus
+macOS's own items: the app menu (About, Settings… ⌘,, Hide, Quit), text
+editing in Edit, and Window. Native shortcuts there are only given to
+app-wide actions (⌘N, ⌘O, ⇧⌘O, ⌘S, ⇧⌘S, ⌘W); the rest stay with the page
+and show in the palette. A click sends the command id back as a `menu`
+event. The menus are resolved in their own component, which alone
+re-renders when commands change (commands register while rendering).
+
+## D48 — Settings screen: saved to settings.json, applied at once where possible
+
+Settings (Ctrl+, / File › Settings… / ⌘, on macOS) edits a draft and Save
+applies everything; Cancel drops it. Appearance (theme, density, column
+histograms) and export defaults (format, CSV delimiter, header) are UI
+preferences kept by the webview, as before. Memory limit, worker threads,
+the quiet-import size, the cache (on/off, size, location) and the
+temporary folder are the backend's `settings.json`; the backend checks
+them (memory ≥ 256 MB and ≤ the computer's, threads ≥ 1, cache ≥ 1 GB) and
+says what's wrong in words, and applies memory and threads (DuckDB `SET`)
+and the cache's on/off and size (a smaller size cleans up at once) without
+a restart. A new cache or temporary folder applies after a restart, which
+the notice says. Empty means automatic, with the automatic value shown
+(half of the memory, every core, the default folders).
+
+File associations are the installers' job: the bundle registers BigView
+as a viewer for CSV/TSV, JSON/NDJSON, Parquet, Excel, SQLite and DuckDB
+files and as the editor of `.bigview` workspaces (`.gz` is left alone).
+Making it the default app is the user's choice in the OS (Windows and
+macOS don't let apps take it), so Settings says how. On macOS files opened
+from the Finder arrive as an `Opened` event, which is handled like the
+command line (held until the UI is ready).
