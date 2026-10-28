@@ -13,7 +13,7 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/release/release.test.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:perf": "playwright test -c playwright.perf.config.ts",
