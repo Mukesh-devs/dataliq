@@ -1009,3 +1009,25 @@ tested, and anything left over.
 - Smoke (real app, Linux): About shows the icon and "DataLiq 0.6.0"; the data folder is
   `app.dataliq.desktop`; the .deb installs `/usr/bin/dataliq` with `Name=DataLiq` and the new
   icon.
+
+### Step 7 — Release workflow ✅
+
+- `.github/workflows/release.yml`: builds the installers on Windows (NSIS setup per user, MSI;
+  WebView2 bootstrapper embedded), macOS (one universal app for Apple silicon and Intel, as a
+  .dmg; signed and notarized when the Apple secrets exist) and Linux (AppImage, .deb, .rpm),
+  then puts them in a **draft** GitHub release with `SHA256SUMS.txt`, the version's CHANGELOG
+  section as notes (with how to check a download), and `latest.json` for the updater when the
+  update key is set up. A pushed `vX.Y.Z` tag makes the release (checked against the app
+  version before building); run by hand, or when the workflow changes, it is a dry run whose
+  files are kept as an artifact. Nothing is ever published automatically.
+- `scripts/release/` holds the file handling (which bundles are released, the updater
+  manifest keys per platform, checksums, notes), with `node:test` tests run by `pnpm test`.
+- Tested: the release script tests (7), and a local run of `collect` and `finish` over this
+  machine's bundles (only the current version picked up, `sha256sum -c` passes, a wrong tag is
+  refused). First dry run on GitHub (run 40720215083): Windows 30 min, macOS universal 39 min,
+  Linux 16 min, all green; 6 installers with checksums and notes, no `latest.json` (no update
+  key yet). Workflow-dispatch works only for workflows GitHub has seen run, so the dry run also
+  starts on a push that changes the workflow.
+- Left over: the first real release needs the tag pushed by the repository owner (tag pushes
+  are not possible from this session), and the update keys and optional Apple secrets added as
+  described in docs/RELEASING.md.

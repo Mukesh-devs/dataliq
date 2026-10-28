@@ -39,8 +39,9 @@ for (const path of walk(bundleDir)) {
   const target = releaseName(name, version);
   copyFileSync(path, join(outDir, target));
   if (existsSync(`${path}.sig`)) copyFileSync(`${path}.sig`, join(outDir, `${target}.sig`));
+  const mb = (statSync(path).size / 1048576).toFixed(1);
   console.log(
-    `${target} — ${info.kind}${existsSync(`${path}.sig`) ? " (signed for updates)" : ""}`,
+    `${target} — ${info.kind}, ${mb} MB${existsSync(`${path}.sig`) ? " (signed for updates)" : ""}`,
   );
   count += 1;
 }

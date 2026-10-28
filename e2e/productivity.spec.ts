@@ -73,8 +73,13 @@ test("copy a selection as Markdown and JSON (Shift+Ctrl+C)", async ({ page, cont
   await page.mouse.click(box.x + 260, box.y + rowY(1));
   await page.keyboard.up("Shift");
 
-  await page.keyboard.press("Control+Shift+c");
+  // On a slow runner the grid can still be handling the Shift+click when the
+  // shortcut is pressed; press again until the palette opens.
   const input = page.getByRole("combobox", { name: "Search commands" });
+  await expect(async () => {
+    await page.keyboard.press("Control+Shift+c");
+    await expect(input).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(input).toHaveValue("Copy ");
   await input.pressSequentially("markdown");
   await input.press("Enter");
