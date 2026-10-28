@@ -259,7 +259,14 @@ impl Source {
             root.trim_end_matches(['/', '\\']).chars().count() + 2
         };
         let col = crate::engine::sql::quote_ident(&self.file_column);
-        format!("(SELECT * REPLACE (substr({col}, {from}) AS {col}) FROM {call})")
+        let relative = format!("substr({col}, {from})");
+        // `/` between folders on Windows too, as the file list shows them.
+        let relative = if cfg!(windows) {
+            format!("replace({relative}, '\\', '/')")
+        } else {
+            relative
+        };
+        format!("(SELECT * REPLACE ({relative} AS {col}) FROM {call})")
     }
 
     /// Every file read, with its size, last change and a digest of the

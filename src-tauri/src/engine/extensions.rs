@@ -15,6 +15,12 @@ use crate::engine::Param;
 use crate::engine::sql::literal;
 use crate::error::{AppError, Result};
 
+/// One install at a time in this process: two engines installing the same
+/// extension at once both download it, and on Windows the second can't
+/// replace the file the first has loaded. After the first, INSTALL finds it
+/// there and does nothing.
+static INSTALLING: Mutex<()> = Mutex::new(());
+
 /// Where extensions go, and which are loaded.
 #[derive(Default)]
 pub struct ExtensionState {
@@ -46,6 +52,7 @@ impl Engine {
             ));
         }
         setup.push_str(&format!("INSTALL {name}; LOAD {name};"));
+        let _installing = INSTALLING.lock();
         self.execute_batch(&setup).map_err(|e| {
             AppError::Query(format!(
                 "{needed_for} needs DuckDB's {name} extension, which couldn't be installed. \

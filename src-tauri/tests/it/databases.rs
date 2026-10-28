@@ -51,16 +51,26 @@ fn make_duckdb(path: &Path) {
     .unwrap();
 }
 
-/// A SQLite file written through DuckDB's sqlite extension.
+/// A SQLite file written through DuckDB's sqlite extension, on an engine
+/// of its own (which installs the extension one test at a time).
 fn make_sqlite(path: &Path, sql: &str) {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
-    conn.execute_batch(&format!(
-        "SET extension_directory = '{}'; INSTALL sqlite; LOAD sqlite;
-         ATTACH '{}' AS s (TYPE sqlite); USE s; {sql}",
-        extension_dir().display(),
-        path.display()
-    ))
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Engine::open_in_memory(&EngineConfig {
+        memory_limit_bytes: 1 << 30,
+        temp_dir: dir.path().join("spill"),
+        threads: Some(1),
+    })
     .unwrap();
+    engine.set_extension_dir(&extension_dir());
+    engine
+        .load_extension("sqlite", "Writing SQLite files")
+        .unwrap();
+    engine
+        .execute_batch(&format!(
+            "ATTACH '{}' AS s (TYPE sqlite); USE s; {sql} USE memory; DETACH s;",
+            path.display()
+        ))
+        .unwrap();
 }
 
 impl Fx {
