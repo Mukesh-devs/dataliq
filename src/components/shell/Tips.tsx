@@ -53,15 +53,16 @@ export function TipSteps({ onDone }: { onDone: () => void }) {
             <ChevronLeft className="size-3.5" aria-hidden /> Back
           </Button>
         )}
-        {last ? (
-          <Button size="sm" variant="secondary" onClick={onDone}>
-            Got it
-          </Button>
-        ) : (
-          <Button size="sm" variant="secondary" onClick={() => setI(i + 1)}>
-            Next <ChevronRight className="size-3.5" aria-hidden />
-          </Button>
-        )}
+        {/* One button that turns into "Got it", so the keyboard focus stays on it. */}
+        <Button size="sm" variant="secondary" onClick={last ? onDone : () => setI(i + 1)}>
+          {last ? (
+            "Got it"
+          ) : (
+            <>
+              Next <ChevronRight className="size-3.5" aria-hidden />
+            </>
+          )}
+        </Button>
       </div>
     </>
   );

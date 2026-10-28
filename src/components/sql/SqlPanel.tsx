@@ -260,7 +260,7 @@ function TableStrip({
                 type="button"
                 aria-label={`Rename table ${t.name}`}
                 onClick={() => setRenaming(t.name)}
-                className="mr-0.5 flex size-5 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-60 hover:bg-hover hover:text-fg group-hover:opacity-100"
+                className="mr-0.5 flex size-6 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-80 hover:bg-hover hover:text-fg group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <Pencil className="size-3" aria-hidden />
               </button>

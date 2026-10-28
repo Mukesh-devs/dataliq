@@ -4,7 +4,13 @@ import {
   closeBracketsKeymap,
   completionKeymap,
 } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  temporarilySetTabFocusMode,
+} from "@codemirror/commands";
 import { PostgreSQL, sql } from "@codemirror/lang-sql";
 import { HighlightStyle, bracketMatching, syntaxHighlighting } from "@codemirror/language";
 import { setDiagnostics } from "@codemirror/lint";
@@ -54,7 +60,8 @@ const theme = EditorView.theme({
   "&": { height: "100%", fontSize: "12.5px", backgroundColor: "var(--bg)", color: "var(--fg)" },
   ".cm-scroller": { fontFamily: "var(--font-data)", lineHeight: "1.55" },
   ".cm-content": { caretColor: "var(--fg)" },
-  "&.cm-focused": { outline: "none" },
+  // A visible focus ring (inset: the panel's edges clip outer outlines).
+  "&.cm-focused": { outline: "2px solid var(--focus-ring)", outlineOffset: "-2px" },
   ".cm-gutters": {
     backgroundColor: "var(--surface)",
     color: "var(--fg-subtle)",
@@ -138,12 +145,15 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
             ...defaultKeymap,
             ...historyKeymap,
             ...completionKeymap,
+            // Tab indents; Escape then Tab leaves the editor (no keyboard
+            // trap), as does Ctrl+M / Shift+Alt+M (from the default keymap).
+            { key: "Escape", run: temporarilySetTabFocusMode },
             indentWithTab,
           ]),
           language.current.of(sqlLanguage([])),
           syntaxHighlighting(highlight),
           theme,
-          EditorView.contentAttributes.of({ "aria-label": "SQL query" }),
+          EditorView.contentAttributes.of({ "aria-label": "SQL query", tabindex: "0" }),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) handlers.current.onChange(u.state.doc.toString());
           }),

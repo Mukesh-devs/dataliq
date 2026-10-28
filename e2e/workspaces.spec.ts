@@ -39,8 +39,10 @@ test("save the open tabs as a workspace and open it again", async ({ page }) => 
 
   // Close everything, then open the workspace from the palette.
   await page.keyboard.press("Control+j");
-  await page.getByRole("button", { name: "Close comma.csv" }).click();
-  await page.getByRole("button", { name: "Close nulls.csv" }).click();
+  await page.getByRole("tab", { name: /comma\.csv/ }).focus();
+  await page.keyboard.press("Delete");
+  await page.getByRole("tab", { name: /nulls\.csv/ }).focus();
+  await page.keyboard.press("Delete");
   await expect(page.getByRole("tab")).toHaveCount(0);
   await page.keyboard.press("Control+k");
   await page.getByRole("combobox", { name: "Search commands" }).fill("open workspace");

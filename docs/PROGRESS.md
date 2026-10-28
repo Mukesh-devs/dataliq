@@ -181,3 +181,23 @@
   version 9.9.9…", with the app still running. The normal build says it can't update itself.
 - Left over: a full install-and-restart needs two signed releases; it is tried with the release
   workflow (step 7).
+
+### Step 5 — Accessibility ✅
+
+- WCAG 2.2 AA, checked by tests (D52): a contrast test of every text colour token against
+  every background (both themes, selected-row tints included) and of the focus ring; axe-core
+  in Playwright on the start screen, an open file, the palette, the filter editor, the
+  shortcuts list, the SQL panel and Settings, in light and dark; a keyboard-only walkthrough.
+- Contrast fixes: subtle grey, null and SQL comments were 2.2–3.9:1, now ≥ 4.5:1 in both
+  themes; the light theme's error/warning/success and two syntax colours darkened slightly;
+  the focus ring is ≥ 3:1; the shortcut badge on the accent button is an outline.
+- Keyboard fixes: the tab bar follows the ARIA tabs pattern (arrows, Home/End, Delete closes);
+  the SQL editor no longer traps Tab (Escape then Tab, or Ctrl+M) and shows a focus ring; the
+  grid shows a ring while focused; the menu bar and chart selects show focus; the tips' Next
+  button keeps the focus as it becomes "Got it".
+- Target sizes ≥ 24 px: tab close, table rename, sidebar column rows. The tab close buttons
+  left the tablist (the mouse's; Delete or Ctrl+W from the keyboard).
+- Tested: Vitest contrast test (30 cases); Playwright axe scans (2 themes × 7 screens) and the
+  keyboard walkthrough; tab tests now close by Delete and by the mouse.
+- Smoke (real app, Linux): Tab from the window lands on the File menu with a visible ring;
+  sidebar rows and greys as intended in the dark theme.

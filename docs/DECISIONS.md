@@ -748,3 +748,34 @@ installs on "Install and restart". Help › Check for updates asks at any
 time. Our own commands wrap the plugin (rather than its JS API), so the UI
 gets progress events and errors in words and the e2e mock can stand in for
 it.
+
+## D52 — Accessibility: WCAG 2.2 AA, checked by tests
+
+The target is WCAG 2.2 AA, and each part is a test rather than a one-off
+review:
+
+- **Contrast** (`src/styles/contrast.test.ts`): every text colour token is
+  at least 4.5:1 on every background it is drawn on, including the accent
+  tint of selected rows, in both themes; the focus ring is at least 3:1.
+  This darkened the light theme's subtle grey, null and status colours and
+  lightened the dark theme's subtle grey (the old ones were 2.2–3.9:1).
+- **Automated rules** (`e2e/a11y.spec.ts`, axe-core): no WCAG A/AA violation
+  on the start screen, an open file, the palette, the filter editor, the
+  shortcuts list, the SQL panel and Settings, in both themes.
+- **Keyboard** (`e2e/keyboard.spec.ts`): a walkthrough with no mouse — the
+  tips, opening files, sorting and filtering (the palette has a command per
+  column), search, tabs, the SQL editor, the menu bar and Settings — with
+  the focus checked at each step.
+
+Fixes it led to: the tab bar follows the ARIA tabs pattern (one tab in the
+Tab order, arrows/Home/End move, Delete closes; the close buttons are for
+the mouse and no longer sit inside the tablist); targets are at least 24 px
+(tab close, table rename, sidebar column rows); the SQL editor no longer
+traps the keyboard (Escape then Tab leaves it, or Ctrl+M) and shows a focus
+ring; the grid shows a ring while its canvas has the focus; the menu bar
+and chart selects show the focus ring; the tips' Next button keeps the
+focus when it becomes "Got it".
+
+The grid itself is a canvas (Glide): it is navigated with the arrow keys and
+exposes its visible cells as an accessible table to screen readers; data
+beyond the visible cells is reached by scrolling, Go to row and SQL.

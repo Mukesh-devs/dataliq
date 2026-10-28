@@ -209,7 +209,7 @@ export function chartColors(root: HTMLElement = document.documentElement): Chart
     ],
     fg: v("--fg", "#18181b"),
     muted: v("--fg-muted", "#52525b"),
-    subtle: v("--fg-subtle", "#8b8b94"),
+    subtle: v("--fg-subtle", "#65656e"),
     border: v("--border", "#e6e6ea"),
     surface: v("--surface", "#f8f8f9"),
     bg: v("--bg", "#ffffff"),

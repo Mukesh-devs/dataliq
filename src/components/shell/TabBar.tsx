@@ -54,7 +54,44 @@ export function TabBar({
           <div className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
         </>
       )}
-      <div role="tablist" aria-label="Open files" className="flex min-w-0 items-center gap-0.5">
+      <div
+        role="tablist"
+        aria-label="Open files"
+        className="flex min-w-0 items-center gap-0.5"
+        // Tabs pattern: one tab in the Tab order, arrows move between them,
+        // Delete closes one.
+        onKeyDown={(e) => {
+          const focused = (e.target as HTMLElement)
+            .closest("[data-tab-id]")
+            ?.getAttribute("data-tab-id");
+          const i = tabs.findIndex((t) => t.id === (focused ?? activeId));
+          if (i < 0) return;
+          const to =
+            e.key === "ArrowRight"
+              ? (i + 1) % tabs.length
+              : e.key === "ArrowLeft"
+                ? (i - 1 + tabs.length) % tabs.length
+                : e.key === "Home"
+                  ? 0
+                  : e.key === "End"
+                    ? tabs.length - 1
+                    : null;
+          if (to !== null) {
+            e.preventDefault();
+            onSelect(tabs[to]!.id);
+            // React clears currentTarget after the handler.
+            const list = e.currentTarget;
+            requestAnimationFrame(() =>
+              list
+                .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(tabs[to]!.id)}"]`)
+                ?.focus(),
+            );
+          } else if (e.key === "Delete") {
+            e.preventDefault();
+            onClose(tabs[i]!.id);
+          }
+        }}
+      >
         {tabs.map((tab) => {
           const busy = tab.status === "loading" || tab.import?.status === "running";
           return (
@@ -71,6 +108,9 @@ export function TabBar({
                 role="tab"
                 type="button"
                 aria-selected={tab.id === activeId}
+                aria-keyshortcuts="Delete"
+                data-tab-id={tab.id}
+                tabIndex={tab.id === activeId ? 0 : -1}
                 title={tab.path}
                 onClick={() => onSelect(tab.id)}
                 // Middle-click closes, as in browsers.
@@ -84,12 +124,14 @@ export function TabBar({
                 )}
                 <span className="truncate">{tab.title}</span>
               </button>
+              {/* For the mouse; from the keyboard, Delete on the tab (or Ctrl+W). */}
               <button
                 type="button"
-                aria-label={`Close ${tab.title}`}
+                aria-hidden
+                tabIndex={-1}
                 title={`Close (${modKey}+W)`}
                 onClick={() => onClose(tab.id)}
-                className="mr-1 flex size-5 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-60 group-hover:opacity-100 hover:bg-active hover:text-fg"
+                className="mr-0.5 flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-80 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-active hover:text-fg"
               >
                 <X className="size-3" aria-hidden />
               </button>

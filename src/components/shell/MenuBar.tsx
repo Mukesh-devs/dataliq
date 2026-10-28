@@ -86,7 +86,7 @@ export function MenuBar({ menus, onRun }: MenuBarProps) {
         <Menubar.Menu key={menu.label}>
           <Menubar.Trigger
             ref={i === 0 ? first : undefined}
-            className="h-6 rounded-[var(--radius)] px-2 text-[13px] text-fg-muted outline-none select-none hover:bg-hover hover:text-fg focus-visible:bg-hover focus-visible:text-fg data-[state=open]:bg-hover data-[state=open]:text-fg"
+            className="h-6 rounded-[var(--radius)] px-2 text-[13px] text-fg-muted select-none hover:bg-hover hover:text-fg focus-visible:bg-hover focus-visible:text-fg data-[state=open]:bg-hover data-[state=open]:text-fg"
           >
             {menu.label}
           </Menubar.Trigger>

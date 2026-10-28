@@ -32,16 +32,16 @@
   --border-strong: #d4d4da;
   --fg: #18181b;
   --fg-muted: #52525b;
-  --fg-subtle: #8b8b94;
+  --fg-subtle: #65656e;
   --accent: #4f46e5;
   --accent-hover: #4338ca;
   --accent-fg: #ffffff;
   --accent-soft: rgb(79 70 229 / 0.12);
-  --focus-ring: rgb(79 70 229 / 0.6);
-  --danger: #dc2626;
-  --warning: #b45309;
-  --success: #15803d;
-  --null: #a1a1aa;
+  --focus-ring: rgb(79 70 229 / 0.85);
+  --danger: #c62020;
+  --warning: #a54c09;
+  --success: #137538;
+  --null: #65656e;
   /* Search matches highlighted in grid cells. */
   --match: rgb(250 204 21 / 0.45);
   /* Comparisons: changed cells, added and removed rows (fills and marks). */
@@ -60,9 +60,9 @@
   --series-4: #eda100;
   /* SQL editor syntax colours. */
   --syntax-keyword: #6d28d9;
-  --syntax-string: #047857;
-  --syntax-number: #b45309;
-  --syntax-comment: #8b8b94;
+  --syntax-string: #047454;
+  --syntax-number: #a54c09;
+  --syntax-comment: #65656e;
   --syntax-name: #1d4ed8;
 }
 
@@ -77,7 +77,7 @@
   --border-strong: #34343b;
   --fg: #ececef;
   --fg-muted: #a1a1aa;
-  --fg-subtle: #71717a;
+  --fg-subtle: #92929a;
   --accent: #818cf8;
   --accent-hover: #a5b4fc;
   --accent-fg: #111113;
@@ -86,7 +86,7 @@
   --danger: #f87171;
   --warning: #fbbf24;
   --success: #4ade80;
-  --null: #5f5f68;
+  --null: #92929a;
   --match: rgb(250 204 21 / 0.3);
   --diff-changed: rgb(251 191 36 / 0.18);
   --diff-added: rgb(74 222 128 / 0.13);
@@ -102,7 +102,7 @@
   --syntax-keyword: #c4b5fd;
   --syntax-string: #6ee7b7;
   --syntax-number: #fcd34d;
-  --syntax-comment: #71717a;
+  --syntax-comment: #92929a;
   --syntax-name: #93c5fd;
 }
 
