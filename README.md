@@ -8,13 +8,17 @@ compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
 and no account.
 
-**Status:** v0.5.0 — SQL over every open file, export to every format, charts, cleaning
-recipes, file comparison and data quality checks. Folders, URLs and database files come in
-v0.6. See [CHANGELOG.md](CHANGELOG.md),
-[PROGRESS.md](PROGRESS.md) and the roadmap in [BUILD_PLAN.md](BUILD_PLAN.md).
+**Status:** v1.0 — see [CHANGELOG.md](CHANGELOG.md) for what's in each version,
+[PROGRESS.md](PROGRESS.md) for how each step was built and tested, and
+[docs/DECISIONS.md](docs/DECISIONS.md) for why things are the way they are.
 
-<!-- Screenshots: light and dark theme with a 50M-row file open. -->
-_Screenshots coming soon._
+![A CSV file open in the grid, with the profile of its unit_price column](docs/screenshots/grid-light.png)
+
+| SQL over every open file | Charts computed by DuckDB |
+| --- | --- |
+| ![The SQL panel: a grouped query over the open file and its 20 result rows](docs/screenshots/sql-light.png) | ![A bar chart of the sum of unit_price by category, in the dark theme](docs/screenshots/chart-dark.png) |
+
+_The screenshots show the built-in sample dataset (Help › Open the sample dataset)._
 
 ## Features
 
@@ -87,6 +91,13 @@ _Screenshots coming soon._
   files and workspaces; **Settings** (Ctrl+,) for theme, density, memory,
   threads, the cache's size and folder, and export defaults.
 - Light and dark themes that follow your OS.
+- **First run**: three short tips, and a sample dataset (50,000 made-up orders) to try
+  everything on before you have a file at hand.
+- **Updates** from signed GitHub releases: BigView checks at most once a day (you can turn it
+  off), shows what's new, and installs only when you say so.
+- **Accessible**: WCAG 2.2 AA contrast in both themes, every action reachable from the
+  keyboard (menus, the command palette, a command per column for sorting, filtering and
+  profiles), visible focus everywhere; checked by automated tests.
 - Tabs, recent files and drag and drop; open files from a terminal with
   `bigview data.csv.gz other.parquet` (a second launch opens them in the
   running app).
@@ -104,8 +115,8 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Save workspace / Save as | Ctrl+S / Shift+Ctrl+S |
 | Command palette | Ctrl+K |
 | Find in data | Ctrl+F |
-| Close tab | Ctrl+W |
-| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab |
+| Close tab | Ctrl+W (or Delete on a focused tab) |
+| Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab (arrows in the tab bar) |
 | Go to row | Ctrl+G |
 | Copy selection (TSV) | Ctrl+C |
 | Copy as CSV / JSON / Markdown / SQL | Shift+Ctrl+C |
@@ -113,27 +124,73 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Export | Ctrl+E |
 | Show / hide the SQL panel | Ctrl+J |
 | Run SQL (or the selection) | Ctrl+Enter |
+| Leave the SQL editor (Tab indents there) | Escape, then Tab |
 | Show / hide the sidebar | Ctrl+B |
 | Show / hide the column profile | Ctrl+Alt+B |
 | Settings | Ctrl+, |
 
 ## Performance
 
-Measured on a 4-core Linux machine (details in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
-first rows of a 5 GB CSV in 0.3 s and of a 5 GB `.csv.gz` in about 1 s; full
-import of a 5 GB CSV in 32 s; reopening a cached file in a few milliseconds;
-random pages anywhere in 50M rows in under 25 ms. On 50M rows: a filter
-shows its first rows and count in 0.1–0.8 s, a sort its first and last rows in
-about 1 s, a column profile takes 0.4–2.8 s, a chart 0.1–1.7 s, an export
-to Parquet 7.6 s, a cleaning recipe its first page in 0.15 s, a data quality
-check 6.5 s, and comparing it with a 50M-row edited copy 14 s. A 50M-row DuckDB
-database opens in 0.03 s, and a folder of 200 `.csv.gz` files in 0.3 s.
+Measured with the dev profile on GitHub-hosted runners (4 vCPU) and a 4-core Linux machine;
+every number per OS is in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+| | Linux | Windows | macOS |
+| --- | --- | --- | --- |
+| First rows of a 5 GB CSV | 0.28 s | 0.34 s | 0.30 s |
+| First rows of a 5 GB `.csv.gz` | 1.2 s | 1.4 s | 0.9 s |
+| Full import of a 5 GB CSV (46M rows) | 40 s | 48 s | 19 s |
+| Reopen a cached file | 2 ms | 3 ms | 2 ms |
+| Open a 50M-row Parquet file | 0.05 s | 0.07 s | 0.04 s |
+| Filter 50M rows: first rows | 0.1–0.9 s | 0.1–1.1 s | 0.02–0.2 s |
+| Sort 50M rows: first and last rows | 0.8–1.0 s | 0.9–1.2 s | 0.3 s |
+| Column profile of 50M rows | 0.7–2.7 s | 0.6–2.6 s | 0.2–2.9 s |
+| Chart of 50M rows | 0.1–1.9 s | 0.1–2.3 s | 0.04–1.5 s |
+
+## How it works
+
+BigView is a [Tauri](https://tauri.app) app: a Rust backend with an embedded
+[DuckDB](https://duckdb.org) engine, and a React interface drawn in the system's web view
+(WebView2, WKWebView or WebKitGTK), so the installers are small and nothing runs in a browser.
+
+- **Opening** a file reads just enough to detect its format, dialect and types, and shows
+  the first rows straight from the file. Parquet, DuckDB databases and URLs are then queried
+  in place; text formats and Excel are imported in the background into a DuckDB database in
+  the cache folder (with progress and Cancel), keyed by the file's path, size and time, so
+  opening it again is instant.
+- **Every view is SQL.** Filters, search, sorting, cleaning steps and charts are turned into
+  one DuckDB query over the file's table (Copy view as SQL shows it). The grid asks for the
+  500 rows it needs at a time, delivered as Arrow, so scrolling through 50M rows never loads
+  them all; big sorts and filters show their first rows at once and are written in full in
+  the background.
+- **Nothing leaves your computer**: no account, no telemetry. The only network requests are
+  the URLs you open, the DuckDB extensions those need (downloaded once), and, if you keep it
+  on, a daily check for a new version.
+- Memory is bounded by DuckDB's limit (half the RAM by default, in Settings); larger work
+  spills to a temporary folder.
+
+The design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Installing
 
-Releases have no published installers yet; build from source (below). The
-Linux build produces `.deb`, `.rpm` and `.AppImage` packages, which need
-WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`, preinstalled on most desktops).
+Download the installer for your system from the
+[releases page](https://github.com/mukesh-dsnl/dataliq/releases); each release lists SHA-256
+checksums of its files.
+
+- **Windows 10/11 (x64)**: `BigView_<version>_x64-setup.exe` (installs for you only, no admin
+  rights needed) or `BigView_<version>_x64_en-US.msi` (for managed machines). WebView2 is
+  included in Windows 11 and installed by the setup if missing. If SmartScreen warns about an
+  unrecognised app, choose More info › Run anyway.
+- **macOS 12 or later**: `BigView_<version>_universal.dmg` (Apple silicon and Intel). Open it
+  and drag BigView to Applications. If the release isn't notarized, the first time
+  right-click BigView › Open.
+- **Linux (x64)**: `BigView_<version>_amd64.AppImage` (any distribution: `chmod +x`, then run
+  it), `.deb` (Debian, Ubuntu: `sudo apt install ./BigView_<version>_amd64.deb`) or `.rpm`
+  (Fedora, openSUSE: `sudo dnf install ./BigView-<version>-1.x86_64.rpm`). They need
+  WebKitGTK 4.1, preinstalled on most desktops.
+
+The installers register BigView for CSV, TSV, JSON, NDJSON, Parquet, Excel, SQLite and DuckDB
+files and `.bigview` workspaces (Settings says how to make it the default app). From a
+terminal, `bigview data.csv.gz other.parquet` opens files in a running BigView.
 
 ## Building from source
 
@@ -153,6 +210,12 @@ pnpm fixtures all       # generate the large test files (16+ GB, git-ignored)
 pnpm bench              # small benchmark suite with the regression guard
 ```
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Releases are made as described in [docs/RELEASING.md](docs/RELEASING.md).
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). BigView uses DuckDB (MIT), Tauri (MIT/Apache-2.0) and other open-source
+libraries under their own licenses.

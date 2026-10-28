@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A menu bar with every action (File, Edit, View, Data, Help) on every OS, recent files and
+  workspaces included: in the window on Windows and Linux (Alt or F10), native on macOS.
+- Settings (Ctrl+,): theme, density, memory limit and threads (applied at once), the cache's
+  size and folder, the temporary folder, export defaults, update checks. The installers
+  register BigView for its file types.
+- Getting-started tips on the start screen and in Help, and a sample dataset to try
+  everything on (Help › Open the sample dataset).
+- Updates from signed GitHub releases: Help › Check for updates, and a quiet daily check at
+  startup that asks before installing anything.
+- Every budget measured on Windows, macOS and Linux (docs/BENCHMARKS.md).
+
+### Changed
+
+- A column profile of a column where nearly every value differs is 3× faster: its most common
+  values are found by an estimate and counted exactly, and the panel says so.
+- Colours meet WCAG 2.2 AA contrast in both themes; focus is visible everywhere; the tab bar
+  works with arrows, Home/End and Delete; the SQL editor lets go of the keyboard with Escape
+  then Tab; small buttons are at least 24 px.
+
+### Fixed
+
+- Every page of a 50M-row sort is readable within seconds instead of after the full sort.
+- The start screen no longer cuts off its top when it is taller than the window.
+
 ## [0.6.0] - 2026-10-28
 
 Power features: many files as one table, files from the web and S3, SQLite and DuckDB
@@ -33,7 +59,7 @@ databases, and workspaces that bring a whole session back.
 - Toolbar buttons keep their labels on one line in a crowded header; the file name shortens
   instead.
 
- - 2026-10-28
+## [0.5.0] - 2026-10-28
 
 Clean, compare, quality: fix a messy file without touching it, compare two versions, and see
 what is wrong with a file at a glance.

@@ -7,28 +7,41 @@ Arrow pages and small aggregates.
 ## Layout
 
 ```
-src-tauri/            Rust backend (Tauri v2)
-  src/lib.rs          app setup
-  src/commands/       thin Tauri command handlers
-  src/engine/         DuckDB session, cancellation
-  src/sources/        format detection + readers
-  src/import/         preview, background import, progress
-  src/cache/          dataset cache
-  src/view/           ViewSpec -> SQL
-  tests/              integration tests
-  benches/            criterion benchmarks
-src/                  React frontend
-  app/                app shell
-  components/         grid, filters, sql, charts, sidebar, palette
-  stores/             Zustand stores
-  lib/                IPC + Arrow helpers
-  styles/             design tokens and global CSS
-scripts/              check, smoke and fixture generation scripts
-fixtures/             small committed fixtures (< 1 MB each)
-docs/                 decisions, benchmarks, architecture
+src-tauri/              Rust backend (Tauri v2)
+  src/lib.rs            app setup, plugins, command list
+  src/commands/         thin Tauri command handlers (one file per area)
+  src/engine/           DuckDB session, connections, cancellation, extensions
+  src/sources/          format detection, readers, folders, databases, URLs
+  src/import/           background import, progress, gzip integrity check
+  src/cache/            cached imports (DuckDB files), size limit
+  src/view/             ViewSpec -> SQL, paging, sorted views, column profiles
+  src/sql/              the SQL panel: tables, results, history, saved queries
+  src/export/           exports to CSV, Parquet, JSON, Excel
+  src/chart/            chart aggregation SQL
+  src/recipe/           cleaning steps -> SQL, recipe files and scripts
+  src/compare/          comparing two files by key
+  src/quality/          data quality warnings and fixes
+  src/remote/           HTTP and S3 sources, keychain credentials
+  src/workspace/        .bigview workspace files
+  src/settings.rs       settings.json (memory, threads, cache, folders)
+  src/menu.rs           the native macOS menu bar
+  src/sample.rs         the sample dataset
+  src/cli.rs            files given on the command line
+  tests/it/             integration tests (and #[ignore]d performance tests)
+  benches/              criterion benchmarks
+src/                    React frontend
+  app/                  app shell, commands, shortcuts
+  components/           grid, filters, profile, sql, chart, recipe, compare,
+                        quality, export, import, palette, settings, shell, ui
+  stores/               Zustand stores (tabs, views, SQL, layout, settings, …)
+  lib/                  IPC, Arrow decoding, menus, formats, platform helpers
+  styles/               design tokens (contrast-tested) and global CSS
+e2e/                    Playwright flows (mocked backend), axe and keyboard checks
+scripts/                check, smoke, benchmarks, fixtures, updater config
+fixtures/               small committed fixtures (< 1 MB each)
+bench/                  benchmark baselines per OS
+docs/                   architecture, decisions, benchmarks, releasing
 ```
-
-Modules are added as the roadmap reaches them.
 
 ## Engine
 
@@ -75,3 +88,31 @@ UI (grid, filters, SQL)  --ViewSpec / SQL-->  Tauri command
    | Arrow IPC bytes (one page or one aggregate)  v
    +------------------------------------  Rust: view builder -> DuckDB
 ```
+
+## Views
+
+A tab's view (filters, search, sort, hidden and renamed columns, cleaning
+steps) is a `ViewSpec`, turned into one SQL query over the dataset by
+`view/sql.rs` (insta snapshots pin the SQL). `open_view` returns the row count
+and the first page at once; a filtered or sorted view over many rows is then
+written in full to a temporary table in the background, and pages read from it
+once it lands. Until then, sorted pages come from the first and last rows, then
+from a row-order table written first (D29); "Copy view as SQL" gives the same
+query as plain DuckDB SQL. Column profiles, header histograms, charts, quality
+warnings and comparisons are aggregate queries over the same view, so only
+small results cross to the UI.
+
+## SQL panel
+
+Every open file is registered as a table (named after the file) on a session
+connection, plus `current_view` for the active tab. Results are datasets like
+any file: paged, opened as tabs and queryable themselves. History and saved
+queries live in the app's data folder.
+
+## Around the data
+
+Settings (`settings.rs`) are applied to the running engine where DuckDB allows
+it (memory, threads); folders apply after a restart (D48). The menu bar and
+the palette share one list of commands (D47). Updates come from signed GitHub
+releases through Tauri's updater, turned on only in release builds (D51).
+Accessibility rules are enforced by tests (D52).
