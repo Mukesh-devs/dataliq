@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeColumns, type ColumnInfo } from "../../lib/arrow";
 import { fetchRows } from "../../lib/files";
 import { formatBytes, formatCount, formatValue } from "../../lib/format";
+import { isUrl } from "../../lib/remote";
 import { COPY_FORMATS, formatRows, quoteIdent, tableName, type CopyFormat } from "../../lib/copyAs";
 import { formatSql } from "../../lib/sqlFormat";
 import { useSql } from "../../stores/sql";
@@ -949,7 +950,7 @@ export function FileView({
                 {tab.info.format}
                 {tab.info.files && ` · ${plural(tab.info.files.count, "file")}`}
                 {tab.info.compression !== "none" && ` · ${tab.info.compression}`} ·{" "}
-                {formatBytes(tab.info.sizeBytes)}
+                {isUrl(tab.path) ? "remote" : formatBytes(tab.info.sizeBytes)}
               </>
             )}
           </span>
@@ -1059,7 +1060,8 @@ export function FileView({
       {tab.import && tab.status === "ready" && (
         <ImportBar
           state={tab.import}
-          quiet={(tab.info?.sizeBytes ?? 0) < smallFileBytes(settings)}
+          // A URL's size isn't known up front: always show the progress.
+          quiet={!isUrl(tab.path) && (tab.info?.sizeBytes ?? 0) < smallFileBytes(settings)}
           onCancel={() => onCancelImport?.()}
           onReadDirect={() => onReadDirect?.()}
           onRetry={() => onReopen(tab.options)}

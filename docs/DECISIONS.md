@@ -549,3 +549,23 @@ any file is a new version), views, SQL and "Copy as SQL" work as for one
 file; a Parquet folder is queried in place. Open it with Open folder
 (Shift+Ctrl+O, the empty window, the macOS File menu), a pattern from the
 palette, by dropping a folder, or with `bigview <folder>`.
+
+## D44 — URLs: httpfs on demand, not cached, credentials in the keychain
+
+`https://`, `http://` and `s3://` files open like local ones (Open URL… in
+the palette, or `bigview <url>`), read by DuckDB's httpfs extension. The
+app stays offline by default (the engine turns off DuckDB's extension autoloading and
+autoinstalling): httpfs is installed once into the app's cache folder
+(`duckdb-extensions`) and loaded only when the first URL is opened, with a
+plain message when there is no internet to fetch it. The format comes from
+the URL's file name (no query), since there is no file to sniff; Excel URLs
+are refused. Parquet is queried in place in byte ranges, a page at a time;
+CSV and JSON import into the session as usual but are never cached, because
+the server's copy can change without a size or date we can trust. S3
+settings (key ID, secret, region, endpoint, URL style, HTTPS) are one
+keychain entry (`keyring`: macOS Keychain, Windows Credential Manager,
+Secret Service on Linux); the UI is shown everything but the secret, and
+saving with an empty secret keeps the stored one. They become a temporary
+DuckDB secret for the session, so nothing sensitive is written to disk.
+HTTP errors are said in words (404: no file at this address; 401/403:
+refused, with a pointer to the S3 settings).

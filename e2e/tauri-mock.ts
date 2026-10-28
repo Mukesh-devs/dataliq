@@ -57,8 +57,8 @@ export interface MockOptions {
   /** Result of `data_quality`. */
   quality?: unknown;
   /**
-   * Folders and patterns that open like a recorded file (`like`), with
-   * changes to its info (e.g. `files`, `fileName`).
+   * Folders, patterns and URLs that open like a recorded file (`like`),
+   * with changes to its info (e.g. `files`, `fileName`).
    */
   folders?: Record<string, { like: string; info: Record<string, unknown> }>;
 }
@@ -395,6 +395,23 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };
               return toBuffer(file.preview);
+            // The keychain: settings kept in memory, the secret never returned.
+            case "get_s3_settings": {
+              const stored = w.__s3 as Record<string, unknown> | undefined;
+              if (!stored) return null;
+              const summary = { ...stored };
+              delete summary.secret;
+              return summary;
+            }
+            case "save_s3_settings": {
+              const next = args.settings as { secret: string };
+              const prev = w.__s3 as { secret: string } | undefined;
+              w.__s3 = { ...next, secret: next.secret || prev?.secret || "" };
+              return null;
+            }
+            case "clear_s3_settings":
+              delete w.__s3;
+              return null;
             default:
               throw { kind: "internal", message: `unmocked command ${cmd}` };
           }

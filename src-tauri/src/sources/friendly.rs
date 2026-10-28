@@ -28,7 +28,22 @@ pub fn friendly_error(raw: &str) -> AppError {
         return AppError::Cancelled;
     }
     let lower = raw.to_lowercase();
-    let msg = if lower.contains("expected number of columns") {
+    let msg = if lower.starts_with("http error") || lower.contains("http error:") {
+        if lower.contains("http 404") {
+            "The server has no file at this address (HTTP 404). Check the URL.".to_string()
+        } else if lower.contains("http 401") || lower.contains("http 403") {
+            "The server refused access to this file (HTTP 401/403). For S3, check the S3 settings."
+                .to_string()
+        } else {
+            format!(
+                "The file couldn't be downloaded: {}",
+                raw.lines()
+                    .next()
+                    .unwrap_or(raw)
+                    .trim_start_matches("HTTP Error: ")
+            )
+        }
+    } else if lower.contains("expected number of columns") {
         let line = number_after(raw, "Line:").map(group_digits);
         let expected = number_after(raw, "Expected Number of Columns:");
         let found = number_after(raw, "Found:");

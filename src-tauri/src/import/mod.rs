@@ -148,7 +148,8 @@ pub fn import(
     let stamp = source.stamp()?;
     let key = cache::cache_key(&stamp, &source.options);
     let cache = target.cache;
-    let caching = cache.config.enabled;
+    // Files on the web may change without notice: imported for this session only.
+    let caching = cache.config.enabled && !source.is_remote();
 
     // Already open in this session.
     if let Ok(ds) = engine.datasets.get(&key) {
@@ -222,6 +223,8 @@ pub fn import(
     };
     // Gzip files to check for damage while they are read.
     let gzipped: Vec<&std::path::Path> = match source.detected.compression {
+        // httpfs reads remote files; they can't be checked here.
+        _ if source.is_remote() => Vec::new(),
         Compression::Gzip => source.files.iter().map(|f| f.as_path()).collect(),
         // A folder of some compressed files: check the gzip ones.
         Compression::Mixed => source

@@ -4,8 +4,8 @@
 use std::path::{Path, PathBuf};
 
 /// Files named on a command line (`args[0]` is the program). Relative paths
-/// are resolved against `cwd`; flags (`-x`, `--y`) are ignored, and `--`
-/// ends flag parsing so a file may start with a dash.
+/// are resolved against `cwd`, URLs kept as they are; flags (`-x`, `--y`)
+/// are ignored, and `--` ends flag parsing so a file may start with a dash.
 pub fn files_from_args<S: AsRef<str>>(args: &[S], cwd: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let mut flags_done = false;
@@ -18,7 +18,7 @@ pub fn files_from_args<S: AsRef<str>>(args: &[S], cwd: &Path) -> Vec<PathBuf> {
             continue;
         }
         let path = Path::new(arg);
-        let abs = if path.is_absolute() {
+        let abs = if path.is_absolute() || crate::remote::is_url(path) {
             path.to_path_buf()
         } else {
             cwd.join(path)
@@ -66,5 +66,19 @@ mod tests {
             vec![PathBuf::from("/w/-odd.csv")]
         );
         assert!(files_from_args(&["bigview"], cwd).is_empty());
+    }
+
+    #[test]
+    fn urls_are_kept_as_they_are() {
+        assert_eq!(
+            files_from_args(
+                &["bigview", "https://x.org/a.csv?t=1", "s3://b/k.parquet"],
+                Path::new("/w")
+            ),
+            vec![
+                PathBuf::from("https://x.org/a.csv?t=1"),
+                PathBuf::from("s3://b/k.parquet"),
+            ]
+        );
     }
 }

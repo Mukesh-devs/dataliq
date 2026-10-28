@@ -9,6 +9,7 @@ import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
 import { OpenPattern } from "../components/shell/OpenPattern";
+import { OpenUrl } from "../components/shell/OpenUrl";
 import {
   onFileDrop,
   onImportProgress,
@@ -168,6 +169,8 @@ export function App() {
   );
 
   const [patternOpen, setPatternOpen] = useState(false);
+  // Open URL, and whether it starts on the S3 settings.
+  const [urlOpen, setUrlOpen] = useState<{ s3: boolean } | null>(null);
   const openFolder = useMemo(
     () => async () => {
       const dir = await pickFolder().catch(() => null);
@@ -230,6 +233,20 @@ export function App() {
         group: "File",
         keywords: "glob wildcard folder many files combine union *.csv",
         run: () => setPatternOpen(true),
+      },
+      {
+        id: "open-url",
+        title: "Open URL…",
+        group: "File",
+        keywords: "http https web download s3 bucket remote cloud",
+        run: () => setUrlOpen({ s3: false }),
+      },
+      {
+        id: "s3-settings",
+        title: "S3 settings…",
+        group: "File",
+        keywords: "aws minio r2 credentials keychain bucket remote cloud",
+        run: () => setUrlOpen({ s3: true }),
       },
     ];
     if (activeId) {
@@ -460,6 +477,13 @@ export function App() {
         open={patternOpen}
         onOpenChange={setPatternOpen}
         onOpen={(p) => void openPaths([p])}
+      />
+      <OpenUrl
+        key={urlOpen ? `open:${urlOpen.s3}` : "closed"}
+        open={urlOpen !== null}
+        onOpenChange={(o) => !o && setUrlOpen(null)}
+        showS3={urlOpen?.s3}
+        onOpen={(u) => void openPaths([u])}
       />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.

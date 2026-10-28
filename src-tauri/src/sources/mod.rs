@@ -109,6 +109,33 @@ impl Source {
     /// Validates the path and options and detects the format. Call
     /// [`Source::resolve_dialect`] before reading CSV files.
     pub fn new(path: &Path, options: OpenOptions) -> Result<Source> {
+        if crate::remote::is_url(path) {
+            options.csv.validate().map_err(AppError::Query)?;
+            let url = path.to_string_lossy().into_owned();
+            let detected = detect::detect_from_name(crate::remote::url_file_part(&url))
+                .ok_or_else(|| {
+                    AppError::Query(
+                        "BigView tells a file's type from its URL: it should end in .csv, .tsv, \
+                         .json, .ndjson or .parquet (optionally .gz or .zst)."
+                            .into(),
+                    )
+                })?;
+            if matches!(detected.format, FileFormat::Xlsx | FileFormat::Xls) {
+                return Err(AppError::Query(
+                    "Excel workbooks can't be read from a URL; download the file and open it."
+                        .into(),
+                ));
+            }
+            return Ok(Source {
+                path: path.to_path_buf(),
+                detected,
+                options,
+                files: vec![path.to_path_buf()],
+                root: None,
+                skipped: 0,
+                file_column: "filename".into(),
+            });
+        }
         if path.is_dir() || (!path.is_file() && multi::is_pattern(path)) {
             options.csv.validate().map_err(AppError::Query)?;
             let set = multi::resolve(path)?;
@@ -142,6 +169,11 @@ impl Source {
             skipped: 0,
             file_column: "filename".into(),
         })
+    }
+
+    /// A file on the web or in S3 (read by httpfs).
+    pub fn is_remote(&self) -> bool {
+        crate::remote::is_url(&self.path)
     }
 
     /// Several files read together (a folder or pattern).
@@ -189,6 +221,15 @@ impl Source {
     /// Every file read, with its size, last change and a digest of the
     /// list: what the cache key of a folder or pattern is made of.
     pub fn stamp(&self) -> Result<crate::cache::SourceStamp> {
+        if self.is_remote() {
+            // Never cached (see `import`): the URL names it for this session.
+            return Ok(crate::cache::SourceStamp {
+                path: self.path.clone(),
+                size: 0,
+                modified_ms: 0,
+                parts: None,
+            });
+        }
         if !self.is_multi() {
             return crate::cache::SourceStamp::of(&self.path);
         }
@@ -445,6 +486,10 @@ impl Source {
     /// delimiter explicitly so the real problem (a bad row) is reported and
     /// "Ignore bad rows" can fix it.
     pub fn resolve_dialect(mut self, engine: &Engine) -> Result<Source> {
+        if self.is_remote() {
+            // Opening a URL is what asks for httpfs.
+            engine.enable_remote()?;
+        }
         if self.is_multi() {
             self = self.resolve_single_dialect(engine)?;
             // The file column needs a name no file uses (as read from the first).
@@ -548,8 +593,10 @@ impl Source {
             column: self.file_column.clone(),
         });
         let mut size_bytes = 0;
-        for f in &self.files {
-            size_bytes += std::fs::metadata(f)?.len();
+        if !self.is_remote() {
+            for f in &self.files {
+                size_bytes += std::fs::metadata(f)?.len();
+            }
         }
         Ok(SourceInfo {
             file_name: self.display_name(),
@@ -569,6 +616,9 @@ impl Source {
     /// The file's name; for a pattern its last two parts (`logs/*.csv.gz`),
     /// for a folder its name.
     pub fn display_name(&self) -> String {
+        if self.is_remote() {
+            return crate::remote::url_name(&self.path.to_string_lossy());
+        }
         let name = |p: &Path| {
             p.file_name()
                 .map(|n| n.to_string_lossy().into_owned())

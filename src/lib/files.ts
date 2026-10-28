@@ -1,6 +1,7 @@
 import type { Table } from "apache-arrow";
 import { decodeIpc } from "./arrow";
 import { call } from "./ipc";
+import { isUrl, urlName } from "./remote";
 
 /** CSV import settings. Unset fields are detected by DuckDB's sniffer. */
 export interface CsvOptions {
@@ -256,5 +257,6 @@ export async function onFileDrop(
 
 /** File name from a path on any OS. */
 export function baseName(path: string): string {
+  if (isUrl(path)) return urlName(path);
   return path.split(/[\\/]/).pop() || path;
 }

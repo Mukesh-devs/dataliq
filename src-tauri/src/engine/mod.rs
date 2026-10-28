@@ -99,6 +99,8 @@ pub struct Engine {
     /// The SQL panel's own connection, so temp tables and `SET` last from
     /// one statement to the next. Created on first use.
     session: Mutex<Option<Connection>>,
+    /// httpfs, loaded only when a URL is opened.
+    pub(crate) remote: crate::remote::RemoteState,
     /// The database handle; declared last so it is closed after `root`.
     raw: raw::RawDb,
 }
@@ -133,6 +135,7 @@ impl Engine {
             temp_dir: cfg.temp_dir.clone(),
             requests: RequestRegistry::default(),
             datasets: Datasets::default(),
+            remote: crate::remote::RemoteState::default(),
             raw,
         })
     }

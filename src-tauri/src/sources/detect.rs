@@ -130,6 +130,16 @@ fn gunzip_head(path: &Path, n: usize) -> Vec<u8> {
     buf
 }
 
+/// The format a file name says (`sales.csv.gz`), for files that can't be
+/// read first (URLs).
+pub fn detect_from_name(name: &str) -> Option<Detected> {
+    let (ext, compression) = extensions(Path::new(name));
+    Some(Detected {
+        format: format_from_ext(ext.as_deref()?)?,
+        compression: compression.unwrap_or(Compression::None),
+    })
+}
+
 /// Detects the format of a file. Magic bytes win over a wrong extension.
 pub fn detect(path: &Path) -> io::Result<Detected> {
     let head = read_head(path, 4096)?;

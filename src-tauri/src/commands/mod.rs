@@ -9,5 +9,6 @@ pub mod import;
 pub mod quality;
 pub mod query;
 pub mod recipe;
+pub mod remote;
 pub mod sql;
 pub mod view;
