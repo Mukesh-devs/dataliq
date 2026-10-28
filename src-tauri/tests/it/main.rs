@@ -24,6 +24,7 @@ mod perf_export;
 mod perf_import;
 mod perf_preview;
 mod perf_sort;
+mod perf_sources;
 mod profile;
 mod quality;
 mod recipes;

@@ -110,6 +110,10 @@ pub struct Source {
     pub file_column: String,
     /// A database file, once attached by [`Source::resolve_dialect`].
     pub db: Option<database::Opened>,
+    /// CSV files of a folder that all start with the same header line:
+    /// read with the first file's dialect and types instead of sniffing
+    /// every file (see [`Source::resolve_dialect`]).
+    pub same_header: bool,
 }
 
 impl Source {
@@ -147,6 +151,7 @@ impl Source {
                 skipped: 0,
                 file_column: "filename".into(),
                 db: None,
+                same_header: false,
             });
         }
         if path.is_dir() || (!path.is_file() && multi::is_pattern(path)) {
@@ -161,6 +166,7 @@ impl Source {
                 skipped: set.skipped,
                 file_column: "filename".into(),
                 db: None,
+                same_header: false,
             });
         }
         if !path.is_file() {
@@ -183,6 +189,7 @@ impl Source {
             skipped: 0,
             file_column: "filename".into(),
             db: None,
+            same_header: false,
         })
     }
 
@@ -215,6 +222,28 @@ impl Source {
             ("filename", Param::Text(self.file_column.clone())),
             ("union_by_name", Param::Bool(true)),
         ]
+    }
+
+    /// The options of a multi-file CSV reader. Columns are matched by name,
+    /// which makes DuckDB sniff every file (seconds for hundreds of files);
+    /// files with the same header need only the first one's.
+    fn csv_multi_options(&self) -> [(&'static str, Param); 2] {
+        let [file, union] = self.multi_options();
+        if self.same_header {
+            [file, ("files_to_sniff", Param::Int(1))]
+        } else {
+            [file, union]
+        }
+    }
+
+    /// The same files read with every file sniffed and columns matched by
+    /// name: what a folder falls back to when a later file's values don't
+    /// fit the first file's types.
+    pub fn sniffing_every_file(&self) -> Source {
+        Source {
+            same_header: false,
+            ..self.clone()
+        }
     }
 
     /// Wraps a multi-file reader so its file column is relative to the folder.
@@ -329,7 +358,7 @@ impl Source {
                 format,
                 compression,
                 &self.options.csv,
-                &extra,
+                &self.csv_multi_options(),
             ),
             FileFormat::Json | FileFormat::Ndjson => {
                 let layout = if format == FileFormat::Ndjson {
@@ -527,6 +556,7 @@ impl Source {
         }
         if self.is_multi() {
             self = self.resolve_single_dialect(engine)?;
+            self.same_header = self.is_csv() && multi::same_header(&self.files, &self.options.csv);
             // The file column needs a name no file uses (as read from the first).
             let mut first = self.clone();
             first.root = None;

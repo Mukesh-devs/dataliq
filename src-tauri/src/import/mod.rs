@@ -142,6 +142,32 @@ pub fn import(
     job_id: &str,
     on_progress: &(dyn Fn(ImportProgress) + Sync),
 ) -> Result<ImportOutcome> {
+    match import_once(engine, imports, target, source, job_id, on_progress) {
+        // A folder read with its first file's types: a later file's values
+        // didn't fit them. Read again with every file sniffed.
+        Err(AppError::Query(e)) if source.same_header => {
+            tracing::info!("folder import falls back to sniffing every file: {e}");
+            import_once(
+                engine,
+                imports,
+                target,
+                &source.sniffing_every_file(),
+                job_id,
+                on_progress,
+            )
+        }
+        other => other,
+    }
+}
+
+fn import_once(
+    engine: &Engine,
+    imports: &Imports,
+    target: &ImportTarget<'_>,
+    source: &Source,
+    job_id: &str,
+    on_progress: &(dyn Fn(ImportProgress) + Sync),
+) -> Result<ImportOutcome> {
     // Keeps `release_memory` away while the import runs.
     let _busy = engine.busy();
     let started = Instant::now();

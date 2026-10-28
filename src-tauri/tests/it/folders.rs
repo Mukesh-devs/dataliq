@@ -300,3 +300,46 @@ fn nothing_to_open_is_said_in_words() {
         .to_string();
     assert!(err.contains("No data files match"), "{err}");
 }
+
+#[test]
+fn files_with_one_header_skip_sniffing_every_file() {
+    let fx = fx();
+    let d = fx.data();
+    write(&d.join("2024-01.csv"), b"id,amount\n1,10\n2,20\n");
+    write(&d.join("2024-02.csv.gz"), &gzip("id,amount\n3,30\n"));
+    let source = fx.source(&d);
+    assert!(source.same_header);
+    let sql = source.reader_display_sql().unwrap();
+    assert!(sql.contains("files_to_sniff = 1"), "{sql}");
+    assert!(!sql.contains("union_by_name"), "{sql}");
+    let (ds, _) = fx.import(&source);
+    assert_eq!(
+        fx.dataset_rows(&ds, &["id", "amount", "filename"], "id"),
+        vec![
+            vec![s("1"), s("10"), s("2024-01.csv")],
+            vec![s("2"), s("20"), s("2024-01.csv")],
+            vec![s("3"), s("30"), s("2024-02.csv.gz")],
+        ]
+    );
+}
+
+#[test]
+fn a_later_file_that_breaks_the_first_ones_types_is_read_again() {
+    let fx = fx();
+    let d = fx.data();
+    write(&d.join("a.csv"), b"id,amount\n1,10\n2,20\n");
+    write(&d.join("b.csv"), b"id,amount\n3,n/a\n");
+    let source = fx.source(&d);
+    assert!(source.same_header);
+    // Read with the first file's types, `amount` is a number and "n/a"
+    // fails; the import reads every file instead and keeps the text.
+    let (ds, _) = fx.import(&source);
+    assert_eq!(
+        fx.dataset_rows(&ds, &["id", "amount"], "id"),
+        vec![
+            vec![s("1"), s("10")],
+            vec![s("2"), s("20")],
+            vec![s("3"), s("n/a")],
+        ]
+    );
+}

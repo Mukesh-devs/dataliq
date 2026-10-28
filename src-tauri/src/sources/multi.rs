@@ -152,6 +152,58 @@ pub fn resolve(path: &Path) -> Result<FileSet> {
     })
 }
 
+/// The line a CSV file's header is on (after `skip` lines), without its
+/// line ending; gzipped files are read through. None when it can't be read
+/// cheaply (zstd, no line in the first megabyte).
+fn header_line(path: &Path, skip: usize) -> Option<Vec<u8>> {
+    use std::io::{BufRead, BufReader, Read};
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut magic = [0u8; 4];
+    let n = file.read(&mut magic).ok()?;
+    let file = std::fs::File::open(path).ok()?;
+    let reader: Box<dyn Read> = if magic[..n].starts_with(&[0x1f, 0x8b]) {
+        Box::new(flate2::read::MultiGzDecoder::new(file))
+    } else if magic[..n].starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
+        return None;
+    } else {
+        Box::new(file)
+    };
+    let mut lines = BufReader::new(reader.take(1 << 20));
+    let mut line = Vec::new();
+    for _ in 0..=skip {
+        line.clear();
+        if lines.read_until(b'\n', &mut line).ok()? == 0 || !line.ends_with(b"\n") {
+            return None;
+        }
+    }
+    while matches!(line.last(), Some(b'\n' | b'\r')) {
+        line.pop();
+    }
+    Some(line)
+}
+
+/// Every file starts with the same header line, so the first file's
+/// dialect and types can be used for all of them. Not for files without a
+/// header (nothing to compare).
+pub fn same_header(files: &[PathBuf], csv: &super::CsvOptions) -> bool {
+    if files.len() < 2 || csv.header == Some(false) {
+        return false;
+    }
+    let skip = csv.skip_rows.unwrap_or(0) as usize;
+    let strip_bom = |l: Vec<u8>| {
+        l.strip_prefix(b"\xef\xbb\xbf")
+            .map(<[u8]>::to_vec)
+            .unwrap_or(l)
+    };
+    let Some(first) = header_line(&files[0], skip).map(strip_bom) else {
+        return false;
+    };
+    !first.is_empty()
+        && files[1..]
+            .iter()
+            .all(|f| header_line(f, skip).map(strip_bom).as_ref() == Some(&first))
+}
+
 /// `path` relative to `root`, with `/` between folders, for showing.
 pub fn relative(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
@@ -210,6 +262,40 @@ mod tests {
         assert_eq!(set.root, d);
         let deep = resolve(&d.join("**/j*.csv")).unwrap();
         assert_eq!(deep.files.len(), 1);
+    }
+
+    #[test]
+    fn same_headers_are_found_through_gzip() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        let a = write(d, "a.csv", "id,name\r\n1,x\r\n");
+        let b = d.join("b.csv.gz");
+        {
+            use std::io::Write;
+            let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+            e.write_all(b"\xef\xbb\xbfid,name\n2,y\n").unwrap();
+            std::fs::write(&b, e.finish().unwrap()).unwrap();
+        }
+        let csv = crate::sources::CsvOptions::default();
+        assert!(same_header(&[a.clone(), b.clone()], &csv));
+        let c = write(d, "c.csv", "id,name,extra\n3,z,!\n");
+        assert!(!same_header(&[a.clone(), b.clone(), c], &csv));
+        // Nothing to compare without a header; one file needs no check.
+        let no_header = crate::sources::CsvOptions {
+            header: Some(false),
+            ..Default::default()
+        };
+        assert!(!same_header(&[a.clone(), b], &no_header));
+        assert!(!same_header(std::slice::from_ref(&a), &csv));
+        // A header after skipped lines.
+        let p = write(d, "p.csv", "exported 2024-01-01\nid,name\n1,x\n");
+        let q = write(d, "q.csv", "exported 2024-02-01\nid,name\n2,y\n");
+        assert!(!same_header(&[p.clone(), q.clone()], &csv));
+        let skip = crate::sources::CsvOptions {
+            skip_rows: Some(1),
+            ..Default::default()
+        };
+        assert!(same_header(&[p, q], &skip));
     }
 
     #[test]

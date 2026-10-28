@@ -550,6 +550,17 @@ file; a Parquet folder is queried in place. Open it with Open folder
 (Shift+Ctrl+O, the empty window, the macOS File menu), a pattern from the
 palette, by dropping a folder, or with `bigview <folder>`.
 
+Matching columns by name makes DuckDB sniff every file, which costs
+seconds for a large folder (200 small `.csv.gz` files: 4.5 s before the
+first rows, and the app binds the reader more than once). So when every
+CSV file starts with the same header line (read cheaply in Rust, through
+gzip, after any skipped lines), the files are read with the first file's
+dialect and types (`files_to_sniff = 1`, no `union_by_name`): 0.28 s for
+the same folder. If a later file's values then don't fit those types
+(text in a number column), the import reads the folder again with every
+file sniffed, so the result is the same either way; only that rare import
+takes longer.
+
 ## D44 — URLs: httpfs on demand, not cached, credentials in the keychain
 
 `https://`, `http://` and `s3://` files open like local ones (Open URL… in

@@ -16,9 +16,9 @@ use bigview_lib::import::{self, ImportTarget, Imports};
 use bigview_lib::sources::{OpenOptions, Source};
 
 /// Serves `dir` on 127.0.0.1; records each request line.
-struct Server {
-    base: String,
-    requests: Arc<Mutex<Vec<String>>>,
+pub(crate) struct Server {
+    pub(crate) base: String,
+    pub(crate) requests: Arc<Mutex<Vec<String>>>,
 }
 
 fn respond(mut stream: TcpStream, dir: &Path, requests: &Mutex<Vec<String>>) {
@@ -77,7 +77,7 @@ fn respond(mut stream: TcpStream, dir: &Path, requests: &Mutex<Vec<String>>) {
     }
 }
 
-fn serve(dir: PathBuf) -> Server {
+pub(crate) fn serve(dir: PathBuf) -> Server {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     let requests = Arc::new(Mutex::new(Vec::new()));
