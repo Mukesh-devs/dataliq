@@ -76,6 +76,32 @@
 
 ## v1.0 — Polish and release
 
+### Step 1 — Performance pass ✅
+
+- Every budget measured on Windows, macOS and Linux: a Budgets workflow (on demand) generates
+  each 5 GB / 50M-row fixture on the runner, runs the tests that measure it and deletes it; the
+  Bench workflow (small suite and 30 % guard) runs on all three OSes, with baselines now
+  recorded for Windows and macOS. Per-OS tables in docs/BENCHMARKS.md.
+- All budgets met on all three runners except column stats of a near-unique column (39.5M
+  distinct timestamps: 3.1 s Linux, 3.3 s Windows). Its most common values are now found by
+  DuckDB's `approx_top_k` and counted exactly above 1M distinct values (D49): 4.8 s → 1.6 s
+  on linux-dev; the profile panel says when the list comes from an estimate.
+- Sorting 50M rows: every page is readable within seconds (5.7 s by date and price, 12.2 s by
+  text) through a row-order table written before the full sort (D29 update).
+- Found on Windows: zlib-rs (under flate2) panics in debug builds after 4 GiB of gzip input
+  (a 32-bit `total_in`, which zlib lets wrap); release builds were fine. zlib-rs is now built
+  without overflow checks in debug too, and an integrity check that stops unexpectedly is
+  logged as an error instead of being dropped silently.
+- The Excel slowdown seen at v0.6.0 (+23–27 % on the CI runner) was runner variance: the code
+  is unchanged since v0.1.0, and this run came in 30–39 % under the same baseline.
+- Tested: integration test of the estimated values on 1.5M rows (sentinel, NULL and a 1 %
+  value found with exact counts, also through a filter); Vitest for the estimate note.
+- Smoke (real app, Linux): `sales_50m.parquet` opened in place; the profile of `order_ts` lists
+  timestamps seen twice, then once, with "Nearly every value is different: … found by an
+  estimate (counts are exact)", in 3.1 s straight from the 0.8 GB Parquet (not cached).
+- Left over: cold start, idle memory and frame rate can't be measured on the hosted Windows and
+  macOS runners (no desktop session); installer sizes per OS come with the release workflow.
+
 ### Step 2 — Settings screen and menu bar ✅
 
 - A menu bar (File, Edit, View, Data, Help) on every OS, made of the palette's commands: each

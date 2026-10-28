@@ -331,3 +331,69 @@ fn small_integer_ranges_get_one_bar_per_value() {
     assert_eq!(p.histogram, Some(vec![]));
     assert_eq!(p.top.len(), 1);
 }
+
+#[test]
+fn near_unique_columns_still_list_every_common_value() {
+    // 1.5M rows: 1.2M unique values (over APPROX_TOP_DISTINCT, so the
+    // values come from the estimate), one sentinel in 10% of the rows, NULL
+    // in another 10%, and one value in 1%.
+    let fx = fx();
+    let conn = fx.engine.connection().unwrap();
+    conn.execute_batch(
+        "CREATE TABLE ids AS SELECT CASE WHEN range % 10 = 0 THEN -1 \
+           WHEN range % 10 = 1 THEN NULL WHEN range % 100 = 2 THEN -2 ELSE range END AS id \
+         FROM range(1500000)",
+    )
+    .unwrap();
+    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+        id: "ids".into(),
+        source: bigview_lib::engine::DatasetSource::Table("ids".into()),
+        row_count: 1_500_000,
+        cached: true,
+    });
+    let p = fx
+        .engine
+        .column_profile("ids", &ViewSpec::default(), "id", &RequestKey::default())
+        .unwrap();
+    assert!(p.distinct.unwrap() > bigview_lib::view::APPROX_TOP_DISTINCT);
+    assert!(p.top_approx);
+    assert!(p.top_truncated);
+    let top: Vec<(Option<&str>, u64)> = p
+        .top
+        .iter()
+        .map(|t| (t.value.as_deref(), t.count))
+        .collect();
+    assert_eq!(top.len(), TOP_VALUES);
+    // The common values, with exact counts and NULL first among equals.
+    assert_eq!(
+        top[..3],
+        [(None, 150_000), (Some("-1"), 150_000), (Some("-2"), 15_000)]
+    );
+    // Then values seen once.
+    assert!(top[3..].iter().all(|(v, n)| v.is_some() && *n == 1));
+
+    // A filter applies to both scans of the estimate (NULLs are filtered out).
+    let spec = ViewSpec {
+        filters: vec![Filter {
+            column: "id".into(),
+            op: FilterOp::Lt {
+                value: Param::Int(1_400_000),
+            },
+            not: false,
+        }],
+        ..ViewSpec::default()
+    };
+    let p = fx
+        .engine
+        .column_profile("ids", &spec, "id", &RequestKey::default())
+        .unwrap();
+    assert!(p.top_approx);
+    assert_eq!(p.nulls, 0);
+    let top: Vec<(Option<&str>, u64)> = p
+        .top
+        .iter()
+        .map(|t| (t.value.as_deref(), t.count))
+        .collect();
+    assert_eq!(top[..2], [(Some("-1"), 150_000), (Some("-2"), 15_000)]);
+    assert!(top[2..].iter().all(|(v, n)| v.is_some() && *n == 1));
+}

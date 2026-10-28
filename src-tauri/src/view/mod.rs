@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 
 pub use open::{MAX_VALUES, OpenedView, ValueCount, ValueList, materialize_request_id};
 pub use profile::{
-    BINS, Bin, ColumnHistogram, ColumnProfile, EXACT_DISTINCT_ROWS, ProfileKind, TOP_VALUES,
+    APPROX_TOP_DISTINCT, BINS, Bin, ColumnHistogram, ColumnProfile, EXACT_DISTINCT_ROWS,
+    ProfileKind, TOP_VALUES,
 };
 pub use sql::{BuiltView, ORDER_TABLE, Relation, RowOrder, build, build_at, standalone_sql};
 

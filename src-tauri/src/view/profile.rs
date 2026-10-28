@@ -18,6 +18,10 @@ pub const TOP_VALUES: usize = 10;
 /// Up to this many rows, distinct values are counted exactly; above, with
 /// DuckDB's HyperLogLog estimate (much faster on tens of millions of rows).
 pub const EXACT_DISTINCT_ROWS: u64 = 10_000_000;
+/// Above this many distinct values, the most common values are found with
+/// DuckDB's `approx_top_k` sketch rather than by counting every value (one
+/// group per value: 3–4 s for 40M timestamps against under 1 s).
+pub const APPROX_TOP_DISTINCT: u64 = 1_000_000;
 
 /// What kind of statistics fit a column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -100,6 +104,10 @@ pub struct ColumnProfile {
     pub top: Vec<ValueCount>,
     /// More distinct values exist than `top` lists.
     pub top_truncated: bool,
+    /// `top` was chosen by an estimate (over [`APPROX_TOP_DISTINCT`] distinct
+    /// values): its counts are exact, but a value as common as the last one
+    /// listed may be missing. Values much more common than that never are.
+    pub top_approx: bool,
     pub elapsed_ms: u64,
 }
 
@@ -288,28 +296,9 @@ impl Engine {
             _ => None,
         };
 
-        // Grouped by the typed value (much cheaper than by its text on
-        // near-unique columns); only the few rows kept are cast to text.
-        let top_sql = format!(
-            "SELECT CAST(v AS VARCHAR), n FROM ( \
-               SELECT {col} AS v, count(*)::BIGINT AS n FROM ({}) \
-               GROUP BY 1 ORDER BY n DESC, v ASC NULLS FIRST LIMIT {} \
-             ) ORDER BY n DESC, v ASC NULLS FIRST",
-            view.select,
-            TOP_VALUES + 1
-        );
-        let top_out = self.query(&top_sql, &view.params, TOP_VALUES + 1, key)?;
-        let mut top = Vec::new();
-        for batch in &top_out.batches {
-            let v = batch.column(0).as_string::<i32>();
-            let n = batch.column(1).as_primitive::<Int64Type>();
-            for i in 0..batch.num_rows() {
-                top.push(ValueCount {
-                    value: (!v.is_null(i)).then(|| v.value(i).to_string()),
-                    count: n.value(i) as u64,
-                });
-            }
-        }
+        let distinct = i64_at(b, 6).map(|d| d as u64);
+        let top_approx = distinct.unwrap_or(0) > APPROX_TOP_DISTINCT;
+        let mut top = self.top_values(&view, &col, top_approx, total - non_null, key)?;
         let top_truncated = top.len() > TOP_VALUES;
         top.truncate(TOP_VALUES);
 
@@ -319,7 +308,7 @@ impl Engine {
             kind,
             rows: total,
             nulls: total - non_null,
-            distinct: i64_at(b, 6).map(|d| d as u64),
+            distinct,
             distinct_approx,
             min: text_at(b, 2),
             max: text_at(b, 3),
@@ -328,8 +317,77 @@ impl Engine {
             histogram,
             top,
             top_truncated,
+            top_approx,
             elapsed_ms: started.elapsed().as_millis() as u64,
         })
+    }
+
+    /// The most common values of `col` in the view, most common first (ties
+    /// by value, NULL first), one more than [`TOP_VALUES`] to tell whether
+    /// there are more.
+    fn top_values(
+        &self,
+        view: &BuiltView,
+        col: &str,
+        approx: bool,
+        nulls: u64,
+        key: &RequestKey,
+    ) -> Result<Vec<ValueCount>> {
+        let k = TOP_VALUES + 1;
+        let (sql, params) = if approx {
+            // Candidates from the sketch (it skips NULLs), then their exact
+            // counts in one more scan.
+            let sql = format!(
+                "SELECT CAST(v AS VARCHAR), n FROM ( \
+                   SELECT {col} AS v, count(*)::BIGINT AS n FROM ({select}) \
+                   WHERE {col} IN ( \
+                     SELECT unnest(approx_top_k({col}, {k})) FROM ({select})) \
+                   GROUP BY 1 \
+                 ) ORDER BY n DESC, v ASC LIMIT {k}",
+                select = view.select
+            );
+            let mut params = view.params.clone();
+            params.extend(view.params.iter().cloned());
+            (sql, params)
+        } else {
+            // Grouped by the typed value (much cheaper than by its text on
+            // near-unique columns); only the few rows kept are cast to text.
+            let sql = format!(
+                "SELECT CAST(v AS VARCHAR), n FROM ( \
+                   SELECT {col} AS v, count(*)::BIGINT AS n FROM ({}) \
+                   GROUP BY 1 ORDER BY n DESC, v ASC NULLS FIRST LIMIT {k} \
+                 ) ORDER BY n DESC, v ASC NULLS FIRST",
+                view.select
+            );
+            (sql, view.params.clone())
+        };
+        let out = self.query(&sql, &params, k, key)?;
+        let mut top = Vec::new();
+        for batch in &out.batches {
+            let v = batch.column(0).as_string::<i32>();
+            let n = batch.column(1).as_primitive::<Int64Type>();
+            for i in 0..batch.num_rows() {
+                top.push(ValueCount {
+                    value: (!v.is_null(i)).then(|| v.value(i).to_string()),
+                    count: n.value(i) as u64,
+                });
+            }
+        }
+        if approx && nulls > 0 {
+            let at = top
+                .iter()
+                .position(|t| t.count <= nulls)
+                .unwrap_or(top.len());
+            top.insert(
+                at,
+                ValueCount {
+                    value: None,
+                    count: nulls,
+                },
+            );
+            top.truncate(k);
+        }
+        Ok(top)
     }
 
     /// Histograms for the grid headers: numbers, dates and timestamps get

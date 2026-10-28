@@ -53,6 +53,7 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
 | Sort 50M rows: every page readable | < 10 s | 5.7 s by date and price, 12.2 s by a text column (row order, D29) | v1.0 step 1 |
 | Column stats on 50M rows | < 3 s | 0.44–2.78 s per column | v0.2 step 6 |
+| Column stats, 39.5M distinct timestamps in 50M rows | < 3 s | 1.59 s (was 4.81 s; most common values by estimate, D49) | v1.0 step 1 |
 | Export 50M rows to Parquet / CSV | — (report) | 7.6 s / 23.9 s | v0.3.0 |
 | Export 1M rows to Excel | — (report) | 14.7 s, peak memory +2 MiB | v0.3.0 |
 | SQL aggregate over 50M rows | — (report) | 0.19 s (8 groups), 1.44 s (100K groups) | v0.3.0 |
@@ -143,10 +144,10 @@ Found while benchmarking: every import waited for its progress thread's
 250 ms poll to end, so imports finished up to 250 ms late. Fixed (the thread
 is woken when the import ends).
 
-### Not yet measured per OS
+### Per OS
 
-Windows and macOS numbers (all budgets) are not measured yet: CI only builds
-and tests there. They are part of the v1.0 performance pass.
+Measured on Windows, macOS and Linux in the v1.0 performance pass: see
+[v1.0 — every budget on three OSes](#v10--every-budget-on-three-oses).
 
 ## v0.2 — views on 50M cached rows (linux-dev)
 
@@ -394,3 +395,82 @@ are not comparable to earlier ones; the runner is the steady reference.
 
 v0.6 doesn't change the Excel path; the two Excel flows are the closest to the guard and are
 on the v1.0 performance pass's list.
+
+## v1.0 — every budget on three OSes
+
+The **Budgets** workflow (`.github/workflows/budgets.yml`, on demand) generates each large
+fixture on a GitHub-hosted runner, runs the exact ignored tests that measure its budgets, and
+deletes the fixture before the next one (5 GB at a time fits the runners' disks). Dev profile
+(dependencies at `opt-level = 2`), like every other number on this page. Runners: `ubuntu-22.04`
+and `windows-latest` (4 vCPU, 16 GB), `macos-latest` (Apple silicon). Run
+[40678094551](https://github.com/mukesh-dsnl/dataliq/actions/runs/40678094551), on cf8fe76.
+
+| Flow | Budget | Linux | Windows | macOS |
+| --- | --- | --- | --- | --- |
+| First rows of a 5 GB CSV | < 1 s | 0.28 s | 0.34 s | 0.30 s |
+| First rows of a 5 GB .csv.gz | < 2 s | 1.22 s | 1.41 s | 0.93 s |
+| First rows of a 5 GB .ndjson.gz | < 2 s | 0.34 s | 0.43 s | 0.24 s |
+| Full import of a 5 GB CSV (45.8M rows) | report (aim < 60 s) | 39.7 s | 47.5 s | 18.7 s |
+| Full import of a 5 GB .csv.gz (109M rows) | report | 122.8 s | 145.1 s | 62.3 s |
+| Reopen a cached file | < 1 s | 1–2 ms | 2–3 ms | 1–2 ms |
+| Peak memory while importing 5 GB | < DuckDB limit + 300 MB | 1.9 GB (CSV), 3.2 GB (.csv.gz); limit 7,994 MiB | not measured¹ | not measured¹ |
+| Open a 50M-row Parquet | < 1 s | 0.047 s | 0.068 s | 0.036 s |
+| Random 500-row page of it | < 100 ms | 18.9 ms | 30.2 ms | 10.9 ms |
+| Filter 50M cached rows: first rows | < 2 s | 0.07–0.92 s | 0.07–1.14 s | 0.02–0.23 s |
+| Sort 50M cached rows: first and last rows | < 10 s | 0.76–1.00 s | 0.91–1.15 s | 0.28–0.29 s |
+| Sort 50M cached rows: written in full (background) | — | 22–32 s | 44 s | 7–11 s |
+| Column stats, one column of 50M rows | < 3 s | 0.70–**3.11 s** | 0.63–**3.30 s** | 0.15–1.14 s |
+| Chart aggregation over 50M rows | < 2 s | 0.11–1.73 s | 0.12–1.97 s | 0.04–0.54 s |
+| Header histograms, 7 columns of 50M rows | — | 5.8 s | 6.6 s | 1.9 s |
+| Data quality check of 50M rows | — | 9.3 s | 10.1 s | 3.1 s |
+
+¹ Peak memory comes from Linux's `VmHWM`; the test reports none elsewhere. DuckDB's own memory
+limit (half of RAM by default, D48) bounds the engine on every OS.
+
+The sort row predates the row-order bridge (ae4470e, "every page readable"); its per-OS number
+comes with the next Budgets run.
+
+**Missed: column stats of `order_ts`** (39.5M distinct timestamps) on the 4-vCPU Linux and Windows
+runners. Of its 3–4 s, the most common values took 3.3 s here: counting every value means one
+group per row. Above 1M distinct values the candidates now come from DuckDB's `approx_top_k`
+sketch and are counted exactly in one more scan (`APPROX_TOP_DISTINCT`): a value common enough
+to matter is always found, and the panel says the list comes from an estimate. On linux-dev,
+`order_ts` went from 4.81 s to 1.59 s (stats 0.5 s, histogram 0.3 s, values 0.8 s); the other columns are unchanged (they stay
+on exact counting).
+
+**Found: zlib-rs panics on Windows after 4 GiB of gzip input in debug builds.** The integrity
+check of the 5 GB `.csv.gz` stopped with "attempt to add with overflow" in `zlib-rs`'s
+`total_in`, an unsigned long (32 bits on Windows) that zlib lets wrap. flate2 keeps its own
+64-bit totals, and release builds wrap as zlib does, so the app was not affected; debug builds
+now build zlib-rs without overflow checks too. The import also ignored the panicked check (the
+thread's result was dropped): it is now logged as an error.
+
+Not measurable on the hosted runners (no desktop session): cold start, idle memory and grid
+frame rate on Windows and macOS, measured on Linux at v0.1.0. Installer sizes per OS are
+recorded with the release workflow (v1.0 step 7).
+
+### Small suite on three OSes
+
+`pnpm bench` on the same runners (run
+[40678094490](https://github.com/mukesh-dsnl/dataliq/actions/runs/40678094490)). Windows and macOS
+had no baseline, so these runs are now theirs (`bench/baseline/<os>.json`); the guard covers
+all three OSes from here on.
+
+| Flow | Linux (baseline) | Linux | Windows | macOS |
+| --- | --- | --- | --- | --- |
+| first_rows_100mb_csv | 216 ms | 131 ms | 323 ms | 359 ms |
+| first_rows_100mb_csv_gz | 1,243 ms | 821 ms | 1,287 ms | 1,145 ms |
+| first_rows_100mb_ndjson_gz | 354 ms | 217 ms | 354 ms | 315 ms |
+| first_rows_100k_xlsx | 52 ms | 36 ms | 76 ms | 129 ms |
+| import_100mb_csv | 1,456 ms | 976 ms | 1,775 ms | 1,315 ms |
+| import_100mb_csv_gz | 3,437 ms | 2,218 ms | 3,700 ms | 2,551 ms |
+| import_100mb_ndjson_gz | 2,975 ms | 1,823 ms | 3,445 ms | 1,979 ms |
+| import_100k_xlsx | 1,403 ms | 960 ms | 2,083 ms | 2,510 ms |
+| reopen_cached_100mb_csv | 0.85 ms | 0.93 ms | 1.75 ms | 0.82 ms |
+| page_1m_parquet | 7.8 ms | 4.8 ms | 12.8 ms | 7.0 ms |
+
+**Excel at v0.6.0 (+23 % / +27 %) was the runner, not the code.** The Excel code and its
+libraries are unchanged since v0.1.0, and on this run every Linux flow, Excel included, came in
+30–39 % *under* the same baseline: hosted runners of one label differ by about a third from
+run to run. A guard failure is therefore re-run once before it is investigated.
+

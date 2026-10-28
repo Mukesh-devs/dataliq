@@ -328,8 +328,12 @@ fn import_once(
                 other => other,
             })?;
             // The table must be complete: wait for the integrity check.
-            if let Some(c) = checker {
-                let _ = c.join();
+            if let Some(c) = checker
+                && c.join().is_err()
+            {
+                // A bug in the check, not in the file: say so in the log
+                // rather than calling a good file damaged.
+                tracing::error!("the gzip integrity check stopped unexpectedly");
             }
             if corrupt.load(Ordering::SeqCst) {
                 return Err(AppError::Query(

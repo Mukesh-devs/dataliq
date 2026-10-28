@@ -234,6 +234,11 @@ export interface ColumnProfile {
   histogram: Bin[] | null;
   top: ValueCount[];
   topTruncated: boolean;
+  /**
+   * `top` was chosen by an estimate (nearly every value differs): the counts
+   * are exact, but a value as common as the last one listed may be missing.
+   */
+  topApprox: boolean;
   elapsedMs: number;
 }
 

@@ -685,3 +685,21 @@ Making it the default app is the user's choice in the OS (Windows and
 macOS don't let apps take it), so Settings says how. On macOS files opened
 from the Finder arrive as an `Opened` event, which is handled like the
 command line (held until the UI is ready).
+
+## D49 — Most common values of near-unique columns: found by an estimate, counted exactly
+
+Listing a column's most common values meant grouping by every value: on a
+column where nearly every value differs (39.5M timestamps in 50M rows) that
+is one group per row, 3–4 s on four cores, over the 3 s budget for column
+stats. Above 1M distinct values (`APPROX_TOP_DISTINCT`, from the estimate
+the statistics already compute), the candidates now come from DuckDB's
+`approx_top_k` sketch and one more scan counts them exactly (about 0.8 s).
+NULL, which the sketch skips, is added from the null count.
+
+The sketch always finds values frequent enough to matter (a sentinel date in
+5 % of the rows, say), which is what the list is for on such a column; it
+can miss or swap values about as common as the last one listed (usually
+values seen once or twice). So the counts shown are exact, and the panel
+says the list was found by an estimate. Skipping the list on near-unique
+columns was rejected: it would hide exactly those sentinels. Below 1M
+distinct values exact counting stays: it is as fast or faster there.
