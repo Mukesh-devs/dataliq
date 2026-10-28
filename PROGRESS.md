@@ -617,3 +617,111 @@ tested, and anything left over.
 - Done criteria: charts are fast on huge files (aggregated in DuckDB, one small result) and
   always match the filtered view (the same view builder as the grid; tests with filters).
 - Left over: none.
+
+## v0.5 — Clean, Compare, Quality
+
+### Step 1 — Cleaning steps (recipe) ✅
+
+- Ten steps: rename, change type (counts the values that don't convert; dates with an optional
+  strptime format), trim, change case (Title Case as spreadsheets' PROPER: "o'neil" → "O'Neil"),
+  find and replace (text or pattern, match case), split column, fill empty cells, remove
+  duplicate rows (all columns or one), remove rows matching a filter, calculated column (a DuckDB
+  expression).
+- One chain of CTEs over the file, applied as a new dataset written in the background like a
+  view; the file and its cache never change (D39). The grid, filters, profiles, charts, export and
+  the tab's SQL table read the cleaned rows; filters on columns a step removed or renamed go.
+- A Clean panel (toolbar, palette, "Clean column…" in the column menu): steps listed with what
+  happened (failed conversions, errors, steps not applied), turn on/off, move up/down, remove,
+  remove all; undo/redo (buttons, Ctrl+Z / Ctrl+Shift+Z, palette).
+- Fixed on the way: Ctrl+F then typing at once lost the first key (the search box was focused one
+  frame late); it is focused at once now, and the slow-frame test types right after the shortcut.
+- Tested: SQL snapshots for every step; integration tests over people.csv check each step against
+  values computed from the parsed CSV (column steps, failure counts, split/title/regex, row steps
+  in file order, disabled and failing steps, a bad fill value) and that the exported script run in
+  plain DuckDB gives exactly the app's rows; Vitest for descriptions, view fitting, the store
+  (cleaned base for views and SQL, renames dropping filters, undo/redo, waiting for the import,
+  closing datasets) and the panel; Playwright for the whole flow and the column menu.
+- Smoke (real app, people.csv): Clean column… on name → Title Case: 1,000 rows cleaned in 3 ms
+  ("søren smith" → "Søren Smith"); change name to number → "989 values couldn't be converted";
+  Ctrl+Z from the grid undoes it; remove rows where amount < 0 → 913 rows (913 counted
+  independently from the CSV); search "o'neil" → 130 of 913 rows; SQL panel `FROM people` sees
+  the cleaned table (913 rows, lowest amount 0.28). Found and fixed: Title Case lowered letters
+  after an apostrophe ("O'neil"), and the Clean button didn't look pressed with its panel open.
+- Left over: none (saving, loading and exporting recipes is step 2).
+
+### Step 2 — Recipes: SQL script, save/load, apply to another file ✅
+
+- From the Clean panel's toolbar or the palette: Copy SQL, Export SQL… (a `.sql` file), Save…
+  (a `.json` recipe), Load… (onto the tab's file; one undo brings the old steps back).
+- The script is the same query the app runs over the file's reader, with a header and each
+  step's description as a comment above it; disabled steps are left out.
+- A recipe file keeps the columns (and types) it was made for: loading it onto a file without
+  some of them, or with other types, says so in the panel; the steps still apply (D40).
+- Tested: recipe files load back exactly, other files are refused with a reason (not JSON, not a
+  recipe, a newer version, damaged), only `.json`/`.sql` are written, files are written whole; a
+  recipe saved on people.csv cleans another file with the same columns exactly as expected; the
+  labelled script runs in plain DuckDB and gives the app's rows; Vitest for the helpers, the
+  column check and the panel; Playwright for copy, export, save and loading onto another file.
+- Smoke (real app): people.csv → Title Case on name ("O'Neil Müller" stays right) → Save… through
+  the GTK dialog (`people-recipe.json` suggested) → the JSON with its 6 columns and the step;
+  Export SQL… → the commented script, which run in plain DuckDB 1.5.6 (Python) gives the same
+  1,000 rows; Ctrl+O people-q2.csv (500 rows, no `joined`) → Load recipe… → "Loaded 1 step from
+  smoke-recipe.json", names in Title Case, and the panel says the file has no column “joined”.
+- Left over: none.
+
+### Step 3 — Compare two files ✅
+
+- Compare (toolbar, palette) with any other open tab: before/after (swappable), key columns
+  (one like `id` suggested), Compare → a new tab of the differing rows: `status`, keys,
+  `changed`, each compared column with its new value and a `(before)` column where it changed.
+- A bar with the counts (each filters the rows), the same rows, changes per column, and notes
+  for repeated keys (matched in order of appearance), columns of different types (compared as
+  text) and columns only one side has. Changed cells are amber, added rows green, removed rows
+  red (tokens, light and dark). The diff exports, filters, sorts and charts like a file (D41).
+- Tested: fixtures `fixtures/compare/orders_v1.csv` → `orders_v2.csv` with documented
+  differences (duplicate keys, a number column that becomes text): exact counts, columns and
+  every row; keys checked on both sides; people.csv against an edited copy (every 50th row
+  removed, every 7th amount changed, two added) against the differences worked out in Rust; the
+  standalone SQL over both readers gives the same rows in plain DuckDB; Vitest for key
+  suggestions, notes, changed cells, the dialog and the bar; Playwright for the whole flow,
+  including the cell fills read from the canvas.
+- Smoke (real app): `bigview orders_v1.csv orders_v2.csv` → Compare from v1 (v2 and `id`
+  preselected) → "7 → 8 rows: 2 added · 1 removed · 4 changed · 2 the same", "Changed: qty 1 ·
+  price 1 · note 2", both notes, the cells filled as expected in dark theme, 38 ms; "2 added"
+  shows those 2 rows; Export → CSV through the save dialog gives exactly the documented rows.
+- Left over: none.
+
+### Step 4 — Data quality warnings ✅
+
+- A Quality panel (toolbar with the warning count, palette) checks the rows the tab reads:
+  mostly empty columns (≥ 20%), stray spaces, text that is mostly numbers with exceptions, dates
+  in several formats, numeric outliers (beyond 3 IQR) and exact duplicate rows.
+- Each warning's "Show rows" puts the filters it was counted with on the view, so it shows
+  exactly that many rows; duplicates open a query in the SQL panel listing each duplicated row
+  with its copies; "Fix" adds the cleaning step that clears it (trim, change type, remove
+  duplicates) and the check runs again on the cleaned rows (D42).
+- Measured on 50M rows: 33 s at first (exact quartiles, six regexes per text column); with the
+  outlier bounds from a repeatable 100,000-row sample and number/date tests only on columns that
+  look like them, 6.2 s warm, every count still over all rows.
+- Tested: `fixtures/quality/messy.csv` with documented problems (see its README): every warning,
+  count and message; each warning's filters give exactly its count; the three fixes applied as
+  a recipe leave only the warnings without a fix; a clean file has none; Vitest for the panel;
+  Playwright for show rows, fix (and the new check on the cleaned rows) and duplicates in SQL.
+- Smoke (real app, messy.csv): 6 warnings in 16 ms matching the README; "Show 3 rows" on date
+  formats → ids 4, 9, 16; Fix trim → 5 warnings; Fix duplicates → 20 rows, 4 warnings left.
+- Left over: none.
+
+### v0.5.0 release ✅
+
+- Version test list: all Rust tests (recipe SQL snapshots; every step, recipe files, scripts in
+  plain DuckDB; compare fixtures with duplicate keys and type differences, an edited people.csv
+  and the standalone SQL; quality fixture with every warning, its rows and its fix), Vitest,
+  Playwright (recipes, compare with canvas fills, quality), Tauri debug build; on demand
+  `perf_recipe_compare_50m` and `perf_quality_50m`; small suite (`pnpm bench`) within the guard.
+- Measured (docs/BENCHMARKS.md): on 50M rows a 4-step recipe shows its first page in 0.15 s
+  (written in full in 14.8 s), a quality check takes 6.5 s, and comparing with an edited 50M-row
+  copy 14 s.
+- Done criteria: a messy file can be cleaned (fixture `messy.csv`: the quality panel's fixes
+  and the cleaning steps), the steps saved as SQL (Export SQL…, run in plain DuckDB in the
+  smoke test), and two file versions compared (`orders_v1.csv` → `orders_v2.csv`).
+- Left over: none.

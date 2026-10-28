@@ -44,6 +44,18 @@ export interface MockOptions {
   exportMs?: number;
   /** Result of `chart_data`; runs in Node. Default: three bars. */
   charts?: (chart: Record<string, unknown>, spec: unknown) => unknown;
+  /**
+   * Result of `apply_recipe` without its dataset (columns, rowCount, steps);
+   * runs in Node. The dataset is `recipe-N`, paged through `fetchRows`.
+   */
+  recipes?: (steps: { op: string; enabled?: boolean }[]) => unknown;
+  /**
+   * Result of `compare_files` without its dataset (counts, columns, …); the
+   * dataset is `diff-N`, paged through `fetchRows`.
+   */
+  comparison?: Record<string, unknown> & { rowCount: number };
+  /** Result of `data_quality`. */
+  quality?: unknown;
 }
 
 /**
@@ -96,8 +108,22 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       charts(chart, spec),
     );
   }
+  if (options.recipes) {
+    const recipes = options.recipes;
+    await page.exposeFunction("__recipes", (steps: { op: string }[]) => recipes(steps));
+  }
   await page.addInitScript(
-    ({ recordings, dialogPaths, datasets, imports, startupFiles, savePaths, exportMs }) => {
+    ({
+      recordings,
+      dialogPaths,
+      datasets,
+      imports,
+      startupFiles,
+      savePaths,
+      exportMs,
+      comparison,
+      quality,
+    }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
@@ -105,6 +131,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       let nextCallback = 1;
       let nextView = 1;
       let nextResult = 1;
+      let nextRecipe = 1;
+      let nextDiff = 1;
       // The SQL panel's history and saved queries (kept for the page's life).
       const history: { sql: string; ranAt: number }[] = [];
       const saved: { name: string; sql: string; savedAt: number }[] = [];
@@ -199,6 +227,38 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 elapsedMs: 5,
               };
             }
+            case "apply_recipe": {
+              const recipes = w.__recipes as
+                | ((s: unknown) => Promise<{ rowCount: number } & Record<string, unknown>>)
+                | undefined;
+              if (!recipes) throw { kind: "internal", message: "unmocked command apply_recipe" };
+              const { rowCount, ...rest } = await recipes(args.steps);
+              const id = `recipe-${nextRecipe++}`;
+              return { dataset: { id, rowCount, cached: true }, elapsedMs: 21, ...rest };
+            }
+            // A saved recipe can be loaded again (in another tab) for the page's life.
+            case "save_recipe":
+              w.__savedRecipe = args.recipe;
+              return null;
+            case "load_recipe":
+              if (!w.__savedRecipe) throw { kind: "io", message: "No such file" };
+              return w.__savedRecipe;
+            case "save_recipe_script":
+              return null;
+            case "recipe_script":
+              return `WITH base AS (SELECT * FROM ${String(args.reader)}),\nstep_1 AS (SELECT * FROM base)\nSELECT * FROM step_1;`;
+            case "compare_files": {
+              if (!comparison)
+                throw { kind: "internal", message: "unmocked command compare_files" };
+              const { rowCount, ...rest } = comparison;
+              const id = `diff-${nextDiff++}`;
+              return { dataset: { id, rowCount, cached: true }, elapsedMs: 12, ...rest };
+            }
+            case "data_quality":
+              if (!quality) throw { kind: "internal", message: "unmocked command data_quality" };
+              return quality;
+            case "compare_sql":
+              return `SELECT 'changed' AS status FROM ${String(args.leftReader)}, ${String(args.rightReader)};`;
             case "chart_sql":
               return `SELECT city, count(*) AS "Count" FROM ${String(args.reader)} GROUP BY 1`;
             case "save_chart_image":
@@ -338,6 +398,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       startupFiles: options.startupFiles ?? [],
       savePaths: options.savePaths ?? [],
       exportMs: options.exportMs ?? 0,
+      comparison: options.comparison,
+      quality: options.quality,
     },
   );
 }

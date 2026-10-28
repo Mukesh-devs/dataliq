@@ -441,3 +441,91 @@ all pass except light-mode contrast of slots 3–4, so every chart also has a
 table view of its values. Bars are at most 24 px thick with 4 px rounded
 ends, lines 2 px, one value axis only, legend from two series up, text in
 the text colours.
+
+## D39 — Cleaning recipes: one chain of CTEs over the file, a new dataset
+
+A recipe is an ordered list of steps, each a `SELECT` over the step before
+(`WITH base AS (…), step_1 AS (…), step_2 AS (… FROM step_1) …`), so the
+whole recipe is one query DuckDB plans at once and the exported script is
+the same text. Column steps keep the column's place (`SELECT a, f(b) AS b,
+c`); rows keep file order (duplicates keep the first row, by a row number
+taken over the step's input). Change type uses `TRY_CAST` (or
+`try_strptime` with a format), so a value that doesn't convert becomes
+empty, and the step says how many did. Remove rows reuses the view's
+filter builder with the test turned around, so the rows where the test
+can't tell (NULL) stay. The output is a new dataset read through its query
+and written to a session table in the background, exactly like a view, so
+the cached file never changes. The tab's base becomes the cleaned rows:
+the grid, filters, profiles, charts, exports and the tab's SQL table all
+read them, and filters on columns a step removed or renamed are dropped.
+The grid switches only when the cleaned rows' view is open, so it never
+shows one set of columns over another's pages. A failing step stops the
+recipe there: the rows are those of the steps before it, the step shows
+DuckDB's message and the later steps say they weren't applied. Undo and
+redo keep up to 100 recipes per tab. SQL results (already a query) have no
+recipe.
+
+## D40 — Recipe files: JSON with the columns they were made for
+
+A saved recipe is a small JSON file (`"format": "bigview-recipe"`,
+`"version": 1`) holding the steps exactly as the app sends them to the
+backend, the name of the file it was made on and that file's columns with
+their types. Loading it onto any open file replaces that tab's recipe (one
+undo brings the old one back) and compares the columns: missing columns
+and columns of another type are named in the Clean panel ("This file has no
+column “joined”: steps using them may fail"), and the steps still apply, so
+a step that can't run says why on its own line. Files from a newer
+version, other JSON and damaged recipes are refused with a sentence each.
+The exported `.sql` script is the same query the app runs (D39) over the
+file's reader, with a two-line header and each step's description as a
+`--` comment above it; disabled steps are left out. Files are written whole
+(a `.partial` file renamed), and only as `.json` or `.sql`.
+
+## D41 — Comparing files: one full outer join, a tab of differences
+
+Two open tabs are compared by key columns the user picks (a column named
+like `id`, `key`, `code` or `…_id` is suggested). Each side's rows get
+their file order and the occurrence of their key, and the join is on the
+keys plus that occurrence, so a repeated key never multiplies rows: the
+first `id = 5` before is matched with the first after, the second with the
+second, and a third only after is added; repeated keys are counted and
+mentioned. Columns both files have are compared with `IS DISTINCT FROM`
+(NULL = NULL), as text when their types differ (said in the bar); columns
+only one side has are listed and not compared. Comparing a cleaned tab
+compares its cleaned rows. The result opens as a new tab whose rows are
+only the differences, in the first file's order then the added rows:
+`status`, the keys, `changed` (the changed columns' names), then each
+compared column with its new value and, for columns that changed
+somewhere, a `… (before)` column right after it. One aggregate query gives
+the counts (added, removed, changed, the same, changes per column); the
+rows are a dataset written in the background like a view, so filters,
+sort, search, charts, export and "Copy view as SQL" (one query over both
+files' readers) work as on any file. The bar's counts filter the rows by
+status; changed cells (and their old values) are filled with a soft amber,
+added rows green, removed rows red, as tokens with dark steps.
+
+## D42 — Data quality warnings: counted with the filters that show them
+
+Six checks, run when the Quality panel opens (and again after each
+cleaning step) on the rows the tab reads: a column empty in at least 20%
+of rows; text with a space at the start or end; text that is at least half
+numbers but not all; text that is at least half dates written in two or
+more formats; numbers further than 3 interquartile ranges outside the
+middle half; and exact duplicate rows. Each warning is counted with the
+very tests its "Show rows" button puts on the view (the empty, regex and
+range filters), so the button always shows that many rows; duplicates,
+which no column filter can show, open a query in the SQL panel listing
+each duplicated row with its number of copies. Where a cleaning step fixes
+a warning (trim, change type to number, remove duplicates) the panel adds
+it to the recipe. Spaces are the ones `trim` removes (spaces, not tabs),
+so the fix clears its warning. On 50M rows a full check took 33 s with
+exact quartiles and six regexes per text column; the outlier bounds now
+come from a repeatable sample of 100,000 rows (all rows when fewer), and
+only text columns that are at least 40% numbers or dates in that sample are
+tested for them in full, so every count is still over all rows: 6.2 s.
+
+Unique keys (the usual case) are found with one `count(DISTINCT hash(keys))`
+per side; then rows join on the keys alone, without numbering each key's
+occurrences, which sorts both sides. On 50M rows against 50M (5M
+differences) the numbering ran out of the container's disk while
+spilling; without it the comparison takes 14 s (D41).

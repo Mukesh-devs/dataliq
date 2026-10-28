@@ -40,7 +40,7 @@ pub struct SniffedCsv {
     pub timestamp_format: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnMeta {
     pub name: String,

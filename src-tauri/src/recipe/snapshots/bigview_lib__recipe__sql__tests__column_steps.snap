@@ -1,0 +1,23 @@
+---
+source: src-tauri/src/recipe/sql.rs
+expression: "all.join(\"\\n\\n\")"
+---
+SELECT "id", "name" AS "Full name", "amount", "joined" FROM t
+
+SELECT "id", "name", "amount", CAST(try_strptime("joined", '%d/%m/%Y') AS DATE) AS "joined" FROM t
+
+SELECT "id", "name", TRY_CAST("amount" AS BIGINT) AS "amount", "joined" FROM t
+
+SELECT "id", trim("name") AS "name", "amount", "joined" FROM t
+
+SELECT "id", array_to_string(list_transform(regexp_extract_all(lower("name"), '\p{L}+|\P{L}+'), w -> upper(w[1]) || w[2:]), '') AS "name", "amount", "joined" FROM t
+
+SELECT "id", regexp_replace("name", 'Mr\. ', '', 'gi') AS "name", "amount", "joined" FROM t
+
+SELECT "id", regexp_replace("name", '(\w+) (\w+)', '\2, \1', 'g') AS "name", "amount", "joined" FROM t
+
+SELECT "id", nullif(split_part("name", ' ', 1), '') AS "first", nullif(split_part("name", ' ', 2), '') AS "last", "amount", "joined" FROM t
+
+SELECT "id", "name", coalesce("amount", CAST('0' AS DOUBLE)) AS "amount", "joined" FROM t
+
+SELECT "id", coalesce(nullif("name", ''), CAST('O''Neil' AS VARCHAR)) AS "name", "amount", "joined" FROM t

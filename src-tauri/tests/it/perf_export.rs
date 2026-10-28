@@ -349,3 +349,122 @@ fn perf_charts_50m() {
         );
     }
 }
+
+/// Data quality warnings over the same 50M rows (one scan of every column,
+/// one for outliers, one for duplicate rows).
+#[test]
+#[ignore = "needs generated fixtures; a minute or two"]
+fn perf_quality_50m() {
+    let Some((engine, ds, _tmp)) = setup() else {
+        eprintln!("sales_50m.parquet not generated, skipping");
+        return;
+    };
+    for run in ["cold", "warm"] {
+        let t = Instant::now();
+        let report = engine.quality(&ds.id, &RequestKey::default()).unwrap();
+        println!(
+            "quality ({run}) {:>6.2} s  warnings {} of {} rows",
+            t.elapsed().as_secs_f64(),
+            report.warnings.len(),
+            report.rows
+        );
+        for w in &report.warnings {
+            println!("  {:?} {:?}: {}", w.kind, w.column, w.message);
+        }
+    }
+}
+
+/// A cleaning recipe and a comparison over the same 50M rows.
+#[test]
+#[ignore = "needs generated fixtures; a few minutes"]
+fn perf_recipe_compare_50m() {
+    use bigview_lib::compare::CompareSpec;
+    use bigview_lib::recipe::{Case, NewType, RecipeStep, Step};
+    let Some((engine, ds, _tmp)) = setup() else {
+        eprintln!("sales_50m.parquet not generated, skipping");
+        return;
+    };
+    let on = |step| RecipeStep {
+        step,
+        enabled: true,
+    };
+    let steps = vec![
+        on(Step::Trim {
+            column: "customer".into(),
+        }),
+        on(Step::ChangeCase {
+            column: "country".into(),
+            case: Case::Upper,
+        }),
+        on(Step::ChangeType {
+            column: "quantity".into(),
+            to: NewType::Number,
+            format: None,
+        }),
+        on(Step::Calculate {
+            name: "total".into(),
+            expression: "quantity * unit_price".into(),
+        }),
+    ];
+    let t = Instant::now();
+    let out = engine
+        .apply_recipe(&ds.id, &steps, &RequestKey::default())
+        .unwrap();
+    println!(
+        "recipe 4 steps (to first page)      {:>6.2} s  rows {}",
+        t.elapsed().as_secs_f64(),
+        out.dataset.row_count
+    );
+    let t = Instant::now();
+    engine.materialize_view(&out.dataset.id).unwrap();
+    println!(
+        "recipe written in full              {:>6.2} s",
+        t.elapsed().as_secs_f64()
+    );
+
+    // A typical edit against the file: some rows removed, empty discounts filled.
+    let edit = vec![
+        on(Step::RemoveRows {
+            filter: bigview_lib::view::Filter {
+                column: "quantity".into(),
+                op: FilterOp::Equals {
+                    value: Param::Int(1),
+                },
+                not: false,
+            },
+        }),
+        on(Step::FillEmpty {
+            column: "discount".into(),
+            value: "0".into(),
+        }),
+    ];
+    let edited = engine
+        .apply_recipe(&ds.id, &edit, &RequestKey::default())
+        .unwrap();
+    engine.materialize_view(&edited.dataset.id).unwrap();
+    let t = Instant::now();
+    let c = engine
+        .compare(
+            &ds.id,
+            &edited.dataset.id,
+            &CompareSpec {
+                keys: vec!["order_id".into()],
+            },
+            &RequestKey::default(),
+        )
+        .unwrap();
+    println!(
+        "compare by order_id                 {:>6.2} s  added {} removed {} changed {} same {}",
+        t.elapsed().as_secs_f64(),
+        c.added,
+        c.removed,
+        c.changed,
+        c.same
+    );
+    let t = Instant::now();
+    engine.materialize_view(&c.dataset.id).unwrap();
+    println!(
+        "differences written in full         {:>6.2} s",
+        t.elapsed().as_secs_f64()
+    );
+}

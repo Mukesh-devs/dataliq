@@ -95,7 +95,7 @@ impl Engine {
         Ok(cols)
     }
 
-    fn count(&self, sql: &str, params: &[Param], key: &RequestKey) -> Result<u64> {
+    pub(crate) fn count(&self, sql: &str, params: &[Param], key: &RequestKey) -> Result<u64> {
         let out = self.query(sql, params, 1, key)?;
         let batch = out
             .batches

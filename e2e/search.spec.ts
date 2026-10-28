@@ -96,11 +96,15 @@ test("shortcuts right after a click on the grid keep their focus on slow frames"
 
   await grid.click({ position: { x: 300, y: 80 } });
   await page.keyboard.press("Control+f");
+  // Typed at once: no key is lost to the grid.
+  await page.keyboard.type("na");
   const box = page.getByLabel("Search text columns");
   await expect(box).toBeFocused();
-  // Still there once the grid's frame has passed.
+  // Still there once the grid's frame has passed, with what was typed.
   await page.waitForTimeout(400);
   await expect(box).toBeFocused();
+  await expect(box).toHaveValue("na");
+  await box.fill("");
 
   await grid.click({ position: { x: 300, y: 110 } });
   await page.keyboard.press("Control+g");

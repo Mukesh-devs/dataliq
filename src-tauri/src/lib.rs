@@ -4,10 +4,13 @@ pub mod cache;
 pub mod chart;
 pub mod cli;
 pub mod commands;
+pub mod compare;
 pub mod engine;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod quality;
+pub mod recipe;
 pub mod settings;
 pub mod sources;
 pub mod sql;
@@ -128,7 +131,15 @@ pub fn run() {
             commands::export::cancel_export,
             commands::chart::chart_data,
             commands::chart::chart_sql,
-            commands::chart::save_chart_image
+            commands::chart::save_chart_image,
+            commands::recipe::apply_recipe,
+            commands::recipe::recipe_script,
+            commands::recipe::save_recipe,
+            commands::recipe::load_recipe,
+            commands::recipe::save_recipe_script,
+            commands::compare::compare_files,
+            commands::compare::compare_sql,
+            commands::quality::data_quality
         ])
         .build(tauri::generate_context!())
         .expect("error while building BigView")

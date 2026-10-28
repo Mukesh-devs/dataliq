@@ -35,6 +35,14 @@ fn main() {
             "chart_data",
             "chart_sql",
             "save_chart_image",
+            "apply_recipe",
+            "recipe_script",
+            "save_recipe",
+            "load_recipe",
+            "save_recipe_script",
+            "compare_files",
+            "compare_sql",
+            "data_quality",
         ]),
     ))
     .expect("failed to run tauri-build");

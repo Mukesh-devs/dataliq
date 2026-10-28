@@ -8,6 +8,7 @@
 
 mod bench_small;
 mod charts;
+mod compare;
 mod copy_sql;
 mod csv_sources;
 mod engine_query;
@@ -22,6 +23,8 @@ mod perf_import;
 mod perf_preview;
 mod perf_sort;
 mod profile;
+mod quality;
+mod recipes;
 mod sort;
 mod sql_results;
 mod sql_tables;

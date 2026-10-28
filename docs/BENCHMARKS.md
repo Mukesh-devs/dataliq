@@ -56,6 +56,9 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Export 1M rows to Excel | — (report) | 14.7 s, peak memory +2 MiB | v0.3.0 |
 | SQL aggregate over 50M rows | — (report) | 0.19 s (8 groups), 1.44 s (100K groups) | v0.3.0 |
 | Chart aggregation over 50M rows | < 2 s | 0.09–1.68 s for every chart type | v0.4 step 1 |
+| Cleaning recipe on 50M rows (4 steps) | — (report) | first page 0.15 s; written in full 14.8 s in the background | v0.5 step 1 |
+| Compare 50M against 50M rows by key (5M differences) | — (report) | 14.0 s; differences written in full 8.5 s | v0.5 step 3 |
+| Data quality check of 50M rows (9 columns) | — (report) | 6.5 s | v0.5 step 4 |
 
 Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
@@ -301,3 +304,40 @@ over many values are the slowest (exact `count(DISTINCT …)`). As with exports,
 after the cache file had not been read for a day waited for this container's disk (57 s cold,
 0.26 s warm).
 
+## v0.5 — cleaning, comparing and quality on 50M cached rows (linux-dev)
+
+`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_recipe_compare_50m perf_quality_50m --
+--ignored --nocapture --test-threads=1` (dev profile, warm cache), through the engine calls the
+panels make.
+
+| Flow | Time |
+| --- | --- |
+| Recipe (trim `customer`, upper-case `country`, `quantity` to number, `quantity * unit_price`): cleaned rows counted, first page ready | 0.15 s |
+| The same recipe written in full to a session table (background) | 14.8 s |
+| Compare the file with an edited copy by `order_id` (2.5M rows removed, 2.5M changed, 45M the same) | 14.0 s |
+| The differences written in full (background) | 8.5 s |
+| Data quality check: every column, outliers, duplicate rows | 6.5 s (7.4 s cold) |
+
+The plan sets no budget for these. Two changes came out of measuring: the quality check took
+33 s with exact quartiles and six regexes on every text column, and 6.5 s with outlier bounds
+from a repeatable 100,000-row sample and number/date tests only where a sample shows numbers or
+dates (D42); the comparison ran out of the container's temporary disk while numbering every
+key's occurrences, and needs no numbering when keys are unique, the usual case (D41).
+
+### Small suite at v0.5.0 (linux-dev)
+
+`pnpm bench` (best of 5 runs) next to v0.3.0 on this machine. Nothing in v0.5 touches opening,
+importing or paging; the guard against the CI runner's baseline passes (all within 30 %).
+
+| Flow | v0.3.0 | v0.5.0 |
+| --- | --- | --- |
+| first_rows_100mb_csv | 257 ms | 261 ms |
+| first_rows_100mb_csv_gz | 1,245 ms | 1,265 ms |
+| first_rows_100mb_ndjson_gz | 368 ms | 384 ms |
+| first_rows_100k_xlsx | 69 ms | 61 ms |
+| import_100mb_csv | 1,614 ms | 1,513 ms |
+| import_100mb_csv_gz | 3,489 ms | 3,114 ms |
+| import_100mb_ndjson_gz | 2,744 ms | 2,746 ms |
+| import_100k_xlsx | 1,957 ms | 1,646 ms |
+| reopen_cached_100mb_csv | 1.5 ms | 1.0 ms |
+| page_1m_parquet | 11.9 ms | 9.8 ms |

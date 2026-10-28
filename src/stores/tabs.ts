@@ -4,10 +4,12 @@ import {
   baseName,
   cancelImport,
   closeDataset,
+  fetchRows,
   importFile,
   openDirect,
   openFile,
   previewFile,
+  type ColumnMeta,
   type ImportProgress,
   type OpenOptions,
   type DatasetInfo,
@@ -16,7 +18,17 @@ import {
 import { cancelQuery } from "../lib/ipc";
 import { describeColumns } from "../lib/arrow";
 import type { ChartSpec } from "../lib/chart";
+import type { CompareInfo } from "../lib/compare";
 import type { ColumnLayout } from "../lib/layout";
+import {
+  appliedSteps,
+  applyRecipe as runRecipe,
+  fitView,
+  hasEffect,
+  recipeScript,
+  type RecipeOutcome,
+  type RecipeStep,
+} from "../lib/recipe";
 import { isIdentity, openView, type ViewReady, type ViewSpec } from "../lib/view";
 import { useRecent } from "./recent";
 
@@ -56,6 +68,28 @@ export interface ViewState {
   error?: string;
 }
 
+/** The tab's cleaning recipe applied to the file, as its own dataset. */
+export interface RecipeState {
+  /** "waiting": the full data isn't ready yet (still importing). */
+  status: "waiting" | "running" | "done" | "error";
+  requestId: string;
+  /** The cleaned rows; kept while a newer recipe is applied. */
+  outcome?: RecipeOutcome;
+  /** The first cleaned rows (their columns and types). */
+  preview?: Table;
+  /** The steps `outcome` was computed for. */
+  steps?: RecipeStep[];
+  /** The cleaned rows as a query over the file's reader ("Copy as SQL"). */
+  readerSql?: string;
+  error?: string;
+}
+
+/** Earlier and undone recipes. */
+export interface RecipeHistory {
+  past: RecipeStep[][];
+  future: RecipeStep[][];
+}
+
 export interface Tab {
   id: string;
   /** Display name, usually the file name. */
@@ -83,7 +117,69 @@ export interface Tab {
   mode?: "grid" | "chart";
   /** The tab's chart (kept while the grid is shown). */
   chart?: ChartSpec;
+  /**
+   * Cleaning steps applied to the file: the grid, filters, charts, exports
+   * and the SQL table all see the cleaned rows. The file never changes.
+   */
+  recipe?: RecipeStep[];
+  recipeHistory?: RecipeHistory;
+  recipeState?: RecipeState;
+  /** The recipe panel is open. */
+  recipeOpen?: boolean;
+  /** The data quality panel is open (one side panel at a time). */
+  qualityOpen?: boolean;
+  /** A comparison of two files: its counts (the tab's rows are the differences). */
+  compare?: CompareInfo;
 }
+
+/** What a tab's views, charts and SQL table read: the cleaned rows or the file. */
+export interface TabBase {
+  /** Full data (undefined until imported, or while a recipe is first applied). */
+  dataset?: DatasetInfo;
+  /** First rows, for the columns and their types. */
+  preview?: Table;
+  columns: ColumnMeta[];
+  /** The data as a table expression for standalone SQL. */
+  readerSql?: string;
+  /** Cleaned by a recipe. */
+  cleaned: boolean;
+}
+
+export function baseOf(tab: Tab): TabBase {
+  if (hasEffect(tab.recipe)) {
+    const r = tab.recipeState;
+    return {
+      dataset: r?.outcome?.dataset,
+      preview: r?.preview ?? tab.preview,
+      columns: r?.outcome?.columns ?? tab.info?.columns ?? [],
+      readerSql: r?.readerSql,
+      cleaned: true,
+    };
+  }
+  return {
+    dataset: tab.info?.dataset ?? undefined,
+    preview: tab.preview,
+    columns: tab.info?.columns ?? [],
+    readerSql: tab.info?.readerSql,
+    cleaned: false,
+  };
+}
+
+/** A view opened over other rows than the tab's current ones (see `applyView`). */
+interface Switch {
+  base: DatasetInfo | undefined;
+  /** Applied together with the view's result. */
+  changes: Partial<Tab>;
+  /** Still wanted. */
+  current: () => boolean;
+}
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** Undo steps kept per tab. */
+const MAX_HISTORY = 100;
+/** Cleaned rows read up front (the columns, and the grid's first page). */
+const RECIPE_PREVIEW_ROWS = 200;
 
 interface TabsState {
   tabs: Tab[];
@@ -124,16 +220,28 @@ interface TabsState {
    * a file). The tab owns the dataset from then on. Returns the tab id.
    */
   openResult: (result: { dataset: DatasetInfo; preview: Table; sql: string }) => string;
+  /**
+   * Opens a comparison's differing rows in a new tab (filters, export, …
+   * as for a file). The tab owns the dataset from then on. Returns the tab id.
+   */
+  openCompare: (c: { compare: CompareInfo; preview: Table; sql?: string }) => string;
   /** Renames the tab's SQL table; undefined goes back to the file's name. */
   setSqlName: (id: string, name: string | undefined) => void;
   setMode: (id: string, mode: "grid" | "chart") => void;
   setChart: (id: string, chart: ChartSpec) => void;
+  /** Replaces the tab's recipe (undoable) and applies it. */
+  setRecipe: (id: string, recipe: RecipeStep[]) => Promise<void>;
+  undoRecipe: (id: string) => Promise<void>;
+  redoRecipe: (id: string) => Promise<void>;
+  setRecipeOpen: (id: string, open: boolean) => void;
+  setQualityOpen: (id: string, open: boolean) => void;
 }
 
 let nextId = 1;
 let nextJob = 1;
 let nextView = 1;
 let nextResult = 1;
+let nextRecipe = 1;
 
 export const useTabs = create<TabsState>()((set, get) => {
   const patch = (id: string, changes: Partial<Tab>) =>
@@ -162,7 +270,7 @@ export const useTabs = create<TabsState>()((set, get) => {
           fromCache: outcome.fromCache,
         },
       });
-      if (find(id)?.view) void applyView(id);
+      void refresh(id);
     } catch (err) {
       if (!isCurrent()) return;
       const kind = (err as { kind?: string }).kind;
@@ -183,12 +291,16 @@ export const useTabs = create<TabsState>()((set, get) => {
   /**
    * Opens the tab's view over its full dataset. The previous view stays on
    * screen until the new one is counted; a newer request for the tab wins.
+   * With `next`, the view is opened over `next.base` instead and lands
+   * together with `next.changes` (a new recipe's rows), so the grid never
+   * shows a view of other columns. Says whether the result landed.
    */
-  const applyView = async (id: string) => {
+  const applyView = async (id: string, next?: Switch): Promise<boolean> => {
     const tab = find(id);
-    if (!tab) return;
-    const spec = tab.view ?? {};
-    const base = tab.info?.dataset;
+    if (!tab) return false;
+    const view = next && "view" in next.changes ? next.changes.view : tab.view;
+    const spec = view ?? {};
+    const base = next ? next.base : baseOf(tab).dataset;
     const shown = tab.viewState?.dataset;
     if (isIdentity(spec) || !base) {
       if (shown) void closeDataset(shown.id).catch(() => {});
@@ -196,22 +308,25 @@ export const useTabs = create<TabsState>()((set, get) => {
       if (tab.viewState?.status === "running")
         void cancelQuery(tab.viewState.requestId).catch(() => {});
       patch(id, {
+        ...next?.changes,
         viewState: isIdentity(spec) ? undefined : { status: "waiting", requestId: "" },
       });
-      return;
+      return true;
     }
     const requestId = `view-${nextView++}`;
     patch(id, { viewState: { ...tab.viewState, status: "running", requestId, error: undefined } });
-    const isCurrent = () => find(id)?.viewState?.requestId === requestId;
+    const isCurrent = () =>
+      find(id)?.viewState?.requestId === requestId && (next?.current() ?? true);
     try {
       const out = await openView(base.id, spec, requestId, `view:${id}`);
       if (!isCurrent()) {
         void closeDataset(out.dataset.id).catch(() => {});
-        return;
+        return false;
       }
       const old = find(id)?.viewState?.dataset;
       if (old) void closeDataset(old.id).catch(() => {});
       patch(id, {
+        ...next?.changes,
         viewState: {
           status: "done",
           requestId,
@@ -223,17 +338,123 @@ export const useTabs = create<TabsState>()((set, get) => {
           sorting: !!out.materializing && (spec.sort?.length ?? 0) > 0,
         },
       });
+      return true;
     } catch (err) {
+      const cancelled = (err as { kind?: string }).kind === "cancelled";
+      if (cancelled && next?.current()) {
+        // The view was stopped: the new rows show without it.
+        const old = find(id)?.viewState?.dataset;
+        if (old) void closeDataset(old.id).catch(() => {});
+        patch(id, { ...next.changes, view: undefined, viewState: undefined });
+        return true;
+      }
+      if (!isCurrent() || cancelled) return false;
+      const failed = { status: "error" as const, requestId, error: errorText(err) };
+      if (next) {
+        // The old view's rows don't match the new columns.
+        if (shown) void closeDataset(shown.id).catch(() => {});
+        patch(id, { ...next.changes, viewState: failed });
+      } else patch(id, { viewState: { ...find(id)?.viewState, ...failed } });
+      return !!next;
+    }
+  };
+
+  /**
+   * Applies the tab's recipe to the full data, then its view over the
+   * cleaned rows. The previous rows stay on screen until both are ready;
+   * a newer recipe for the tab wins.
+   */
+  const applyRecipe = async (id: string) => {
+    const tab = find(id);
+    if (!tab) return;
+    const steps = tab.recipe ?? [];
+    const file = tab.info?.dataset ?? undefined;
+    const old = tab.recipeState;
+    if (old?.status === "running") void cancelQuery(old.requestId).catch(() => {});
+    if (!hasEffect(steps)) {
+      // Back to the file's own rows and columns.
+      const recipe = tab.recipe;
+      const landed = await applyView(id, {
+        base: file,
+        changes: {
+          recipeState: undefined,
+          view: fitView(
+            tab.view,
+            (tab.info?.columns ?? []).map((c) => c.name),
+          ),
+        },
+        current: () => find(id)?.recipe === recipe,
+      });
+      if (landed && old?.outcome) void closeDataset(old.outcome.dataset.id).catch(() => {});
+      return;
+    }
+    if (!file) {
+      patch(id, { recipeState: { ...old, status: "waiting", requestId: "" } });
+      return;
+    }
+    const requestId = `recipe-${nextRecipe++}`;
+    patch(id, { recipeState: { ...old, status: "running", requestId, error: undefined } });
+    const isCurrent = () => find(id)?.recipeState?.requestId === requestId;
+    let outcome: RecipeOutcome | undefined;
+    try {
+      outcome = await runRecipe(file.id, steps, requestId, `recipe:${id}`);
+      const preview = await fetchRows(outcome.dataset.id, 0, RECIPE_PREVIEW_ROWS);
+      const reader = find(id)?.info?.readerSql;
+      const readerSql = reader
+        ? await recipeScript(file.id, appliedSteps(steps, outcome.steps), reader)
+            .then((sql) => `(\n${sql.replace(/;\s*$/, "")}\n)`)
+            .catch(() => undefined)
+        : undefined;
+      if (!isCurrent()) {
+        void closeDataset(outcome.dataset.id).catch(() => {});
+        return;
+      }
+      const done = outcome;
+      const landed = await applyView(id, {
+        base: done.dataset,
+        changes: {
+          recipeState: { status: "done", requestId, outcome: done, preview, steps, readerSql },
+          // Filters on columns the recipe removed or renamed go.
+          view: fitView(
+            find(id)?.view,
+            done.columns.map((c) => c.name),
+          ),
+        },
+        current: isCurrent,
+      });
+      if (!landed) {
+        // Replaced meanwhile (unless it is the rows now on screen).
+        if (find(id)?.recipeState?.outcome?.dataset.id !== done.dataset.id)
+          void closeDataset(done.dataset.id).catch(() => {});
+        return;
+      }
+      if (old?.outcome) void closeDataset(old.outcome.dataset.id).catch(() => {});
+    } catch (err) {
+      if (outcome) void closeDataset(outcome.dataset.id).catch(() => {});
       if (!isCurrent() || (err as { kind?: string }).kind === "cancelled") return;
       patch(id, {
-        viewState: {
-          ...find(id)?.viewState,
+        recipeState: {
+          ...find(id)?.recipeState,
           status: "error",
           requestId,
-          error: err instanceof Error ? err.message : String(err),
+          error: errorText(err),
         },
       });
     }
+  };
+
+  /** Applies what the tab asks for once its full data is there. */
+  const refresh = async (id: string) => {
+    const tab = find(id);
+    if (!tab) return;
+    if (hasEffect(tab.recipe)) await applyRecipe(id);
+    else if (tab.view) await applyView(id);
+  };
+
+  /** Replaces the recipe and its undo history, then applies it. */
+  const changeRecipe = (id: string, recipe: RecipeStep[], history: RecipeHistory) => {
+    patch(id, { recipe: recipe.length ? recipe : undefined, recipeHistory: history });
+    return applyRecipe(id);
   };
 
   /** Loads info and preview in parallel; a newer load for the tab wins. */
@@ -250,8 +471,8 @@ export const useTabs = create<TabsState>()((set, get) => {
       if (!current || current.options !== options) return; // superseded or closed
       patch(id, { status: "ready", info, preview, previewMs: performance.now() - started });
       if (!info.dataset) void startImport(id, path, options);
-      // Data available at once (Parquet in place): a kept view applies now.
-      else if (find(id)?.view) void applyView(id);
+      // Data available at once (Parquet in place): a kept recipe and view apply now.
+      else void refresh(id);
     } catch (err) {
       const current = find(id);
       if (!current || current.options !== options) return;
@@ -268,7 +489,13 @@ export const useTabs = create<TabsState>()((set, get) => {
     if (ds) void closeDataset(ds.id).catch(() => {});
     const view = tab.viewState?.dataset;
     if (view) void closeDataset(view.id).catch(() => {});
+    const recipe = tab.recipeState;
+    if (recipe?.status === "running") void cancelQuery(recipe.requestId).catch(() => {});
+    if (recipe?.outcome) void closeDataset(recipe.outcome.dataset.id).catch(() => {});
   };
+  /** A released tab's recipe waits for the full data again. */
+  const waitingRecipe = (tab: Tab): RecipeState | undefined =>
+    hasEffect(tab.recipe) ? { status: "waiting", requestId: "" } : undefined;
 
   return {
     tabs: [],
@@ -312,6 +539,7 @@ export const useTabs = create<TabsState>()((set, get) => {
         view: undefined,
         viewState: undefined,
         layout: undefined,
+        recipeState: waitingRecipe(tab),
       });
       await load(id, tab.path, options);
     },
@@ -322,6 +550,7 @@ export const useTabs = create<TabsState>()((set, get) => {
       patch(id, {
         info: tab.info ? { ...tab.info, dataset: null } : tab.info,
         viewState: tab.view ? { status: "waiting", requestId: "" } : undefined,
+        recipeState: waitingRecipe(tab),
       });
       // A new options object: `load` tells a newer load by identity.
       await load(id, tab.path, { ...tab.options });
@@ -341,7 +570,7 @@ export const useTabs = create<TabsState>()((set, get) => {
           info: { ...t.info, dataset },
           import: { jobId: "direct", status: "done", percent: 100, elapsedMs: 0 },
         });
-        if (find(id)?.view) void applyView(id);
+        void refresh(id);
       } catch (err) {
         patch(id, {
           import: {
@@ -374,6 +603,39 @@ export const useTabs = create<TabsState>()((set, get) => {
     setSqlName: (id, sqlName) => patch(id, { sqlName }),
     setMode: (id, mode) => patch(id, { mode }),
     setChart: (id, chart) => patch(id, { chart }),
+    setRecipe: async (id, recipe) => {
+      const tab = find(id);
+      if (!tab) return;
+      const h = tab.recipeHistory ?? { past: [], future: [] };
+      await changeRecipe(id, recipe, {
+        past: [...h.past, tab.recipe ?? []].slice(-MAX_HISTORY),
+        future: [],
+      });
+    },
+    undoRecipe: async (id) => {
+      const tab = find(id);
+      const h = tab?.recipeHistory;
+      const prev = h?.past.at(-1);
+      if (!tab || !h || !prev) return;
+      await changeRecipe(id, prev, {
+        past: h.past.slice(0, -1),
+        future: [tab.recipe ?? [], ...h.future],
+      });
+    },
+    redoRecipe: async (id) => {
+      const tab = find(id);
+      const h = tab?.recipeHistory;
+      const next = h?.future[0];
+      if (!tab || !h || !next) return;
+      await changeRecipe(id, next, {
+        past: [...h.past, tab.recipe ?? []],
+        future: h.future.slice(1),
+      });
+    },
+    setRecipeOpen: (id, recipeOpen) =>
+      patch(id, recipeOpen ? { recipeOpen, qualityOpen: false } : { recipeOpen }),
+    setQualityOpen: (id, qualityOpen) =>
+      patch(id, qualityOpen ? { qualityOpen, recipeOpen: false } : { qualityOpen }),
     openResult: ({ dataset, preview, sql }) => {
       const id = `tab-${nextId++}`;
       const title = `Result ${nextResult++}`;
@@ -396,6 +658,31 @@ export const useTabs = create<TabsState>()((set, get) => {
       }));
       return id;
     },
+    openCompare: ({ compare, preview, sql }) => {
+      const id = `tab-${nextId++}`;
+      const title = `${compare.left} ↔ ${compare.right}`;
+      const info: SourceInfo = {
+        path: "",
+        fileName: title,
+        sizeBytes: 0,
+        format: "sql",
+        compression: "none",
+        sniffed: null,
+        excel: null,
+        columns: compare.columns,
+        // "Copy view as SQL" reads both files (none when unknown).
+        readerSql: sql ? `(\n${sql.replace(/;\s*$/, "")}\n)` : "",
+        dataset: compare.dataset,
+      };
+      set((s) => ({
+        tabs: [
+          ...s.tabs,
+          { id, title, path: "", options: {}, status: "ready", info, preview, compare },
+        ],
+        activeId: id,
+      }));
+      return id;
+    },
     setView: async (id, view) => {
       if (!find(id)) return;
       patch(id, { view: isIdentity(view) ? undefined : view });
@@ -403,6 +690,28 @@ export const useTabs = create<TabsState>()((set, get) => {
     },
     cancelView: (id) => {
       const tab = find(id);
+      const r = tab?.recipeState;
+      if (tab && r?.status === "running") {
+        // Back to the cleaning on screen (and the view over it).
+        void cancelQuery(r.requestId).catch(() => {});
+        const vs = tab.viewState;
+        if (vs?.status === "running") {
+          void cancelQuery(vs.requestId).catch(() => {});
+          patch(id, {
+            view: vs.dataset ? vs.spec : undefined,
+            viewState: vs.dataset
+              ? { ...vs, status: "done", requestId: `${vs.requestId}:cancelled` }
+              : undefined,
+          });
+        }
+        patch(id, {
+          recipe: r.outcome ? r.steps : undefined,
+          recipeState: r.outcome
+            ? { ...r, status: "done", requestId: `${r.requestId}:cancelled` }
+            : undefined,
+        });
+        return;
+      }
       const vs = tab?.viewState;
       if (!tab || !vs) return;
       if (vs.status === "running") {

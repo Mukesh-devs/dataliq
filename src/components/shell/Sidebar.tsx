@@ -4,7 +4,7 @@ import { describeColumns } from "../../lib/arrow";
 import { label, reconcile, setHidden, showAll, visible, type ColumnLayout } from "../../lib/layout";
 import { formatBytes } from "../../lib/format";
 import { useApp } from "../../stores/app";
-import type { Tab } from "../../stores/tabs";
+import { baseOf, type Tab } from "../../stores/tabs";
 import { Button } from "../ui/Button";
 
 function Section({
@@ -74,7 +74,8 @@ function ColumnList({
   tab: Tab;
   onLayoutChange?: (layout: ColumnLayout) => void;
 }) {
-  const columns = useMemo(() => (tab.preview ? describeColumns(tab.preview) : []), [tab.preview]);
+  const preview = baseOf(tab).preview;
+  const columns = useMemo(() => (preview ? describeColumns(preview) : []), [preview]);
   const layout = useMemo(
     () =>
       reconcile(

@@ -40,6 +40,14 @@
     "allow-cancel-export",
     "allow-chart-data",
     "allow-chart-sql",
-    "allow-save-chart-image"
+    "allow-save-chart-image",
+    "allow-apply-recipe",
+    "allow-recipe-script",
+    "allow-save-recipe",
+    "allow-load-recipe",
+    "allow-save-recipe-script",
+    "allow-compare-files",
+    "allow-compare-sql",
+    "allow-data-quality"
   ]
 }
