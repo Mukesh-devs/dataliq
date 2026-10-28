@@ -34,7 +34,7 @@ for (const path of walk(bundleDir)) {
   // Only this version's files (a local bundle folder keeps older ones); the
   // macOS update bundle is the one without a version in its name.
   const thisVersion =
-    name.includes(`_${version}_`) || name.includes(`-${version}-`) || name === "BigView.app.tar.gz";
+    name.includes(`_${version}_`) || name.includes(`-${version}-`) || name === "DataLiq.app.tar.gz";
   if (!info || !thisVersion) continue;
   const target = releaseName(name, version);
   copyFileSync(path, join(outDir, target));

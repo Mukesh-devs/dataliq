@@ -7,11 +7,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use arrow::array::{Array, AsArray};
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{Compression, FileFormat, OpenOptions, Source};
-use bigview_lib::view::Relation;
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{Compression, FileFormat, OpenOptions, Source};
+use dataliq_lib::view::Relation;
 
 struct Fx {
     engine: Engine,
@@ -109,7 +109,7 @@ impl Fx {
 
     fn dataset_rows(&self, ds: &Dataset, cols: &[&str], order: &str) -> Vec<Vec<Option<String>>> {
         let rel = Relation::of(&ds.source);
-        let from = bigview_lib::sources::inline_params(&rel.sql, &rel.params);
+        let from = dataliq_lib::sources::inline_params(&rel.sql, &rel.params);
         self.rows(&from, cols, order)
     }
 }

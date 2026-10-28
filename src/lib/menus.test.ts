@@ -100,8 +100,8 @@ describe("menus", () => {
 
   it("tell recent files of the same name apart by their folder", () => {
     const recent = [
-      { path: "/work/proj/work.bigview", name: "work.bigview" },
-      { path: "/work/old/work.bigview", name: "work.bigview" },
+      { path: "/work/proj/work.dataliq", name: "work.dataliq" },
+      { path: "/work/old/work.dataliq", name: "work.dataliq" },
       { path: "https://example.com/a.csv", name: "a.csv" },
       { path: "C:\\data\\a.csv", name: "a.csv" },
       { path: "/d/b.csv", name: "b.csv" },
@@ -109,8 +109,8 @@ describe("menus", () => {
     const file = resolveMenus(MENUS, [], recent, false)[0]!;
     const sub = file.items.find((i) => i.kind === "submenu" && i.label === "Open recent");
     expect(sub && sub.kind === "submenu" && labels(sub.items).slice(0, 5)).toEqual([
-      "work.bigview — proj",
-      "work.bigview — old",
+      "work.dataliq — proj",
+      "work.dataliq — old",
       "a.csv — example.com",
       "a.csv — data",
       "b.csv",

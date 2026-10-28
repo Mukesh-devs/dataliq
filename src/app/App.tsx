@@ -212,7 +212,7 @@ export function App() {
     void probeEngine();
     void loadApp();
     if (useSettings.getState().checkUpdates) void useUpdate.getState().autoCheck();
-    // `bigview file.csv` at startup.
+    // `dataliq file.csv` at startup.
     void takeStartupFiles()
       .then((paths) => {
         if (paths.length > 0) void openPaths(paths);
@@ -559,7 +559,7 @@ export function App() {
       },
       {
         id: "about",
-        title: "About BigView",
+        title: "About DataLiq",
         group: "Help",
         keywords: "version",
         run: () => setHelp("about"),
@@ -600,7 +600,7 @@ export function App() {
 
   useSubscription(useMemo(() => () => onImportProgress(applyProgress), [applyProgress]));
   useSubscription(useMemo(() => () => onViewReady(applyViewReady), [applyViewReady]));
-  // A second `bigview <files>` launch forwards its files here.
+  // A second `dataliq <files>` launch forwards its files here.
   useSubscription(useMemo(() => () => onOpenFiles((p) => void openPaths(p)), [openPaths]));
   useSubscription(
     useMemo(

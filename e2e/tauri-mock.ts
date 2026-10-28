@@ -36,7 +36,7 @@ export interface MockOptions {
    * `stepMs`) and the final row count. Paths not listed never finish.
    */
   imports?: Record<string, { progress: number[]; rows: number; stepMs?: number }>;
-  /** Files the app "was started with" (`bigview <files>`). */
+  /** Files the app "was started with" (`dataliq <files>`). */
   startupFiles?: string[];
   /** Paths returned by successive "Save" dialogs (null = cancelled). */
   savePaths?: (string | null)[];
@@ -339,9 +339,9 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 totalMemoryMb: 16384,
                 defaultMemoryLimitMb: 8192,
                 cores: 8,
-                defaultCacheDir: "/home/me/.cache/bigview/datasets",
-                defaultTempDir: "/tmp/bigview-spill",
-                settingsFile: "/home/me/.config/bigview/settings.json",
+                defaultCacheDir: "/home/me/.cache/dataliq/datasets",
+                defaultTempDir: "/tmp/dataliq-spill",
+                settingsFile: "/home/me/.config/dataliq/settings.json",
               };
             case "save_settings": {
               const next = args.settings as {

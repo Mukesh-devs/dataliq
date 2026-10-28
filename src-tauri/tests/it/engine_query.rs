@@ -13,8 +13,8 @@ use arrow::array::{
 use arrow::datatypes::{DataType, TimeUnit};
 use arrow::ipc::reader::StreamReader;
 use arrow::record_batch::RecordBatch;
-use bigview_lib::engine::{Engine, EngineConfig, Param, RequestKey};
-use bigview_lib::error::AppError;
+use dataliq_lib::engine::{Engine, EngineConfig, Param, RequestKey};
+use dataliq_lib::error::AppError;
 
 const KNOWN_QUERY: &str = "SELECT * FROM (VALUES
     (1::BIGINT, 'alpha', 1.5::DOUBLE, true, DATE '2024-01-31', TIMESTAMP '2024-01-31 12:34:56.789', [1, 2]),

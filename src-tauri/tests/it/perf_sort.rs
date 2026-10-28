@@ -1,14 +1,14 @@
 //! Sorting and filtering 50M cached rows (budget: sort < 10 s, filter < 2 s).
 //! Needs `pnpm fixtures sales_50m.parquet`. Ignored by default:
-//!   cargo test -p bigview --test it perf_sort -- --ignored --nocapture --test-threads=1
+//!   cargo test -p dataliq --test it perf_sort -- --ignored --nocapture --test-threads=1
 //! Set `PERF_CACHE_DB=<path>` to keep the imported database between runs.
 
 use std::path::PathBuf;
 use std::time::Instant;
 
-use bigview_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, Param, RequestKey};
-use bigview_lib::settings::Settings;
-use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
+use dataliq_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, Param, RequestKey};
+use dataliq_lib::settings::Settings;
+use dataliq_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
 
 fn generated(name: &str) -> Option<PathBuf> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -323,7 +323,7 @@ fn perf_views_50m() {
              then page {:.1} ms",
             t4.elapsed().as_secs_f64() * 1000.0
         );
-        bigview_lib::import::close_dataset(&engine, &v.dataset.id).unwrap();
+        dataliq_lib::import::close_dataset(&engine, &v.dataset.id).unwrap();
     }
 }
 

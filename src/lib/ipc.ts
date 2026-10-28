@@ -20,24 +20,24 @@ export interface QueryOptions {
 export type ErrorKind = "query" | "cancelled" | "io" | "settings" | "internal";
 
 /** Error raised by a backend command, with a user-facing message. */
-export class BigViewError extends Error {
+export class DataLiqError extends Error {
   readonly kind: ErrorKind;
   constructor(kind: ErrorKind, message: string) {
     super(message);
-    this.name = "BigViewError";
+    this.name = "DataLiqError";
     this.kind = kind;
   }
 }
 
-function toError(err: unknown): BigViewError {
+function toError(err: unknown): DataLiqError {
   if (err && typeof err === "object" && "kind" in err && "message" in err) {
     const e = err as { kind: ErrorKind; message: string };
-    return new BigViewError(e.kind, e.message);
+    return new DataLiqError(e.kind, e.message);
   }
-  return new BigViewError("internal", String(err));
+  return new DataLiqError("internal", String(err));
 }
 
-/** Calls a backend command, normalizing errors to BigViewError. */
+/** Calls a backend command, normalizing errors to DataLiqError. */
 export async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   try {
     return await invoke<T>(cmd, args);

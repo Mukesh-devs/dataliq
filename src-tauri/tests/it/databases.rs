@@ -9,11 +9,11 @@
 use std::path::{Path, PathBuf};
 
 use arrow::array::{Array, AsArray};
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{DatabaseOptions, FileFormat, OpenOptions, Source};
-use bigview_lib::view::Relation;
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{DatabaseOptions, FileFormat, OpenOptions, Source};
+use dataliq_lib::view::Relation;
 
 fn extension_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/duckdb-extensions")
@@ -74,7 +74,7 @@ fn make_sqlite(path: &Path, sql: &str) {
 }
 
 impl Fx {
-    fn open(&self, path: &Path, table: Option<(&str, &str)>) -> bigview_lib::error::Result<Source> {
+    fn open(&self, path: &Path, table: Option<(&str, &str)>) -> dataliq_lib::error::Result<Source> {
         let options = OpenOptions {
             database: DatabaseOptions {
                 schema: table.map(|t| t.0.to_string()),
@@ -134,7 +134,7 @@ impl Fx {
 
     fn count(&self, ds: &Dataset) -> String {
         let rel = Relation::of(&ds.source);
-        let from = bigview_lib::sources::inline_params(&rel.sql, &rel.params);
+        let from = dataliq_lib::sources::inline_params(&rel.sql, &rel.params);
         self.texts(&format!("SELECT count(*) FROM {from}"))[0]
             .clone()
             .unwrap()

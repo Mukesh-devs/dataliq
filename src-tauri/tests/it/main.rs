@@ -1,9 +1,9 @@
 //! All integration tests in one binary: each test binary links DuckDB
 //! statically, so one binary keeps builds fast and `target/` small.
 //!
-//! Run everything: `cargo test -p bigview --test it`
+//! Run everything: `cargo test -p dataliq --test it`
 //! On-demand perf checks (need `pnpm fixtures ...`):
-//!   `cargo test -p bigview --test it perf_ -- --ignored --nocapture --test-threads=1`
+//!   `cargo test -p dataliq --test it perf_ -- --ignored --nocapture --test-threads=1`
 //! Small benchmark suite for the CI regression guard: `node scripts/bench.mjs`
 
 mod bench_small;

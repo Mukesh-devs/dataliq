@@ -1,9 +1,9 @@
 //! Views end to end: SQL built from a ViewSpec runs in DuckDB and returns the
 //! expected rows, including on columns whose names need quoting.
 
-use bigview_lib::engine::{DatasetSource, Engine, EngineConfig, Param};
-use bigview_lib::sources::ColumnMeta;
-use bigview_lib::view::{self, Filter, FilterOp, Relation, SortKey, ViewSpec};
+use dataliq_lib::engine::{DatasetSource, Engine, EngineConfig, Param};
+use dataliq_lib::sources::ColumnMeta;
+use dataliq_lib::view::{self, Filter, FilterOp, Relation, SortKey, ViewSpec};
 
 const NAME: &str = "first name";
 const QUOTE: &str = "say \"hi\"";

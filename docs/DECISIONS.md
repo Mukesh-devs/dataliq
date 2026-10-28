@@ -4,7 +4,7 @@ Deviations from, or clarifications of, `BUILD_PLAN.md`, with the reasoning.
 
 ## D1 — Repository root is the project root
 
-The plan shows a `bigview/` folder. This repository *is* the project, so
+The plan shows a `dataliq/` folder. This repository *is* the project, so
 `src-tauri/`, `src/`, `scripts/` etc. live at the repo root. A Cargo workspace
 at the root lets `cargo fmt/clippy/test` run from the root as the check script
 expects.
@@ -181,7 +181,7 @@ written by `scripts/make_xls.py` (xlwt), since no Rust crate writes BIFF8.
 _Replaced by D47 (v1.0): every OS has a menu bar now._
 
 macOS apps are expected to have a menu bar (and it provides Copy/Paste in
-text fields), so BigView installs the standard menu plus File > Open… /
+text fields), so DataLiq installs the standard menu plus File > Open… /
 Close Tab there. On Windows and Linux a menu bar would add a row of chrome
 the layout doesn't have; the same actions are on the keyboard (Ctrl+O,
 Ctrl+W, Ctrl+Tab), in the tab bar, and in the command palette (v0.2).
@@ -242,7 +242,7 @@ logic would. Sorts are always `NULLS LAST`, in both directions.
 
 DuckDB's CSV reader treats `""` as NULL by default (`allow_quoted_nulls`).
 That erases the difference between "no value" and "an empty string" that a
-file states explicitly, and BigView shows NULL and empty text differently.
+file states explicitly, and DataLiq shows NULL and empty text differently.
 We read CSV/TSV with `allow_quoted_nulls = false`: an unquoted empty field is
 NULL and `""` is an empty string. The cache format version was bumped so
 files imported before the change are imported again.
@@ -383,7 +383,7 @@ session (D32), which other connections can't see, so its rows can't be
 paged by re-running it elsewhere. The panel's last statement, when it is a
 query (SELECT, WITH, FROM, VALUES, TABLE, DESCRIBE, SHOW, SUMMARIZE, PIVOT),
 is written once on the session connection as
-`CREATE TABLE bv_scratch.main.r_<n> AS SELECT * FROM (<query>)` (DuckDB
+`CREATE TABLE dl_scratch.main.r_<n> AS SELECT * FROM (<query>)` (DuckDB
 keeps the query's order) and becomes a dataset like a written-out view: the
 grid pages all of its rows, a tab can own it (filters, sort, profiles, copy,
 "Copy view as SQL" over the query), and it is a SQL table itself
@@ -477,7 +477,7 @@ recipe.
 
 ## D40 — Recipe files: JSON with the columns they were made for
 
-A saved recipe is a small JSON file (`"format": "bigview-recipe"`,
+A saved recipe is a small JSON file (`"format": "dataliq-recipe"`,
 `"version": 1`) holding the steps exactly as the app sends them to the
 backend, the name of the file it was made on and that file's columns with
 their types. Loading it onto any open file replaces that tab's recipe (one
@@ -558,7 +558,7 @@ file's path, size and modification time, so adding, removing or editing
 any file is a new version), views, SQL and "Copy as SQL" work as for one
 file; a Parquet folder is queried in place. Open it with Open folder
 (Shift+Ctrl+O, the empty window, the macOS File menu), a pattern from the
-palette, by dropping a folder, or with `bigview <folder>`.
+palette, by dropping a folder, or with `dataliq <folder>`.
 
 Matching columns by name makes DuckDB sniff every file, which costs
 seconds for a large folder (200 small `.csv.gz` files: 4.5 s before the
@@ -574,7 +574,7 @@ takes longer.
 ## D44 — URLs: httpfs on demand, not cached, credentials in the keychain
 
 `https://`, `http://` and `s3://` files open like local ones (Open URL… in
-the palette, or `bigview <url>`), read by DuckDB's httpfs extension. The
+the palette, or `dataliq <url>`), read by DuckDB's httpfs extension. The
 app stays offline by default (the engine turns off DuckDB's extension autoloading and
 autoinstalling): httpfs is installed once into the app's cache folder
 (`duckdb-extensions`) and loaded only when the first URL is opened, with a
@@ -613,15 +613,15 @@ DuckDB files need nothing. SQLite has no date type, so its dates arrive as
 text (Clean changes the type). "Copy as SQL" gives `sqlite_scan(path,
 table)` for SQLite, which runs in plain DuckDB with the extension; a DuckDB
 table is given by its attached name (`"shop"."main"."orders"`), which
-needs `ATTACH 'path' AS shop (READ_ONLY)` outside BigView. Databases can't
+needs `ATTACH 'path' AS shop (READ_ONLY)` outside DataLiq. Databases can't
 be combined in a folder or read from a URL. A file another program holds
 open for writing, and one from another DuckDB version, are said in words.
 
-## D46 — Workspaces: a `.bigview` file of tabs, opened in place of the tabs
+## D46 — Workspaces: a `.dataliq` file of tabs, opened in place of the tabs
 
 "Save workspace" (Ctrl/Cmd+S; "Save workspace as…" with Shift) writes the
 open tabs, the SQL panel (text, open, height) and the side panels to a
-`.bigview` JSON file (`format: bigview-workspace`, `version: 1`). For each
+`.dataliq` JSON file (`format: dataliq-workspace`, `version: 1`). For each
 tab it keeps the file and only what was set on it: import settings (CSV
 options, Excel sheet, database table), filters, sort and search, column
 layout, SQL table name, chart and mode, recipe, and which side panel was
@@ -631,7 +631,7 @@ and passes each tab's settings through unread, so new tab settings need no
 backend change. Every file is stored by absolute path and, when inside the
 workspace's folder, by its path from there: a moved or shared project
 folder finds its files again. Opening a workspace (palette, file dialog,
-drop, recent files, `bigview work.bigview`) replaces the open tabs, since a
+drop, recent files, `dataliq work.dataliq`) replaces the open tabs, since a
 workspace is a whole working state; each file opens as usual (from the
 cache when unchanged) and its view and recipe apply when its data is ready,
 the way a reload does. A missing file's tab says it is missing. Save writes
@@ -678,9 +678,9 @@ a restart. A new cache or temporary folder applies after a restart, which
 the notice says. Empty means automatic, with the automatic value shown
 (half of the memory, every core, the default folders).
 
-File associations are the installers' job: the bundle registers BigView
+File associations are the installers' job: the bundle registers DataLiq
 as a viewer for CSV/TSV, JSON/NDJSON, Parquet, Excel, SQLite and DuckDB
-files and as the editor of `.bigview` workspaces (`.gz` is left alone).
+files and as the editor of `.dataliq` workspaces (`.gz` is left alone).
 Making it the default app is the user's choice in the OS (Windows and
 macOS don't let apps take it), so Settings says how. On macOS files opened
 from the Finder arrive as an `Opened` event, which is handled like the
@@ -723,7 +723,7 @@ the normal path (preview, quiet import) like any file the user drops.
 
 ## D51 — Updates: Tauri's updater, turned on by the release build only
 
-BigView updates itself with Tauri's updater plugin: it reads a `latest.json`
+DataLiq updates itself with Tauri's updater plugin: it reads a `latest.json`
 manifest from the latest GitHub release, downloads the bundle for this OS
 and checks its minisign signature against the public key built into the app
 before installing it (Windows: the installer in passive mode; macOS: the
@@ -779,3 +779,21 @@ focus when it becomes "Got it".
 The grid itself is a canvas (Glide): it is navigated with the arrow keys and
 exposes its visible cells as an accessible table to screen readers; data
 beyond the visible cells is reached by scrolling, Go to row and SQL.
+
+## D53 — The name is DataLiq, and the icon is a drop of data in flight
+
+The app is called **DataLiq** (data + liquid: data that flows), written with two
+capitals. The name replaces the working title everywhere: the window, menus and
+dialogs, installers and their file names, the bundle identifier
+(`app.dataliq.desktop`, so its folders are new), the command (`dataliq file.csv`),
+the workspace files (`.dataliq`, format `dataliq-workspace`), recipe files, the
+crate (`dataliq` / `dataliq_lib`), internal SQL names (`dl_` prefix), local
+storage keys and the release variables (`DATALIQ_UPDATER_PUBKEY`). No build has
+been published, so nothing reads the old names.
+
+The icon (`assets/icon.svg`, rendered into every size by `tauri icon`) is a
+streamlined drop moving to the right: its body is five rows of data in a
+cyan-to-violet gradient, and the middle rows stream off its tail as speed lines,
+on a deep navy tile. Data (rows), liquid (the drop) and speed (the streamlined
+shape and trails) in one mark that stays legible at 32 px and in both themes.
+It also appears in Help › About.

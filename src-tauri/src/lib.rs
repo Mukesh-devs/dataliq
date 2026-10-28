@@ -1,4 +1,4 @@
-//! BigView desktop app: Tauri entry point and module tree.
+//! DataLiq desktop app: Tauri entry point and module tree.
 
 pub mod cache;
 pub mod chart;
@@ -104,7 +104,7 @@ pub fn run() {
                 enabled: settings.cache_enabled,
             })?;
             // Uncached imports live only for this session.
-            let temp_dir = std::env::temp_dir().join(format!("bigview-{}", std::process::id()));
+            let temp_dir = std::env::temp_dir().join(format!("dataliq-{}", std::process::id()));
             app.manage(Arc::new(commands::import::ImportState {
                 cache,
                 imports: import::Imports::default(),
@@ -176,7 +176,7 @@ pub fn run() {
             commands::workspace::load_workspace
         ])
         .build(context)
-        .expect("error while building BigView")
+        .expect("error while building DataLiq")
         .run(|app, event| match event {
             tauri::RunEvent::Exit => {
                 // Uncached imports are session-only.

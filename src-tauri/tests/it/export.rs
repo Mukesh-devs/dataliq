@@ -7,13 +7,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, DatasetSource, Engine, Param};
-use bigview_lib::error::AppError;
-use bigview_lib::export::{self, ExportFormat, ExportOptions, ExportRequest, Exports};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{OpenOptions, Source};
-use bigview_lib::view::{self, Filter, FilterOp, Relation, SortKey, ViewSpec};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, DatasetSource, Engine, Param};
+use dataliq_lib::error::AppError;
+use dataliq_lib::export::{self, ExportFormat, ExportOptions, ExportRequest, Exports};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{OpenOptions, Source};
+use dataliq_lib::view::{self, Filter, FilterOp, Relation, SortKey, ViewSpec};
 
 use crate::filters::{Fx, Person, fx};
 
@@ -300,7 +300,7 @@ fn grid_rows(engine: &Engine, view_id: &str, positions: &[u64]) -> Vec<(i64, i64
         .iter()
         .map(|&p| {
             let bytes = engine
-                .fetch_rows(view_id, p, 1, &bigview_lib::engine::RequestKey::default())
+                .fetch_rows(view_id, p, 1, &dataliq_lib::engine::RequestKey::default())
                 .unwrap();
             let batch =
                 arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(bytes), None)
@@ -324,7 +324,7 @@ fn selected_rows_are_the_rows_the_grid_shows() {
     let ds = engine
         .sql_result(
             "SELECT i, i % 7 AS k FROM range(300000) t(i)",
-            &bigview_lib::engine::RequestKey::default(),
+            &dataliq_lib::engine::RequestKey::default(),
         )
         .unwrap();
     let k = |op| Filter {
@@ -354,7 +354,7 @@ fn selected_rows_are_the_rows_the_grid_shows() {
     ];
     for spec in views {
         let view = engine
-            .open_view(&ds.id, &spec, &bigview_lib::engine::RequestKey::default())
+            .open_view(&ds.id, &spec, &dataliq_lib::engine::RequestKey::default())
             .unwrap();
         engine.materialize_view(&view.dataset.id).unwrap();
         let ranges = vec![[40_000, 40_003], [7, 9], [30_001, 30_002]];

@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 use arrow::array::{Array, AsArray};
 use arrow::ipc::reader::StreamReader;
 use arrow::record_batch::RecordBatch;
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::error::AppError;
-use bigview_lib::sources::{Compression, CsvOptions, FileFormat, OpenOptions, Source, SourceInfo};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::error::AppError;
+use dataliq_lib::sources::{Compression, CsvOptions, FileFormat, OpenOptions, Source, SourceInfo};
 
 fn fixture(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

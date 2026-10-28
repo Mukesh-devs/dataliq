@@ -12,7 +12,7 @@ All notable changes to this project are documented here. The format follows
   workspaces included: in the window on Windows and Linux (Alt or F10), native on macOS.
 - Settings (Ctrl+,): theme, density, memory limit and threads (applied at once), the cache's
   size and folder, the temporary folder, export defaults, update checks. The installers
-  register BigView for its file types.
+  register DataLiq for its file types.
 - Getting-started tips on the start screen and in Help, and a sample dataset to try
   everything on (Help › Open the sample dataset).
 - Updates from signed GitHub releases: Help › Check for updates, and a quiet daily check at
@@ -21,6 +21,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The app is now called **DataLiq**, with a new icon: a drop made of rows of data, speeding
+  forward. Workspaces are `.dataliq` files, and settings, cache and logs live in the
+  `app.dataliq.desktop` folders (settings from earlier builds start fresh).
 - A column profile of a column where nearly every value differs is 3× faster: its most common
   values are found by an estimate and counted exactly, and the panel says so.
 - Colours meet WCAG 2.2 AA contrast in both themes; focus is visible everywhere; the tab bar
@@ -39,7 +42,7 @@ databases, and workspaces that bring a whole session back.
 
 ### Added
 
-- Open a folder (Shift+Ctrl+O, the empty window, a drop, `bigview <folder>`) or a pattern such
+- Open a folder (Shift+Ctrl+O, the empty window, a drop, `dataliq <folder>`) or a pattern such
   as `logs/*.csv.gz` or `data/**/*.parquet` as one table: columns matched by name, a
   `filename` column saying where each row came from, plain and gzipped files mixed, other
   formats left out and listed. Folders whose files share a header open as fast as one file.
@@ -52,7 +55,7 @@ databases, and workspaces that bring a whole session back.
   also a database in the SQL panel (`SELECT * FROM shop.orders`), so files can be joined.
 - Workspaces: Save workspace (Ctrl+S) keeps every tab's file, import settings, filters, sort,
   search, column layout, chart and recipe, plus the SQL panel; Open workspace (or opening a
-  `.bigview` file) brings them back, finding the files again when the project folder moved.
+  `.dataliq` file) brings them back, finding the files again when the project folder moved.
 
 ### Changed
 
@@ -197,7 +200,7 @@ First version: a fast viewer for huge tabular files.
 - Background import into a disk cache with progress (incl. `.gz`), cancel, gzip integrity check, instant reopen of unchanged files, re-import on change, LRU size limit (default 20 GB), "Clear cache", free-space check with a "Read directly" fallback.
 - JSON (array or NDJSON, also `.gz`/`.zst`) with nested values shown as JSON that expands pretty-printed; Parquet queried in place with an instant row count and fast paging; DECIMAL and TIME values formatted correctly.
 - Excel `.xlsx` and `.xls`: sheet picker, header row detection and choice, typed columns (dates, numbers, booleans), cached formula values, fast streaming preview, background import.
-- Tabs (close button, middle-click, Ctrl+W, Ctrl+Tab / Ctrl+Shift+Tab), open several files at once, recent files, drag and drop, `bigview <files>` from a terminal, single instance (a second launch opens its files in the running app), macOS File menu.
+- Tabs (close button, middle-click, Ctrl+W, Ctrl+Tab / Ctrl+Shift+Tab), open several files at once, recent files, drag and drop, `dataliq <files>` from a terminal, single instance (a second launch opens its files in the running app), macOS File menu.
 - Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and CI on Windows, macOS and Linux.
 - Benchmarks: a small suite on 100 MB files with a regression guard (`pnpm bench`, `bench.yml`), on-demand large-file budgets, and a grid scroll check (`pnpm e2e:perf`).
 

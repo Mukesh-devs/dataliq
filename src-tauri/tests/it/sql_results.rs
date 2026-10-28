@@ -6,11 +6,11 @@ use std::path::{Path, PathBuf};
 use arrow::array::{Array, AsArray};
 use arrow::datatypes::{Float64Type, Int64Type};
 use arrow::ipc::reader::StreamReader;
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, Engine, RequestKey};
-use bigview_lib::error::AppError;
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, Engine, RequestKey};
+use dataliq_lib::error::AppError;
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{OpenOptions, Source};
 
 use crate::filters::fx;
 

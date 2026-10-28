@@ -13,7 +13,7 @@ tested, and anything left over.
 - CI (`.github/workflows/ci.yml`): checks + `tauri build --debug` on Ubuntu, macOS, Windows.
 - Docs: README, CHANGELOG, CONTRIBUTING, LICENSE (MIT), docs/ARCHITECTURE, DECISIONS, BENCHMARKS.
 - Tested: Vitest render test; `scripts/check.sh` passes locally (Linux); smoke check —
-  the debug binary opens a 1280×800 window showing "BigView" (Xvfb screenshot).
+  the debug binary opens a 1280×800 window showing "DataLiq" (Xvfb screenshot).
 - Left over: none.
 
 ### Step 2 — Design system and app shell ✅
@@ -38,7 +38,7 @@ tested, and anything left over.
 - Commands `run_query` (returns raw Arrow IPC via `tauri::ipc::Response`, capped at 100k rows)
   and `cancel_query`; per-command permissions in `capabilities/default.json`.
 - Frontend: `src/lib/arrow.ts` (decode + type mapping), `src/lib/ipc.ts` (typed `invoke`,
-  `BigViewError`), status bar shows the DuckDB version via a real Arrow round trip.
+  `DataLiqError`), status bar shows the DuckDB version via a real Arrow round trip.
 - Logging with `tracing` to stderr and a daily-rolling file in the app log dir.
 - Tested: 10 engine integration tests (types/values of a known query, IPC round trip vs a
   committed fixture, empty results keep schema, bound parameters, row cap, memory/temp/thread
@@ -181,7 +181,7 @@ tested, and anything left over.
 - Recent files (10, newest first, persisted) in the empty state.
 - Drag and drop via Tauri's webview drag-drop events (real paths): highlighted drop zone, or a
   "Drop to open in a new tab" overlay when files are open.
-- CLI: `bigview <files>` (relative paths resolved, flags ignored, `--` supported) opens at
+- CLI: `dataliq <files>` (relative paths resolved, flags ignored, `--` supported) opens at
   startup (`take_startup_files`); single instance (tauri-plugin-single-instance): a second
   launch forwards its files (`open-files` event), focuses the window and exits.
 - macOS File menu (Open…, Close Tab) — D22. Integration tests merged into one binary — D23.
@@ -192,7 +192,7 @@ tested, and anything left over.
   Playwright (3 files: two from one dialog + Ctrl+O, Ctrl+Tab / Ctrl+Shift+Tab, Ctrl+W, close
   buttons, reopen from recent files; drag-and-drop states and drop; startup files and forwarded
   "open-files"; same-row-count import switch; two concurrent imports). Smoke (real app, Xvfb +
-  D-Bus): `bigview comma.csv` opened at startup; `bigview semicolon.csv records.ndjson` from a
+  D-Bus): `dataliq comma.csv` opened at startup; `dataliq semicolon.csv records.ndjson` from a
   second launch exited in 0.06 s and both files opened as tabs in the running app with rows.
 - Left over: file associations are v1.0 (settings/installer).
 
@@ -685,7 +685,7 @@ tested, and anything left over.
   standalone SQL over both readers gives the same rows in plain DuckDB; Vitest for key
   suggestions, notes, changed cells, the dialog and the bar; Playwright for the whole flow,
   including the cell fills read from the canvas.
-- Smoke (real app): `bigview orders_v1.csv orders_v2.csv` → Compare from v1 (v2 and `id`
+- Smoke (real app): `dataliq orders_v1.csv orders_v2.csv` → Compare from v1 (v2 and `id`
   preselected) → "7 → 8 rows: 2 added · 1 removed · 4 changed · 2 the same", "Changed: qty 1 ·
   price 1 · note 2", both notes, the cells filled as expected in dark theme, 38 ms; "2 added"
   shows those 2 rows; Export → CSV through the save dialog gives exactly the documented rows.
@@ -732,7 +732,7 @@ tested, and anything left over.
 
 - Open folder (Shift+Ctrl+O, the empty window, the macOS File menu), "Open files matching a
   pattern…" in the palette (`logs/*.csv.gz`, `data/**/*.parquet`), dropping a folder, or
-  `bigview <folder>`: the files are read as one table, columns matched by name, with a
+  `dataliq <folder>`: the files are read as one table, columns matched by name, with a
   `filename` column (relative to the folder; `source_file` if the files have a `filename`).
 - The most common format wins; other formats and empty files are left out and counted in the
   header tooltip, which lists the files ("CSV · 3 files · mixed"). Plain and `.gz` files mix;
@@ -745,7 +745,7 @@ tested, and anything left over.
   files, patterns, NDJSON and Parquet folders, a `filename` column clash; Playwright for Open
   folder and a pattern from the palette, and the header's file list. The UI recordings gained
   the new `files` field.
-- Smoke (real app): `bigview sales/` (2024-01.csv, 2024-02.csv.gz, 2024-03.csv with an extra
+- Smoke (real app): `dataliq sales/` (2024-01.csv, 2024-02.csv.gz, 2024-03.csv with an extra
   `channel` column, and notes.json) → "CSV · 3 files · mixed · 15.7 KB", 900 rows imported in
   44 ms, columns `order_id, customer, amount, channel, filename`; sorted by filename the March
   rows have `channel`, the others are empty; searching `2024-02.csv.gz` → 300 of 900 rows.
@@ -754,7 +754,7 @@ tested, and anything left over.
 
 ### Step 2 — Open files from a URL (HTTP(S) and S3) ✅
 
-- "Open URL…" in the palette (or `bigview <url>`) opens `https://`, `http://` and `s3://`
+- "Open URL…" in the palette (or `dataliq <url>`) opens `https://`, `http://` and `s3://`
   CSV, TSV, JSON and Parquet files, gzipped or not, named after the file in the URL (no query)
   with "remote" in the header. Parquet is queried in place in byte ranges; CSV and JSON
   import into the session and are never cached (D44).
@@ -770,8 +770,8 @@ tested, and anything left over.
   with nothing cached, gzip, Parquet in place with a page from the middle, 404, a URL without
   an extension, Excel); Vitest for URL names; Playwright for Open URL (validation, tab title,
   header) and saving, reloading, keeping and removing S3 settings.
-- Smoke (real app, `python -m http.server`): `bigview http://127.0.0.1:8765/people.csv.gz` →
-  httpfs installed into `~/.cache/app.bigview.desktop/duckdb-extensions`, "CSV · GZIP · REMOTE",
+- Smoke (real app, `python -m http.server`): `dataliq http://127.0.0.1:8765/people.csv.gz` →
+  httpfs installed into `~/.cache/app.dataliq.desktop/duckdb-extensions`, "CSV · GZIP · REMOTE",
   1,000 rows imported in 172 ms; `types.parquet` from the Open URL box → 3 rows queried in
   place, all 18 types; `missing.csv` → "The server has no file at this address (HTTP 404)."
 - Left over: the container has no Secret Service, so storing S3 settings in a real keychain was
@@ -781,7 +781,7 @@ tested, and anything left over.
 ### Step 3 — SQLite and DuckDB files ✅
 
 - SQLite (`.sqlite`, `.sqlite3`, `.db`, `.db3`) and DuckDB (`.duckdb`, `.ddb`) files open like
-  any file (dialog, drop, `bigview shop.duckdb`), told apart by their header bytes, attached
+  any file (dialog, drop, `dataliq shop.duckdb`), told apart by their header bytes, attached
   read-only once per session under a name from the file (`Shop Data.duckdb` → `shop_data`),
   so the SQL panel can join their tables with anything else.
 - A "Table" picker in the header lists tables (DuckDB with row counts), views, and other
@@ -797,7 +797,7 @@ tested, and anything left over.
   changed SQLite file read again, an empty database and a database URL; Playwright for the
   picker (labels, SQL name, picking a table in another schema). UI recordings gained
   `database`.
-- Smoke (real app): `bigview "Shop Data.duckdb" chinook.sqlite` → "DUCKDB · 9.8 MB",
+- Smoke (real app): `dataliq "Shop Data.duckdb" chinook.sqlite` → "DUCKDB · 9.8 MB",
   customers (97 rows) queried in place; picking orders (2,000,000 rows) → in place, the last
   page at once; chinook → sqlite extension installed, artists imported in 12 ms; in the SQL
   panel `chinook.tracks JOIN chinook.artists` with `shop_data.orders` → 4 rows in 25 ms.
@@ -805,13 +805,13 @@ tested, and anything left over.
 
 ### Step 4 — Workspaces ✅
 
-- "Save workspace" (Ctrl/Cmd+S) and "Save workspace as…" (Shift) write a `.bigview` file:
+- "Save workspace" (Ctrl/Cmd+S) and "Save workspace as…" (Shift) write a `.dataliq` file:
   every file tab with its import settings, filters, sort and search, column layout, SQL name,
   chart, recipe and open side panel; the SQL panel's text, height and state; the side panels.
   Comparison and SQL result tabs are left out and counted in the notice. Save writes the same
   file again.
-- "Open workspace…" (palette), or a `.bigview` file from the dialog, drop, recent files or
-  `bigview work.bigview`, replaces the open tabs; each file reopens (from the cache when
+- "Open workspace…" (palette), or a `.dataliq` file from the dialog, drop, recent files or
+  `dataliq work.dataliq`, replaces the open tabs; each file reopens (from the cache when
   unchanged) and its view and recipe apply once its data is there. Files inside the
   workspace's folder are also saved by their path from there, so a moved project finds them
   (D46).
@@ -822,8 +822,8 @@ tested, and anything left over.
   text back, replaced tabs released); Playwright for Ctrl+S with the save dialog and opening
   from the palette (tabs, active tab, search, SQL text).
 - Smoke (real app): people.csv searched for "Paris" plus chinook.sqlite, the SQL panel open →
-  Ctrl+S suggested `people.bigview`, saved as `proj/work.bigview` with `data/…` relative
-  paths; the folder moved to `proj-moved`, then `bigview proj-moved/work.bigview` → both tabs
+  Ctrl+S suggested `people.dataliq`, saved as `proj/work.dataliq` with `data/…` relative
+  paths; the folder moved to `proj-moved`, then `dataliq proj-moved/work.dataliq` → both tabs
   from the new place, "167 of 1,000 rows · filtered", the SQL text and panel back.
 - Left over: none.
 
@@ -885,9 +885,9 @@ tested, and anything left over.
 - Settings (Ctrl+, / File › Settings… / ⌘, on macOS): theme, density, column histograms;
   memory limit and worker threads (applied at once), temporary folder; cache on/off and size
   (at once) and location (after a restart); quiet-import size; export defaults; how to make
-  BigView the default app. Values are checked by the backend and explained in words (D48).
+  DataLiq the default app. Values are checked by the backend and explained in words (D48).
 - File associations in the installers (CSV/TSV, JSON/NDJSON, Parquet, Excel, SQLite, DuckDB,
-  `.bigview`); on macOS files opened from the Finder arrive as an event and open like the
+  `.dataliq`); on macOS files opened from the Finder arrive as an event and open like the
   command line. Help › Keyboard shortcuts (from the commands themselves) and About.
 - Tested: unit tests for settings validation, live memory/thread limits; Vitest for the menus
   (titles, disabled items, separators, recent files and duplicates, macOS differences and
@@ -988,3 +988,22 @@ tested, and anything left over.
   release entry. License: MIT (LICENSE, package.json, Cargo.toml agree).
 - Tested: `pnpm lint`; every link in README and CONTRIBUTING points at a file in the
   repository.
+
+### Rename to DataLiq, new icon ✅
+
+- The app is DataLiq everywhere (D53): window and dialogs, menus, installers and their names
+  (`DataLiq_<v>_x64-setup.exe`, `DataLiq_<v>_universal.dmg`, `DataLiq_<v>_amd64.deb`, …), the
+  bundle identifier `app.dataliq.desktop`, the `dataliq` command, `.dataliq` workspaces,
+  recipe and workspace formats, the Rust crate and its snapshots, internal SQL names, storage
+  keys, workflows, release scripts and every document. A search of the repository, the
+  built binary and the .deb finds no trace of the old name. (Git history and earlier pull
+  request titles keep it: history is never rewritten.)
+- New icon (`assets/icon.svg`): a streamlined drop moving right, its body five rows of data in
+  a cyan-to-violet gradient, the middle rows streaming off its tail as speed lines, on a deep
+  navy tile; rendered to every platform size with `tauri icon`, and shown in Help › About and
+  at the top of the README.
+- Tested: the full check (Rust tests with the renamed snapshots, Vitest, Playwright, the
+  Tauri bundles); the icon checked at 1024, 64 and 32 px on light and dark backgrounds.
+- Smoke (real app, Linux): About shows the icon and "DataLiq 0.6.0"; the data folder is
+  `app.dataliq.desktop`; the .deb installs `/usr/bin/dataliq` with `Name=DataLiq` and the new
+  icon.

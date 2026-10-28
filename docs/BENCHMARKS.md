@@ -62,33 +62,33 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Compare 50M against 50M rows by key (5M differences) | — (report) | 14.0 s; differences written in full 8.5 s | v0.5 step 3 |
 | Data quality check of 50M rows (9 columns) | — (report) | 6.5 s | v0.5 step 4 |
 
-Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
+Import numbers come from `cargo test -p dataliq --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
 so `.csv.gz` imports are bounded by it (plus our parallel integrity check on another core).
 
-Preview numbers come from `cargo test -p bigview --test it perf_preview -- --ignored --nocapture`
+Preview numbers come from `cargo test -p dataliq --test it perf_preview -- --ignored --nocapture`
 (dev profile) and the app's status bar.
 
 ## v0.1.0 — linux-dev
 
 **Startup** (release build, Xvfb with software rendering, 6 runs): the window
 is mapped 0.12–0.16 s after launch; the UI is ready (React mounted, first IPC
-call, logged as `frontend ready`) after 0.86–0.89 s. With `bigview comma.csv`
+call, logged as `frontend ready`) after 0.86–0.89 s. With `dataliq comma.csv`
 the file's rows are on screen after ~1.0 s.
 
 **Idle memory** (release, no file open, 12 s after launch, PSS summed over the
-`bigview`, `WebKitWebProcess` and `WebKitNetworkProcess` processes):
+`dataliq`, `WebKitWebProcess` and `WebKitNetworkProcess` processes):
 
 | Process | PSS | of which private (anonymous) |
 | --- | --- | --- |
-| bigview (Rust + DuckDB + GTK) | 104 MiB | 33 MiB |
+| dataliq (Rust + DuckDB + GTK) | 104 MiB | 33 MiB |
 | WebKitWebProcess (UI) | 115 MiB | 36 MiB |
 | WebKitNetworkProcess | 22 MiB | 8 MiB |
 | **Total** | **241 MiB** | **77 MiB** |
 
 The budget is missed on PSS but met on private memory. Most of the rest is
 shared library code mapped from disk: WebKitGTK and JavaScriptCore (~85 MiB
-across the three processes), the bigview binary itself (29 MiB, mostly
+across the three processes), the dataliq binary itself (29 MiB, mostly
 DuckDB) and `libLLVM` (36 MiB), which is only loaded because Xvfb has no GPU
 and WebKit falls back to llvmpipe software GL. On a desktop with a GPU driver
 that part goes away. These pages are clean and shared with other WebKitGTK
@@ -151,7 +151,7 @@ Measured on Windows, macOS and Linux in the v1.0 performance pass: see
 
 ## v0.2 — views on 50M cached rows (linux-dev)
 
-`cargo test -p bigview --test it perf_views_50m -- --ignored --nocapture` on
+`cargo test -p dataliq --test it perf_views_50m -- --ignored --nocapture` on
 `sales_50m.parquet` imported into a cache database (9 columns: ids, dates,
 timestamps, text, decimals, booleans). "First rows" is `open_view` plus the
 first 500-row page, i.e. what the user waits for.
@@ -200,7 +200,7 @@ The CI guard (baseline from the runner, D26) runs on the v0.2.0 tag.
 
 ### Column profiles (v0.2 step 6)
 
-`cargo test -p bigview --test it perf_profile_50m -- --ignored --nocapture`, same 50M rows,
+`cargo test -p dataliq --test it perf_profile_50m -- --ignored --nocapture`, same 50M rows,
 warm cache. One profile is the stats query (count, nulls, min, max, mean, std dev, distinct —
 HyperLogLog above 10M rows), the histogram and the 10 most common values.
 
@@ -222,7 +222,7 @@ or date column; they load behind the grid and are cancelled by the next view cha
 
 ## v0.3 — exports and SQL on 50M cached rows (linux-dev)
 
-`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_export -- --ignored --nocapture
+`PERF_CACHE_DB=<db> cargo test -p dataliq --test it perf_export -- --ignored --nocapture
 --test-threads=1` (dev profile, warm cache): the same 50M rows (9 columns) as v0.2, exported
 through `export::export` exactly as the app does (view query, `.partial` file and rename).
 "Peak" is the growth of the process's peak memory during that export.
@@ -286,7 +286,7 @@ CI guard on the tag is the one that counts (D26).
 
 ## v0.4 — charts on 50M cached rows (linux-dev)
 
-`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_charts_50m -- --ignored --nocapture`
+`PERF_CACHE_DB=<db> cargo test -p dataliq --test it perf_charts_50m -- --ignored --nocapture`
 (dev profile, warm cache), through `Engine::chart_data` exactly as the chart panel asks.
 
 | Chart | Points | Time |
@@ -308,7 +308,7 @@ after the cache file had not been read for a day waited for this container's dis
 
 ## v0.5 — cleaning, comparing and quality on 50M cached rows (linux-dev)
 
-`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_recipe_compare_50m perf_quality_50m --
+`PERF_CACHE_DB=<db> cargo test -p dataliq --test it perf_recipe_compare_50m perf_quality_50m --
 --ignored --nocapture --test-threads=1` (dev profile, warm cache), through the engine calls the
 panels make.
 
@@ -346,7 +346,7 @@ importing or paging; the guard against the CI runner's baseline passes (all with
 
 ## v0.6 — folders, databases and URLs (linux-dev)
 
-`cargo test -p bigview --test it perf_sources -- --ignored --nocapture --test-threads=1` (dev
+`cargo test -p dataliq --test it perf_sources -- --ignored --nocapture --test-threads=1` (dev
 profile), through the calls the app makes when opening each kind of source. Measured on a
 fresh container (the machine changed since v0.5.0; see the small suite below).
 

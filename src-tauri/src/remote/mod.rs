@@ -17,10 +17,10 @@ use crate::engine::sql::literal;
 use crate::error::{AppError, Result};
 
 /// The keychain entry for the S3 settings.
-const KEYCHAIN_SERVICE: &str = "BigView";
+const KEYCHAIN_SERVICE: &str = "DataLiq";
 const KEYCHAIN_USER: &str = "s3";
 /// The DuckDB secret made from them.
-const SECRET: &str = "bigview_s3";
+const SECRET: &str = "dataliq_s3";
 
 /// A path that is a URL DuckDB can read: `http(s)://` or `s3://`.
 pub fn is_url(path: &Path) -> bool {
@@ -224,7 +224,7 @@ mod tests {
         };
         assert_eq!(
             secret_sql(&s),
-            "CREATE OR REPLACE TEMPORARY SECRET bigview_s3 (TYPE s3, KEY_ID 'AKIA''1', SECRET 's3cr3t')"
+            "CREATE OR REPLACE TEMPORARY SECRET dataliq_s3 (TYPE s3, KEY_ID 'AKIA''1', SECRET 's3cr3t')"
         );
         s.region = Some("eu-west-1".into());
         s.endpoint = Some("http://minio.local:9000/".into());
@@ -232,7 +232,7 @@ mod tests {
         s.use_ssl = Some(false);
         assert_eq!(
             secret_sql(&s),
-            "CREATE OR REPLACE TEMPORARY SECRET bigview_s3 (TYPE s3, KEY_ID 'AKIA''1', SECRET 's3cr3t', \
+            "CREATE OR REPLACE TEMPORARY SECRET dataliq_s3 (TYPE s3, KEY_ID 'AKIA''1', SECRET 's3cr3t', \
              REGION 'eu-west-1', ENDPOINT 'minio.local:9000', URL_STYLE 'path', USE_SSL false)"
         );
         // The UI never sees the secret.

@@ -1,4 +1,4 @@
-//! Saving and opening workspaces (`.bigview` files).
+//! Saving and opening workspaces (`.dataliq` files).
 
 use std::path::PathBuf;
 

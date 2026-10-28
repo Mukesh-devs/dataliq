@@ -6,11 +6,11 @@
 use std::path::{Path, PathBuf};
 
 use arrow::array::{Array, AsArray};
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::compare::{CompareSpec, Comparison};
-use bigview_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::compare::{CompareSpec, Comparison};
+use dataliq_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{OpenOptions, Source};
 
 use crate::filters::people;
 

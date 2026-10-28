@@ -105,17 +105,17 @@ jobs:
       - name: Updater config
         shell: bash
         env:
-          BIGVIEW_UPDATER_PUBKEY: ${{ vars.BIGVIEW_UPDATER_PUBKEY }}
+          DATALIQ_UPDATER_PUBKEY: ${{ vars.DATALIQ_UPDATER_PUBKEY }}
           HAS_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -z "$BIGVIEW_UPDATER_PUBKEY" ]; then
-            echo "::notice::No BIGVIEW_UPDATER_PUBKEY: this release can't update itself (docs/RELEASING.md)."
+          if [ -z "$DATALIQ_UPDATER_PUBKEY" ]; then
+            echo "::notice::No DATALIQ_UPDATER_PUBKEY: this release can't update itself (docs/RELEASING.md)."
             exit 0
           fi
           if [ "$HAS_PRIVATE_KEY" != "true" ]; then
-            echo "::error::BIGVIEW_UPDATER_PUBKEY is set but the TAURI_SIGNING_PRIVATE_KEY secret is missing."
+            echo "::error::DATALIQ_UPDATER_PUBKEY is set but the TAURI_SIGNING_PRIVATE_KEY secret is missing."
             exit 1
           fi
           node scripts/updater-config.mjs target/updater.conf.json
@@ -220,6 +220,6 @@ jobs:
             gh release upload "$TAG" $files --clobber
           else
             gh release create "$TAG" $files --draft --verify-tag \
-              --title "BigView $VERSION" --notes-file out/notes.md
+              --title "DataLiq $VERSION" --notes-file out/notes.md
           fi
           echo "Draft release $TAG: review it on GitHub, then publish." >> "$GITHUB_STEP_SUMMARY"

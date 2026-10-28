@@ -128,7 +128,7 @@ export const MENUS: MenuSpec[] = [
       sep,
       { command: "keyboard-shortcuts", label: "Keyboard shortcuts" },
       { command: "check-updates", label: "Check for updates…" },
-      { command: "about", label: "About BigView" },
+      { command: "about", label: "About DataLiq" },
     ],
   },
 ];

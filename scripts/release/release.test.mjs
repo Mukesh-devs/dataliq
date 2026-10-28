@@ -15,30 +15,30 @@ import {
 
 const v = "1.0.0";
 const bundles = [
-  `BigView_${v}_x64-setup.exe`,
-  `BigView_${v}_x64_en-US.msi`,
-  `BigView_${v}_universal.dmg`,
-  `BigView_${v}_universal.app.tar.gz`,
-  `BigView_${v}_amd64.AppImage`,
-  `BigView_${v}_amd64.deb`,
-  `BigView-${v}-1.x86_64.rpm`,
+  `DataLiq_${v}_x64-setup.exe`,
+  `DataLiq_${v}_x64_en-US.msi`,
+  `DataLiq_${v}_universal.dmg`,
+  `DataLiq_${v}_universal.app.tar.gz`,
+  `DataLiq_${v}_amd64.AppImage`,
+  `DataLiq_${v}_amd64.deb`,
+  `DataLiq-${v}-1.x86_64.rpm`,
 ];
 
 test("every installer Tauri builds is released, nothing else", () => {
   for (const name of bundles) assert.ok(classify(name), name);
   for (const name of [
-    "BigView.app",
-    `BigView_${v}_amd64.AppImage.sig`,
-    "bigview",
+    "DataLiq.app",
+    `DataLiq_${v}_amd64.AppImage.sig`,
+    "dataliq",
     "latest.json",
-    `BigView_${v}_aarch64.dmg`,
+    `DataLiq_${v}_aarch64.dmg`,
   ])
     assert.equal(classify(name), null, name);
 });
 
 test("the macOS update bundle gets the version in its name", () => {
-  assert.equal(releaseName("BigView.app.tar.gz", v), `BigView_${v}_universal.app.tar.gz`);
-  assert.equal(releaseName(`BigView_${v}_amd64.deb`, v), `BigView_${v}_amd64.deb`);
+  assert.equal(releaseName("DataLiq.app.tar.gz", v), `DataLiq_${v}_universal.app.tar.gz`);
+  assert.equal(releaseName(`DataLiq_${v}_amd64.deb`, v), `DataLiq_${v}_amd64.deb`);
 });
 
 test("latest.json lists each signed bundle under every key the updater looks up", () => {
@@ -69,8 +69,8 @@ test("latest.json lists each signed bundle under every key the updater looks up"
     "windows-x86_64-nsis",
   ]);
   assert.deepEqual(manifest.platforms["windows-x86_64"], {
-    signature: `sig of BigView_${v}_x64-setup.exe`,
-    url: `https://github.com/o/r/releases/download/v1.0.0/BigView_${v}_x64-setup.exe`,
+    signature: `sig of DataLiq_${v}_x64-setup.exe`,
+    url: `https://github.com/o/r/releases/download/v1.0.0/DataLiq_${v}_x64-setup.exe`,
   });
   assert.equal(
     manifest.platforms["darwin-aarch64"].url,
@@ -87,8 +87,8 @@ test("no signatures, no manifest; two bundles for one key is an error", () => {
       buildManifest({
         ...base,
         files: [
-          { name: `BigView_${v}_amd64.deb`, signature: "a" },
-          { name: `BigView_${v}_amd64.deb`, signature: "b" },
+          { name: `DataLiq_${v}_amd64.deb`, signature: "a" },
+          { name: `DataLiq_${v}_amd64.deb`, signature: "b" },
         ],
       }),
     /two update bundles for linux-x86_64-deb/,

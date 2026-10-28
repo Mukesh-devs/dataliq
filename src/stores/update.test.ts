@@ -60,7 +60,7 @@ describe("update store", () => {
     await useUpdate.getState().autoCheck();
     expect(api.checkUpdate).toHaveBeenCalledTimes(1);
 
-    localStorage.setItem("bigview.lastUpdateCheck", String(Date.now() - 25 * 3600 * 1000));
+    localStorage.setItem("dataliq.lastUpdateCheck", String(Date.now() - 25 * 3600 * 1000));
     api.checkUpdate.mockResolvedValue(info);
     await useUpdate.getState().autoCheck();
     expect(useUpdate.getState()).toMatchObject({ phase: "available", info, open: true });

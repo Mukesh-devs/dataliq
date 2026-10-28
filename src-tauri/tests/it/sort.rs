@@ -8,9 +8,9 @@ use std::io::Cursor;
 use arrow::array::AsArray;
 use arrow::datatypes::Int64Type;
 use arrow::ipc::reader::StreamReader;
-use bigview_lib::engine::{DatasetSource, Engine, Param, RequestKey};
-use bigview_lib::import;
-use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
+use dataliq_lib::engine::{DatasetSource, Engine, Param, RequestKey};
+use dataliq_lib::import;
+use dataliq_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
 
 use crate::filters::{Person, fx};
 
@@ -63,7 +63,7 @@ fn expected(
     rows.iter().map(|p| p.id).collect()
 }
 
-fn open(fx: &crate::filters::Fx, spec: &ViewSpec) -> bigview_lib::view::OpenedView {
+fn open(fx: &crate::filters::Fx, spec: &ViewSpec) -> dataliq_lib::view::OpenedView {
     fx.engine
         .open_view(&fx.dataset.id, spec, &RequestKey::default())
         .unwrap()
@@ -185,7 +185,7 @@ fn scratch_tables(engine: &Engine) -> Vec<String> {
     let conn = engine.connection().unwrap();
     let mut stmt = conn
         .prepare(
-            "SELECT table_name FROM duckdb_tables() WHERE database_name = 'bv_scratch' ORDER BY 1",
+            "SELECT table_name FROM duckdb_tables() WHERE database_name = 'dl_scratch' ORDER BY 1",
         )
         .unwrap();
     stmt.query_map([], |r| r.get(0))
@@ -238,7 +238,7 @@ fn a_newer_sort_cancels_an_older_one_in_the_same_group() {
              CAST(range AS VARCHAR) AS t FROM range(10000000)",
         )
         .unwrap();
-    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+    fx.engine.datasets.insert(dataliq_lib::engine::Dataset {
         id: "big".into(),
         source: DatasetSource::Table("big".into()),
         row_count: 10_000_000,
@@ -280,7 +280,7 @@ fn a_newer_sort_cancels_an_older_one_in_the_same_group() {
     let fast = engine.open_view(&fx.dataset.id, &spec, &newer).unwrap();
     let old = slow.join().unwrap();
     assert!(
-        matches!(old, Err(bigview_lib::error::AppError::Cancelled)),
+        matches!(old, Err(dataliq_lib::error::AppError::Cancelled)),
         "{:?}",
         old.map(|v| v.dataset)
     );
@@ -306,7 +306,7 @@ fn sorting_a_parquet_file_queried_in_place() {
             path.to_string_lossy().replace('\'', "''")
         ))
         .unwrap();
-    let source = bigview_lib::sources::Source::new(&path, Default::default()).unwrap();
+    let source = dataliq_lib::sources::Source::new(&path, Default::default()).unwrap();
     let ds = import::open_in_place(&fx.engine, &source).unwrap();
     let v = fx
         .engine
@@ -331,7 +331,7 @@ fn sorting_a_parquet_file_queried_in_place() {
 /// served before the full sort is written; middle pages wait for it.
 #[test]
 fn big_sorts_show_first_and_last_rows_before_the_full_sort() {
-    use bigview_lib::engine::datasets::MAX_HEAD;
+    use dataliq_lib::engine::datasets::MAX_HEAD;
     let fx = fx();
     let n: u64 = 3 * MAX_HEAD;
     fx.engine
@@ -339,7 +339,7 @@ fn big_sorts_show_first_and_last_rows_before_the_full_sort() {
             "CREATE TABLE mid AS SELECT range AS id, hash(range) % 1000 AS k FROM range({n})"
         ))
         .unwrap();
-    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+    fx.engine.datasets.insert(dataliq_lib::engine::Dataset {
         id: "mid".into(),
         source: DatasetSource::Table("mid".into()),
         row_count: n,
@@ -429,7 +429,7 @@ fn big_sorts_show_first_and_last_rows_before_the_full_sort() {
 
 #[test]
 fn pages_in_between_read_through_the_row_order_before_the_full_sort() {
-    use bigview_lib::engine::datasets::MAX_HEAD;
+    use dataliq_lib::engine::datasets::MAX_HEAD;
     let fx = fx();
     let n: u64 = 4 * MAX_HEAD;
     fx.engine
@@ -438,7 +438,7 @@ fn pages_in_between_read_through_the_row_order_before_the_full_sort() {
              'n' || (range % 13) AS name FROM range({n})"
         ))
         .unwrap();
-    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+    fx.engine.datasets.insert(dataliq_lib::engine::Dataset {
         id: "ord".into(),
         source: DatasetSource::Table("ord".into()),
         row_count: n,
@@ -524,7 +524,7 @@ fn pages_in_between_read_through_the_row_order_before_the_full_sort() {
 
 #[test]
 fn the_tail_serves_the_last_rows_in_order() {
-    use bigview_lib::engine::datasets::MAX_HEAD;
+    use dataliq_lib::engine::datasets::MAX_HEAD;
     let fx = fx();
     let n: u64 = 3 * MAX_HEAD + 123;
     fx.engine
@@ -532,7 +532,7 @@ fn the_tail_serves_the_last_rows_in_order() {
             "CREATE TABLE t3 AS SELECT range AS id, CASE WHEN range % 7 = 0 THEN NULL ELSE hash(range) % 50 END AS k FROM range({n})"
         ))
         .unwrap();
-    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+    fx.engine.datasets.insert(dataliq_lib::engine::Dataset {
         id: "t3".into(),
         source: DatasetSource::Table("t3".into()),
         row_count: n,
@@ -564,7 +564,7 @@ fn the_tail_serves_the_last_rows_in_order() {
     };
     fx.engine
         .execute_batch(&format!(
-            "CREATE TABLE bv_scratch.main.manual_tail AS {reversed} LIMIT {MAX_HEAD}"
+            "CREATE TABLE dl_scratch.main.manual_tail AS {reversed} LIMIT {MAX_HEAD}"
         ))
         .unwrap();
     assert!(params.is_empty());
@@ -573,7 +573,7 @@ fn the_tail_serves_the_last_rows_in_order() {
             tail, tail_rows, ..
         } = s
         {
-            *tail = Some("bv_scratch.main.manual_tail".into());
+            *tail = Some("dl_scratch.main.manual_tail".into());
             *tail_rows = MAX_HEAD;
         }
     }));

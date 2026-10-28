@@ -44,7 +44,7 @@ pub struct UpdateProgress {
     pub total: Option<u64>,
 }
 
-const NOT_CONFIGURED: &str = "This build of BigView can't update itself (it was built without an update key). \
+const NOT_CONFIGURED: &str = "This build of DataLiq can't update itself (it was built without an update key). \
      Download new versions from the releases page.";
 
 fn failed(what: &str, e: tauri_plugin_updater::Error) -> AppError {

@@ -44,7 +44,7 @@ test("the latest version, and a failed check with Try again", async ({ page }) =
     };
   });
   await dialog.getByRole("button", { name: "Try again" }).click();
-  await expect(dialog).toContainText("BigView 1.0.0 is the latest version.");
+  await expect(dialog).toContainText("DataLiq 1.0.0 is the latest version.");
 });
 
 test("a newer version found at startup: notes, then install with progress", async ({ page }) => {
@@ -52,7 +52,7 @@ test("a newer version found at startup: notes, then install with progress", asyn
   await setUpdate(page, { status: configured, info: newer });
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Updates" });
-  await expect(dialog).toContainText("BigView 1.1.0 is available");
+  await expect(dialog).toContainText("DataLiq 1.1.0 is available");
   await expect(dialog).toContainText("You have 1.0.0. Released 2026-11-02.");
   await expect(dialog.getByLabel("Release notes")).toContainText("A new chart type.");
 
@@ -78,7 +78,7 @@ test("no startup check when it's turned off in Settings", async ({ page }) => {
   await setUpdate(page, { status: configured, info: newer });
   await page.addInitScript(() =>
     localStorage.setItem(
-      "bigview.settings",
+      "dataliq.settings",
       JSON.stringify({ state: { checkUpdates: false }, version: 0 }),
     ),
   );

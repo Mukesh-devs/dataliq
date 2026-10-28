@@ -9,11 +9,11 @@ use std::time::{Duration, Instant};
 use arrow::array::AsArray;
 use arrow::datatypes::Int64Type;
 use arrow::ipc::reader::StreamReader;
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::error::AppError;
-use bigview_lib::import::{self, ImportOutcome, ImportProgress, ImportTarget, Imports};
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::error::AppError;
+use dataliq_lib::import::{self, ImportOutcome, ImportProgress, ImportTarget, Imports};
+use dataliq_lib::sources::{OpenOptions, Source};
 
 struct Env {
     _tmp: tempfile::TempDir,

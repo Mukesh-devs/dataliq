@@ -1,17 +1,17 @@
 //! Exports and SQL over 50M cached rows. Needs `pnpm fixtures sales_50m.parquet`,
 //! or a database it was imported into (`PERF_CACHE_DB`, as `perf_sort` keeps).
 //! Ignored by default:
-//!   PERF_CACHE_DB=<path> cargo test -p bigview --test it perf_export -- --ignored --nocapture --test-threads=1
+//!   PERF_CACHE_DB=<path> cargo test -p dataliq --test it perf_export -- --ignored --nocapture --test-threads=1
 //! `PERF_ONLY=parquet,xlsx,…` runs some of the cases.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use bigview_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, Param, RequestKey};
-use bigview_lib::export::{self, ExportFormat, ExportOptions, ExportRequest, Exports};
-use bigview_lib::settings::Settings;
-use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
+use dataliq_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, Param, RequestKey};
+use dataliq_lib::export::{self, ExportFormat, ExportOptions, ExportRequest, Exports};
+use dataliq_lib::settings::Settings;
+use dataliq_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
 
 /// The process's peak resident memory since the last reset, in MiB.
 fn peak_mib() -> f64 {
@@ -242,7 +242,7 @@ fn perf_export_50m() {
                 result.row_count,
                 page.elapsed().as_secs_f64() * 1000.0
             );
-            bigview_lib::import::close_dataset(&engine, &result.id).unwrap();
+            dataliq_lib::import::close_dataset(&engine, &result.id).unwrap();
         }
     }
 }
@@ -251,7 +251,7 @@ fn perf_export_50m() {
 #[test]
 #[ignore = "needs generated fixtures; a minute or two"]
 fn perf_charts_50m() {
-    use bigview_lib::chart::{Agg, Bucket, ChartKind, ChartSpec, Measure};
+    use dataliq_lib::chart::{Agg, Bucket, ChartKind, ChartSpec, Measure};
     let Some((engine, ds, _tmp)) = setup() else {
         eprintln!("sales_50m.parquet not generated, skipping");
         return;
@@ -378,8 +378,8 @@ fn perf_quality_50m() {
 #[test]
 #[ignore = "needs generated fixtures; a few minutes"]
 fn perf_recipe_compare_50m() {
-    use bigview_lib::compare::CompareSpec;
-    use bigview_lib::recipe::{Case, NewType, RecipeStep, Step};
+    use dataliq_lib::compare::CompareSpec;
+    use dataliq_lib::recipe::{Case, NewType, RecipeStep, Step};
     let Some((engine, ds, _tmp)) = setup() else {
         eprintln!("sales_50m.parquet not generated, skipping");
         return;
@@ -425,7 +425,7 @@ fn perf_recipe_compare_50m() {
     // A typical edit against the file: some rows removed, empty discounts filled.
     let edit = vec![
         on(Step::RemoveRows {
-            filter: bigview_lib::view::Filter {
+            filter: dataliq_lib::view::Filter {
                 column: "quantity".into(),
                 op: FilterOp::Equals {
                     value: Param::Int(1),

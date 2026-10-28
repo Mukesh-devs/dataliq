@@ -27,7 +27,7 @@ describe("Tips", () => {
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByRole("region", { name: "Getting started" })).not.toBeInTheDocument();
     expect(useOnboarding.getState().tipsHidden).toBe(true);
-    expect(JSON.parse(localStorage.getItem("bigview.onboarding")!).state.tipsHidden).toBe(true);
+    expect(JSON.parse(localStorage.getItem("dataliq.onboarding")!).state.tipsHidden).toBe(true);
   });
 
   it("closes from the corner button", async () => {

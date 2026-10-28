@@ -1,8 +1,10 @@
-# BigView
+<p align="center"><img src="assets/icon.svg" width="112" alt="DataLiq icon: a drop made of data rows, speeding forward"></p>
+
+# DataLiq
 
 > Drag in a 5 GB file. See data in 1 second. Filter, query, and export without loading it into RAM.
 
-BigView is a free, open-source, cross-platform desktop app for exploring huge
+DataLiq is a free, open-source, cross-platform desktop app for exploring huge
 tabular files: CSV, TSV, Parquet, JSON/NDJSON and Excel, including `.gz`
 compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app),
 Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
@@ -85,7 +87,7 @@ _The screenshots show the built-in sample dataset (Help › Open the sample data
   inconsistent date formats, outliers and duplicate rows, each one showing
   exactly the affected rows and, where it can, fixing them with one click.
 - **Workspaces** (Ctrl+S): save the open tabs with their filters, layout,
-  charts and recipes, and the SQL panel, as a `.bigview` file and open it
+  charts and recipes, and the SQL panel, as a `.dataliq` file and open it
   again later, even after moving the project folder.
 - A **menu bar** with every action (File, Edit, View, Data, Help), recent
   files and workspaces; **Settings** (Ctrl+,) for theme, density, memory,
@@ -93,13 +95,13 @@ _The screenshots show the built-in sample dataset (Help › Open the sample data
 - Light and dark themes that follow your OS.
 - **First run**: three short tips, and a sample dataset (50,000 made-up orders) to try
   everything on before you have a file at hand.
-- **Updates** from signed GitHub releases: BigView checks at most once a day (you can turn it
+- **Updates** from signed GitHub releases: DataLiq checks at most once a day (you can turn it
   off), shows what's new, and installs only when you say so.
 - **Accessible**: WCAG 2.2 AA contrast in both themes, every action reachable from the
   keyboard (menus, the command palette, a command per column for sorting, filtering and
   profiles), visible focus everywhere; checked by automated tests.
 - Tabs, recent files and drag and drop; open files from a terminal with
-  `bigview data.csv.gz other.parquet` (a second launch opens them in the
+  `dataliq data.csv.gz other.parquet` (a second launch opens them in the
   running app).
 
 ## Keyboard shortcuts
@@ -148,7 +150,7 @@ every number per OS is in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## How it works
 
-BigView is a [Tauri](https://tauri.app) app: a Rust backend with an embedded
+DataLiq is a [Tauri](https://tauri.app) app: a Rust backend with an embedded
 [DuckDB](https://duckdb.org) engine, and a React interface drawn in the system's web view
 (WebView2, WKWebView or WebKitGTK), so the installers are small and nothing runs in a browser.
 
@@ -176,21 +178,21 @@ Download the installer for your system from the
 [releases page](https://github.com/mukesh-dsnl/dataliq/releases); each release lists SHA-256
 checksums of its files.
 
-- **Windows 10/11 (x64)**: `BigView_<version>_x64-setup.exe` (installs for you only, no admin
-  rights needed) or `BigView_<version>_x64_en-US.msi` (for managed machines). WebView2 is
+- **Windows 10/11 (x64)**: `DataLiq_<version>_x64-setup.exe` (installs for you only, no admin
+  rights needed) or `DataLiq_<version>_x64_en-US.msi` (for managed machines). WebView2 is
   included in Windows 11 and installed by the setup if missing. If SmartScreen warns about an
   unrecognised app, choose More info › Run anyway.
-- **macOS 12 or later**: `BigView_<version>_universal.dmg` (Apple silicon and Intel). Open it
-  and drag BigView to Applications. If the release isn't notarized, the first time
-  right-click BigView › Open.
-- **Linux (x64)**: `BigView_<version>_amd64.AppImage` (any distribution: `chmod +x`, then run
-  it), `.deb` (Debian, Ubuntu: `sudo apt install ./BigView_<version>_amd64.deb`) or `.rpm`
-  (Fedora, openSUSE: `sudo dnf install ./BigView-<version>-1.x86_64.rpm`). They need
+- **macOS 12 or later**: `DataLiq_<version>_universal.dmg` (Apple silicon and Intel). Open it
+  and drag DataLiq to Applications. If the release isn't notarized, the first time
+  right-click DataLiq › Open.
+- **Linux (x64)**: `DataLiq_<version>_amd64.AppImage` (any distribution: `chmod +x`, then run
+  it), `.deb` (Debian, Ubuntu: `sudo apt install ./DataLiq_<version>_amd64.deb`) or `.rpm`
+  (Fedora, openSUSE: `sudo dnf install ./DataLiq-<version>-1.x86_64.rpm`). They need
   WebKitGTK 4.1, preinstalled on most desktops.
 
-The installers register BigView for CSV, TSV, JSON, NDJSON, Parquet, Excel, SQLite and DuckDB
-files and `.bigview` workspaces (Settings says how to make it the default app). From a
-terminal, `bigview data.csv.gz other.parquet` opens files in a running BigView.
+The installers register DataLiq for CSV, TSV, JSON, NDJSON, Parquet, Excel, SQLite and DuckDB
+files and `.dataliq` workspaces (Settings says how to make it the default app). From a
+terminal, `dataliq data.csv.gz other.parquet` opens files in a running DataLiq.
 
 ## Building from source
 
@@ -217,5 +219,5 @@ Releases are made as described in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## License
 
-[MIT](LICENSE). BigView uses DuckDB (MIT), Tauri (MIT/Apache-2.0) and other open-source
+[MIT](LICENSE). DataLiq uses DuckDB (MIT), Tauri (MIT/Apache-2.0) and other open-source
 libraries under their own licenses.

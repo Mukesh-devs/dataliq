@@ -70,7 +70,7 @@ pub struct BuiltView {
 /// id while the full sort is written.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RowOrder {
-    /// `SELECT rowid AS __bv_r FROM <table> [WHERE ...] ORDER BY ...`, with
+    /// `SELECT rowid AS __dl_r FROM <table> [WHERE ...] ORDER BY ...`, with
     /// the view's `params`.
     pub rows: String,
     /// A page of the view from a table written from `rows` (named by
@@ -80,7 +80,7 @@ pub struct RowOrder {
 }
 
 /// Stands for the written order table in [`RowOrder::page`].
-pub const ORDER_TABLE: &str = "__BV_ORDER_TABLE__";
+pub const ORDER_TABLE: &str = "__DL_ORDER_TABLE__";
 
 /// Builds the SQL for `spec` over `relation`, whose columns are `schema`.
 pub fn build(spec: &ViewSpec, relation: &Relation, schema: &[ColumnMeta]) -> Result<BuiltView> {
@@ -126,16 +126,16 @@ pub fn build_at(
         (!order.is_empty() && relation.row_order.as_deref() == Some("rowid")).then(|| {
             // The order table's own rowid is the position in the view.
             let shown = if projection == "*" {
-                "* EXCLUDE (__bv_r, __bv_pos)".to_string()
+                "* EXCLUDE (__dl_r, __dl_pos)".to_string()
             } else {
                 projection.clone()
             };
             RowOrder {
-                rows: format!("SELECT rowid AS __bv_r {from} ORDER BY {order}"),
+                rows: format!("SELECT rowid AS __dl_r {from} ORDER BY {order}"),
                 page: format!(
-                    "SELECT {shown} FROM {table} AS __bv_d JOIN (SELECT __bv_r, rowid AS __bv_pos \
-                 FROM {ORDER_TABLE} WHERE rowid >= ? AND rowid < ?) AS __bv_p \
-                 ON __bv_d.rowid = __bv_p.__bv_r ORDER BY __bv_pos",
+                    "SELECT {shown} FROM {table} AS __dl_d JOIN (SELECT __dl_r, rowid AS __dl_pos \
+                 FROM {ORDER_TABLE} WHERE rowid >= ? AND rowid < ?) AS __dl_p \
+                 ON __dl_d.rowid = __dl_p.__dl_r ORDER BY __dl_pos",
                     table = relation.sql
                 ),
             }
@@ -206,7 +206,7 @@ pub fn standalone_sql(
         sql.push_str(&format!("FROM {reader}"));
     } else {
         // Number the rows in file order (an unused name) as the tiebreak.
-        let mut row = "bigview_row".to_string();
+        let mut row = "dataliq_row".to_string();
         while schema.iter().any(|c| c.name == row) {
             row.insert(0, '_');
         }

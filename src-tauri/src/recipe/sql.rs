@@ -11,7 +11,7 @@ use crate::sources::ColumnMeta;
 use crate::view::{Filter, ProfileKind, Relation, ViewSpec, build};
 
 /// Row position kept while removing duplicates (not a name users have).
-const POS: &str = "__bigview_pos";
+const POS: &str = "__dataliq_pos";
 
 fn column<'a>(schema: &'a [ColumnMeta], name: &str) -> Result<&'a ColumnMeta> {
     schema
@@ -46,7 +46,7 @@ fn check_new_name(schema: &[ColumnMeta], name: &str, except: Option<&str>) -> Re
     }
     if name == POS {
         return Err(AppError::Query(format!(
-            "\"{POS}\" is a name BigView uses itself."
+            "\"{POS}\" is a name DataLiq uses itself."
         )));
     }
     if schema

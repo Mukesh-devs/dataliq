@@ -32,6 +32,6 @@ export const useRecent = create<RecentState>()(
       remove: (path) => set((s) => ({ files: s.files.filter((f) => f.path !== path) })),
       clear: () => set({ files: [] }),
     }),
-    { name: "bigview.recent" },
+    { name: "dataliq.recent" },
   ),
 );

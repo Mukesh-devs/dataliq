@@ -4,13 +4,13 @@
 
 use std::path::PathBuf;
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::quality::{QualityReport, WarningKind};
-use bigview_lib::recipe::RecipeStep;
-use bigview_lib::sources::{OpenOptions, Source};
-use bigview_lib::view::ViewSpec;
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::quality::{QualityReport, WarningKind};
+use dataliq_lib::recipe::RecipeStep;
+use dataliq_lib::sources::{OpenOptions, Source};
+use dataliq_lib::view::ViewSpec;
 
 struct Fx {
     engine: Engine,

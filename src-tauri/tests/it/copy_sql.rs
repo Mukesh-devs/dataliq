@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use arrow::array::{Array, AsArray};
-use bigview_lib::engine::{Param, RequestKey};
-use bigview_lib::sources::{OpenOptions, Source};
-use bigview_lib::view::{self, Filter, FilterOp, Relation, SortKey, ViewSpec};
+use dataliq_lib::engine::{Param, RequestKey};
+use dataliq_lib::sources::{OpenOptions, Source};
+use dataliq_lib::view::{self, Filter, FilterOp, Relation, SortKey, ViewSpec};
 
 use crate::filters::{Fx, fx};
 
@@ -202,9 +202,9 @@ fn copied_sql_uses_display_names_and_reads_like_sql() {
         sql,
         format!(
             "SELECT \"name\" AS \"Full \"\"name\"\"\", \"id\"\n\
-             FROM (SELECT *, row_number() OVER () AS \"bigview_row\" FROM {reader})\n\
+             FROM (SELECT *, row_number() OVER () AS \"dataliq_row\" FROM {reader})\n\
              WHERE \"id\" <= 10\n\
-             ORDER BY \"name\" ASC NULLS LAST, \"bigview_row\";",
+             ORDER BY \"name\" ASC NULLS LAST, \"dataliq_row\";",
             reader = Source::new(&people_path(), OpenOptions::default())
                 .unwrap()
                 .resolve_dialect(&fx.engine)

@@ -8,10 +8,10 @@ use arrow::array::{Array, AsArray};
 use arrow::datatypes::DataType;
 use arrow::ipc::reader::StreamReader;
 use arrow::record_batch::RecordBatch;
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{Compression, FileFormat, OpenOptions, Source, SourceInfo};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{Compression, FileFormat, OpenOptions, Source, SourceInfo};
 
 fn fixture(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

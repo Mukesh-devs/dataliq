@@ -3,8 +3,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use bigview_lib::engine::{Param, RequestKey};
-use bigview_lib::view::{BINS, Filter, FilterOp, ProfileKind, TOP_VALUES, ViewSpec};
+use dataliq_lib::engine::{Param, RequestKey};
+use dataliq_lib::view::{BINS, Filter, FilterOp, ProfileKind, TOP_VALUES, ViewSpec};
 
 use crate::filters::{Person, fx};
 
@@ -12,7 +12,7 @@ fn profile(
     fx: &crate::filters::Fx,
     spec: &ViewSpec,
     column: &str,
-) -> bigview_lib::view::ColumnProfile {
+) -> dataliq_lib::view::ColumnProfile {
     fx.engine
         .column_profile(&fx.dataset.id, spec, column, &RequestKey::default())
         .unwrap()
@@ -172,7 +172,7 @@ fn top_values_and_filters() {
                 not: false,
             },
         ],
-        sort: vec![bigview_lib::view::SortKey {
+        sort: vec![dataliq_lib::view::SortKey {
             column: "amount".into(),
             descending: true,
         }],
@@ -287,9 +287,9 @@ fn small_integer_ranges_get_one_bar_per_value() {
              FROM range(103)",
         )
         .unwrap();
-    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+    fx.engine.datasets.insert(dataliq_lib::engine::Dataset {
         id: "stars".into(),
-        source: bigview_lib::engine::DatasetSource::Table("stars".into()),
+        source: dataliq_lib::engine::DatasetSource::Table("stars".into()),
         row_count: 103,
         cached: true,
     });
@@ -345,9 +345,9 @@ fn near_unique_columns_still_list_every_common_value() {
          FROM range(1500000)",
     )
     .unwrap();
-    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+    fx.engine.datasets.insert(dataliq_lib::engine::Dataset {
         id: "ids".into(),
-        source: bigview_lib::engine::DatasetSource::Table("ids".into()),
+        source: dataliq_lib::engine::DatasetSource::Table("ids".into()),
         row_count: 1_500_000,
         cached: true,
     });
@@ -355,7 +355,7 @@ fn near_unique_columns_still_list_every_common_value() {
         .engine
         .column_profile("ids", &ViewSpec::default(), "id", &RequestKey::default())
         .unwrap();
-    assert!(p.distinct.unwrap() > bigview_lib::view::APPROX_TOP_DISTINCT);
+    assert!(p.distinct.unwrap() > dataliq_lib::view::APPROX_TOP_DISTINCT);
     assert!(p.top_approx);
     assert!(p.top_truncated);
     let top: Vec<(Option<&str>, u64)> = p

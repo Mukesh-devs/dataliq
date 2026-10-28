@@ -1,5 +1,5 @@
 {
-  "name": "bigview",
+  "name": "dataliq",
   "private": true,
   "version": "0.6.0",
   "description": "Open huge tabular files instantly. Filter, query with SQL, chart and export without loading them into RAM.",

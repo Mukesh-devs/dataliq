@@ -1,15 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="#4f46e5"/>
-  <g fill="#ffffff">
-    <rect x="232" y="272" width="560" height="96" rx="24"/>
-    <rect x="232" y="416" width="160" height="80" rx="20" opacity="0.9"/>
-    <rect x="432" y="416" width="160" height="80" rx="20" opacity="0.9"/>
-    <rect x="632" y="416" width="160" height="80" rx="20" opacity="0.9"/>
-    <rect x="232" y="536" width="160" height="80" rx="20" opacity="0.7"/>
-    <rect x="432" y="536" width="160" height="80" rx="20" opacity="0.7"/>
-    <rect x="632" y="536" width="160" height="80" rx="20" opacity="0.7"/>
-    <rect x="232" y="656" width="160" height="80" rx="20" opacity="0.5"/>
-    <rect x="432" y="656" width="160" height="80" rx="20" opacity="0.5"/>
-    <rect x="632" y="656" width="160" height="80" rx="20" opacity="0.5"/>
+  <!-- DataLiq: rows of data flowing into a drop in flight (round head ahead,
+       streamlined tail behind), with rows streaming off the tail for speed. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a3d"/>
+      <stop offset="1" stop-color="#1b0f45"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#6d7cff"/>
+      <stop offset="1" stop-color="#b48cff"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0.95"/>
+    </linearGradient>
+    <!-- The drop: round head at the right, streamlined tail at the left. -->
+    <clipPath id="drop">
+      <path d="M 196 512 C 350 376, 466 282, 650 282 A 230 230 0 0 1 650 742 C 466 742, 350 648, 196 512 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#tile)"/>
+
+  <!-- Rows streaming off the tail (behind the drop). -->
+  <g fill="url(#trail)">
+    <rect x="132" y="400" width="250" height="30" rx="15"/>
+    <rect x="96" y="497" width="200" height="30" rx="15"/>
+    <rect x="132" y="594" width="250" height="30" rx="15"/>
   </g>
+
+  <!-- Data rows inside the drop. -->
+  <g clip-path="url(#drop)" fill="url(#flow)">
+    <rect x="180" y="282" width="720" height="72"/>
+    <rect x="180" y="379" width="720" height="72"/>
+    <rect x="180" y="476" width="720" height="72"/>
+    <rect x="180" y="573" width="720" height="72"/>
+    <rect x="180" y="670" width="720" height="72"/>
+  </g>
+
+  <!-- A glint on the head. -->
+  <path d="M 712 330 A 178 178 0 0 1 822 448" fill="none" stroke="#ffffff" stroke-opacity="0.55"
+        stroke-width="22" stroke-linecap="round"/>
 </svg>

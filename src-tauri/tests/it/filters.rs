@@ -5,11 +5,11 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, Engine, EngineConfig, Param, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{OpenOptions, Source};
-use bigview_lib::view::{Filter, FilterOp, ViewSpec};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, Engine, EngineConfig, Param, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{OpenOptions, Source};
+use dataliq_lib::view::{Filter, FilterOp, ViewSpec};
 
 #[derive(Debug)]
 pub(crate) struct Person {

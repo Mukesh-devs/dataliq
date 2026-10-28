@@ -1,4 +1,4 @@
-# Contributing to BigView
+# Contributing to DataLiq
 
 Thanks for helping! Bug reports, ideas, documentation and code are all welcome.
 
@@ -6,9 +6,9 @@ Thanks for helping! Bug reports, ideas, documentation and code are all welcome.
 
 Open an issue with what you did, what you expected and what happened instead. For a file
 that doesn't open or looks wrong, say its format, size and (if you can) share a few lines
-that reproduce it: BigView never uploads anything, so we only see what you attach. Help ›
-About shows the BigView and DuckDB versions; the log is in the app's data folder
-(`logs/bigview.log.<date>`).
+that reproduce it: DataLiq never uploads anything, so we only see what you attach. Help ›
+About shows the DataLiq and DuckDB versions; the log is in the app's data folder
+(`logs/dataliq.log.<date>`).
 
 ## Setting up
 

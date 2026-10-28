@@ -123,7 +123,7 @@ export const useExport = create<ExportState>()(
       },
     }),
     {
-      name: "bigview.export",
+      name: "dataliq.export",
       partialize: (s) => ({ defaults: s.defaults }),
       merge: (persisted, current) => ({
         ...current,

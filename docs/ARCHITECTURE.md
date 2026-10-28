@@ -1,6 +1,6 @@
 # Architecture
 
-BigView never loads a whole file into memory and never sends more rows to the
+DataLiq never loads a whole file into memory and never sends more rows to the
 UI than are visible. DuckDB reads from disk; the UI only receives small Apache
 Arrow pages and small aggregates.
 
@@ -22,7 +22,7 @@ src-tauri/              Rust backend (Tauri v2)
   src/compare/          comparing two files by key
   src/quality/          data quality warnings and fixes
   src/remote/           HTTP and S3 sources, keychain credentials
-  src/workspace/        .bigview workspace files
+  src/workspace/        .dataliq workspace files
   src/settings.rs       settings.json (memory, threads, cache, folders)
   src/menu.rs           the native macOS menu bar
   src/sample.rs         the sample dataset

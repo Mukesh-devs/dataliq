@@ -27,8 +27,8 @@ pub const CHANGED: &str = "changed";
 /// Suffix of the column holding a changed column's old value.
 pub const BEFORE: &str = " (before)";
 
-const POS: &str = "__bigview_pos";
-const DUP: &str = "__bigview_dup";
+const POS: &str = "__dataliq_pos";
+const DUP: &str = "__dataliq_dup";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

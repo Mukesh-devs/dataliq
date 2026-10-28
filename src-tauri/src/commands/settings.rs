@@ -38,7 +38,7 @@ pub struct SettingsInfo {
 #[serde(rename_all = "camelCase")]
 pub struct SavedSettings {
     pub settings: Settings,
-    /// A folder changed: it applies when BigView restarts.
+    /// A folder changed: it applies when DataLiq restarts.
     pub restart_needed: bool,
 }
 

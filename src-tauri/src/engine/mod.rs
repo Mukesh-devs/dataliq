@@ -146,7 +146,7 @@ impl Engine {
     }
 
     /// Schema for session-only tables (materialized views), attached on first
-    /// use: `bv_scratch.main`. On disk, so big views are compressed and
+    /// use: `dl_scratch.main`. On disk, so big views are compressed and
     /// don't count against the memory limit.
     pub fn scratch_schema(&self) -> Result<&'static str> {
         let mut scratch = self.scratch.lock();
@@ -158,12 +158,12 @@ impl Engine {
             ));
             let _ = std::fs::remove_file(&path);
             self.execute_batch(&format!(
-                "ATTACH '{}' AS bv_scratch",
+                "ATTACH '{}' AS dl_scratch",
                 path.to_string_lossy().replace('\'', "''")
             ))?;
             *scratch = Some(path);
         }
-        Ok("bv_scratch.main")
+        Ok("dl_scratch.main")
     }
 
     /// Runs a statement that returns no rows (e.g. `CREATE TABLE … AS`),
@@ -389,7 +389,7 @@ impl Drop for Engine {
             let _ = self
                 .root
                 .lock()
-                .execute_batch("DETACH DATABASE IF EXISTS bv_scratch");
+                .execute_batch("DETACH DATABASE IF EXISTS dl_scratch");
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(path.with_extension("duckdb.wal"));
         }

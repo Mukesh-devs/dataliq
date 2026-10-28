@@ -83,7 +83,7 @@ impl Settings {
     pub fn effective_temp_dir(&self) -> PathBuf {
         self.temp_dir
             .clone()
-            .unwrap_or_else(|| std::env::temp_dir().join("bigview-spill"))
+            .unwrap_or_else(|| std::env::temp_dir().join("dataliq-spill"))
     }
 }
 

@@ -14,6 +14,6 @@ export const useOnboarding = create<OnboardingState>()(
       tipsHidden: false,
       hideTips: () => set({ tipsHidden: true }),
     }),
-    { name: "bigview.onboarding" },
+    { name: "dataliq.onboarding" },
   ),
 );

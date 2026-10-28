@@ -31,7 +31,7 @@ mkdirSync(outDir, { recursive: true });
 run("cargo", ["run", "--quiet", "-p", "gen_fixtures", "--", "small"]);
 run(
   "cargo",
-  ["test", "-p", "bigview", "--test", "it", "bench_small", "--", "--ignored", "--nocapture"],
+  ["test", "-p", "dataliq", "--test", "it", "bench_small", "--", "--ignored", "--nocapture"],
   { BENCH_OUT: outPath },
 );
 

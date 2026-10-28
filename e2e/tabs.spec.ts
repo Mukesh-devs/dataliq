@@ -80,7 +80,7 @@ test("files from the command line open at startup and from a second launch", asy
   await mockTauri(page, { startupFiles: ["/data/comma.csv"] });
   await page.goto("/");
   await expect(tab(page, "comma.csv")).toBeVisible();
-  // `bigview semicolon.csv` while the app runs: the single-instance plugin
+  // `dataliq semicolon.csv` while the app runs: the single-instance plugin
   // forwards the files as an "open-files" event.
   await emitEvent(page, "open-files", ["/data/semicolon.csv", "/data/nulls.csv"]);
   await expect(page.getByRole("tab")).toHaveCount(3);

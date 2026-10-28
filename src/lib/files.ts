@@ -253,7 +253,7 @@ export const FILE_EXTENSIONS = [
   "duckdb",
   "ddb",
   // Workspaces (open the tabs they saved).
-  "bigview",
+  "dataliq",
 ];
 
 /** Shows the native open dialog. Resolves to [] when cancelled. */
@@ -291,7 +291,7 @@ export function takeStartupFiles(): Promise<string[]> {
   return call<string[]>("take_startup_files");
 }
 
-/** Files forwarded by a second `bigview <files>` launch. */
+/** Files forwarded by a second `dataliq <files>` launch. */
 export async function onOpenFiles(handler: (paths: string[]) => void): Promise<() => void> {
   const { listen } = await import("@tauri-apps/api/event");
   return listen<string[]>("open-files", (e) => handler(e.payload));

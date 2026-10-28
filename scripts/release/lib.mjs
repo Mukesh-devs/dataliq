@@ -32,7 +32,7 @@ export function classify(name) {
 
 /**
  * The name a bundle is released under. Tauri names the macOS update bundle
- * `BigView.app.tar.gz` with no version; give it one, like the others.
+ * `DataLiq.app.tar.gz` with no version; give it one, like the others.
  */
 export function releaseName(name, version) {
   return name.endsWith(".app.tar.gz") && !name.includes(version)

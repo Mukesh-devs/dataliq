@@ -1,13 +1,13 @@
 //! Preview speed budgets on generated large files (`pnpm fixtures ...`).
 //! Ignored by default; run with:
-//!   cargo test -p bigview --test it perf_preview -- --ignored --nocapture
+//!   cargo test -p dataliq --test it perf_preview -- --ignored --nocapture
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::settings::Settings;
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::settings::Settings;
+use dataliq_lib::sources::{OpenOptions, Source};
 
 fn generated(name: &str) -> Option<PathBuf> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -77,7 +77,7 @@ fn preview_5gb_ndjson_gz() {
 #[test]
 #[ignore = "needs generated fixtures"]
 fn parquet_50m_open_and_page() {
-    use bigview_lib::import;
+    use dataliq_lib::import;
     let Some(path) = generated("sales_50m.parquet") else {
         eprintln!("sales_50m.parquet: not generated, skipping");
         return;

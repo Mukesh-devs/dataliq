@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "BigView",
+  "productName": "DataLiq",
   "version": "0.6.0",
-  "identifier": "app.bigview.desktop",
+  "identifier": "app.dataliq.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "BigView",
+        "title": "DataLiq",
         "width": 1280,
         "height": 800,
         "minWidth": 720,
@@ -29,7 +29,7 @@
     "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "Open huge tabular files instantly",
-    "longDescription": "BigView opens huge CSV, Parquet, JSON and Excel files (including .gz) instantly and lets you filter, query with SQL, chart and export them without loading them into RAM.",
+    "longDescription": "DataLiq opens huge CSV, Parquet, JSON and Excel files (including .gz) instantly and lets you filter, query with SQL, chart and export them without loading them into RAM.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -107,12 +107,12 @@
       },
       {
         "ext": [
-          "bigview"
+          "dataliq"
         ],
-        "name": "BigView workspace",
-        "description": "BigView workspace: open tabs, views and SQL",
+        "name": "DataLiq workspace",
+        "description": "DataLiq workspace: open tabs, views and SQL",
         "role": "Editor",
-        "mimeType": "application/x-bigview-workspace"
+        "mimeType": "application/x-dataliq-workspace"
       }
     ],
     "windows": {

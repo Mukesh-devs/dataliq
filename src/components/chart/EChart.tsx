@@ -4,7 +4,7 @@ import * as echarts from "echarts/core";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 
-// Only the chart types and parts BigView draws (keeps the bundle small).
+// Only the chart types and parts DataLiq draws (keeps the bundle small).
 echarts.use([
   BarChart,
   LineChart,

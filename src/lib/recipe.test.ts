@@ -122,7 +122,7 @@ describe("recipe files", () => {
     ];
     const sql = await readableScript("ds1", steps, "read_csv('p.csv')", "people.csv");
     expect(sql).toBe(
-      "-- BigView recipe for people.csv: 1 step.\n" +
+      "-- DataLiq recipe for people.csv: 1 step.\n" +
         "-- Runs as-is in DuckDB: it reads the file and gives the cleaned rows.\n" +
         "WITH base AS (…)\nSELECT * FROM step_1;",
     );

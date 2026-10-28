@@ -75,7 +75,7 @@ pub fn cache_key(stamp: &SourceStamp, options: &OpenOptions) -> String {
     let mut h = Sha256::new();
     // Format version: bump to invalidate every cache entry after a change
     // in how imports are written.
-    h.update(b"bigview-cache-v2\0");
+    h.update(b"dataliq-cache-v2\0");
     h.update(stamp.path.to_string_lossy().as_bytes());
     h.update(b"\0");
     h.update(stamp.size.to_le_bytes());

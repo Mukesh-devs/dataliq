@@ -184,7 +184,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
       void refreshCache();
       notice(
         out.restartNeeded
-          ? "Settings saved. The new folders are used when BigView restarts."
+          ? "Settings saved. The new folders are used when DataLiq restarts."
           : "Settings saved.",
       );
       onDone();
@@ -375,7 +375,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
               checked={draft.checkUpdates}
               onChange={(e) => setDraft({ ...draft, checkUpdates: e.target.checked })}
             />
-            Check for a new version when BigView starts (once a day at most)
+            Check for a new version when DataLiq starts (once a day at most)
           </label>
           <p className="text-[12px] text-fg-muted">
             Only the version number is asked for; your files never leave this computer. Help › Check
@@ -385,10 +385,10 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
 
         <Section title="File types">
           <p className="text-[12px] text-fg-muted">
-            The installer registers BigView for {types}.{" "}
+            The installer registers DataLiq for {types}.{" "}
             {isMac
-              ? "To open them with BigView by default, use Get Info › Open with › Change All in the Finder."
-              : "To open them with BigView by default, choose Open with › BigView › Always in your file manager."}
+              ? "To open them with DataLiq by default, use Get Info › Open with › Change All in the Finder."
+              : "To open them with DataLiq by default, choose Open with › DataLiq › Always in your file manager."}
           </p>
         </Section>
 

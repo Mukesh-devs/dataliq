@@ -234,7 +234,7 @@ export const useSql = create<SqlState>()(
       },
     }),
     {
-      name: "bigview.sql",
+      name: "dataliq.sql",
       partialize: (s) => ({ open: s.open, height: s.height, text: s.text }),
     },
   ),

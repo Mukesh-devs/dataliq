@@ -41,7 +41,7 @@ export const useSettings = create<SettingsState>()(
       cycleTheme: () => set((s) => ({ theme: nextTheme[s.theme] })),
     }),
     {
-      name: "bigview.settings",
+      name: "dataliq.settings",
       partialize: (s) => ({
         theme: s.theme,
         density: s.density,

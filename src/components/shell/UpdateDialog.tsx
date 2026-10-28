@@ -23,15 +23,15 @@ export function UpdateDialog() {
         >
           <h2 className="font-semibold text-fg">
             {phase === "available" || installing
-              ? `BigView ${info?.version} is available`
+              ? `DataLiq ${info?.version} is available`
               : "Updates"}
           </h2>
           <div aria-live="polite" className="flex flex-col gap-2 text-fg-muted">
             {phase === "checking" && <p>Checking for updates…</p>}
-            {phase === "latest" && <p>BigView {currentVersion} is the latest version.</p>}
+            {phase === "latest" && <p>DataLiq {currentVersion} is the latest version.</p>}
             {phase === "unavailable" && (
               <p>
-                This build of BigView can&apos;t update itself (it was built without an update key).
+                This build of DataLiq can&apos;t update itself (it was built without an update key).
                 Download new versions from the releases page.
               </p>
             )}
@@ -40,7 +40,7 @@ export function UpdateDialog() {
                 <p>
                   You have {info.currentVersion}.
                   {info.date && ` Released ${info.date.slice(0, 10)}.`} The download is checked
-                  against BigView&apos;s signing key before it&apos;s installed.
+                  against DataLiq&apos;s signing key before it&apos;s installed.
                 </p>
                 {info.notes && (
                   <div
@@ -60,7 +60,7 @@ export function UpdateDialog() {
                         progress.total ? ` of ${formatBytes(progress.total)}` : ""
                       }`
                     : "Starting the download…"}{" "}
-                  BigView restarts when it&apos;s installed.
+                  DataLiq restarts when it&apos;s installed.
                 </p>
                 <div
                   role="progressbar"

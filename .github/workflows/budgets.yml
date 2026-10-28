@@ -53,13 +53,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           # Same cache as the CI check job on this OS.
-          shared-key: bigview-${{ matrix.os }}
+          shared-key: dataliq-${{ matrix.os }}
 
       - name: Build
         run: |
           mkdir -p target
           cargo build --release -p gen_fixtures
-          cargo test -p bigview --test it --no-run
+          cargo test -p dataliq --test it --no-run
 
       # `measure <fixture> <test>...`: generates the fixture, runs the tests,
       # deletes the fixture. Test names are exact (`module::test`).
@@ -71,7 +71,7 @@ jobs:
             echo "::group::$fixture"
             cargo run -q --release -p gen_fixtures -- "$fixture" 2>&1 | tee -a "$LOG"
             for t in "$@"; do
-              cargo test -q -p bigview --test it "$t" -- --ignored --nocapture --exact \
+              cargo test -q -p dataliq --test it "$t" -- --ignored --nocapture --exact \
                 --test-threads=1 2>&1 | tee -a "$LOG"
             done
             rm -f "fixtures/generated/$fixture"
@@ -87,7 +87,7 @@ jobs:
           for t in perf_preview::parquet_50m_open_and_page perf_sort::perf_views_50m \
                    perf_sort::perf_profile_50m perf_export::perf_charts_50m \
                    perf_export::perf_quality_50m; do
-            cargo test -q -p bigview --test it "$t" -- --ignored --nocapture --exact \
+            cargo test -q -p dataliq --test it "$t" -- --ignored --nocapture --exact \
               --test-threads=1 2>&1 | tee -a "$LOG" || status=1
           done
           exit $status

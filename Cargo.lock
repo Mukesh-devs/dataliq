@@ -484,39 +484,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
-name = "bigview"
-version = "0.6.0"
-dependencies = [
- "arrow",
- "base64 0.22.1",
- "calamine",
- "chrono",
- "criterion",
- "dirs",
- "duckdb",
- "flate2",
- "glob",
- "insta",
- "keyring",
- "parking_lot",
- "rust_xlsxwriter",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-single-instance",
- "tauri-plugin-updater",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1209,6 +1176,39 @@ dependencies = [
  "darling_core",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "dataliq"
+version = "0.6.0"
+dependencies = [
+ "arrow",
+ "base64 0.22.1",
+ "calamine",
+ "chrono",
+ "criterion",
+ "dirs",
+ "duckdb",
+ "flate2",
+ "glob",
+ "insta",
+ "keyring",
+ "parking_lot",
+ "rust_xlsxwriter",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-updater",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]

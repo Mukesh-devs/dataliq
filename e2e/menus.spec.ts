@@ -85,7 +85,7 @@ test("settings are saved and applied", async ({ page }) => {
   await box.getByLabel("Default format").selectOption("parquet");
   await box.getByRole("button", { name: "Save" }).click();
   await expect(box).toBeHidden();
-  await expect(page.getByRole("status")).toContainText("used when BigView restarts");
+  await expect(page.getByRole("status")).toContainText("used when DataLiq restarts");
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   const saved = await invokes(page, "save_settings");
   expect(saved.at(-1)).toEqual({

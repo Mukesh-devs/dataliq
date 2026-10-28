@@ -32,7 +32,7 @@ interface UpdateState {
   install: () => Promise<void>;
 }
 
-const LAST_CHECK_KEY = "bigview.lastUpdateCheck";
+const LAST_CHECK_KEY = "dataliq.lastUpdateCheck";
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 

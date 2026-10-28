@@ -1,9 +1,9 @@
 //! The sample dataset: written once, the same every time, and opened like
 //! any CSV with the types and values the tips rely on.
 
-use bigview_lib::engine::{Engine, EngineConfig};
-use bigview_lib::sample::{SAMPLE_FILE, SAMPLE_ROWS, sample_dataset};
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::engine::{Engine, EngineConfig};
+use dataliq_lib::sample::{SAMPLE_FILE, SAMPLE_ROWS, sample_dataset};
+use dataliq_lib::sources::{OpenOptions, Source};
 
 fn engine(tmp: &tempfile::TempDir) -> Engine {
     Engine::open_in_memory(&EngineConfig {

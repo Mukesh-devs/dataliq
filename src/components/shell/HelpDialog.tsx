@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { modKey } from "../../lib/platform";
 import { allCommands, useCommands } from "../../stores/commands";
 import { useEngine } from "../../stores/engine";
+import logo from "../../../assets/icon.svg";
 import { Button } from "../ui/Button";
 import { TipSteps } from "./Tips";
 
@@ -53,7 +54,10 @@ function About() {
   }, []);
   return (
     <div className="flex flex-col gap-1.5">
-      <h2 className="font-semibold text-fg">BigView{version && ` ${version}`}</h2>
+      <div className="flex items-center gap-3">
+        <img src={logo} alt="" className="size-12" />
+        <h2 className="text-[15px] font-semibold text-fg">DataLiq{version && ` ${version}`}</h2>
+      </div>
       <p className="text-fg-muted">
         A fast viewer for big CSV, JSON, Parquet and Excel files, with filters, SQL, charts and
         cleaning. Everything runs on this computer.
@@ -64,7 +68,7 @@ function About() {
 }
 
 const LABELS: Record<HelpTopic, string> = {
-  about: "About BigView",
+  about: "About DataLiq",
   shortcuts: "Keyboard shortcuts",
   tips: "Getting-started tips",
 };

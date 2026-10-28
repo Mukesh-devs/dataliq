@@ -3,14 +3,14 @@
 //! the exported script gives the same rows in plain DuckDB.
 
 use arrow::array::{Array, AsArray};
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Dataset, Param, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::recipe::{
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Dataset, Param, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::recipe::{
     Case, NewType, RecipeFile, RecipeOutcome, RecipeStep, Step, load_recipe, save_recipe,
 };
-use bigview_lib::sources::{OpenOptions, Source};
-use bigview_lib::view::{Filter, FilterOp};
+use dataliq_lib::sources::{OpenOptions, Source};
+use dataliq_lib::view::{Filter, FilterOp};
 
 use crate::filters::{Fx, fx};
 
@@ -38,7 +38,7 @@ fn rows(fx: &Fx, out: &RecipeOutcome) -> Rows {
         .collect::<Vec<_>>()
         .join(", ");
     let sql = match &out.dataset.source {
-        bigview_lib::engine::DatasetSource::Query { sql, .. } => sql.clone(),
+        dataliq_lib::engine::DatasetSource::Query { sql, .. } => sql.clone(),
         other => panic!("{other:?}"),
     };
     let q = fx

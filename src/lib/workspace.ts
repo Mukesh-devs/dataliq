@@ -6,9 +6,9 @@ import type { RecipeStep } from "./recipe";
 import type { ViewSpec } from "./view";
 
 /** A workspace file's extension. */
-export const WORKSPACE_EXTENSION = "bigview";
+export const WORKSPACE_EXTENSION = "dataliq";
 
-export const isWorkspacePath = (path: string) => /\.bigview$/i.test(path);
+export const isWorkspacePath = (path: string) => /\.dataliq$/i.test(path);
 
 /** A tab as saved in a workspace: its file and what was set on it. */
 export interface SavedTab {
@@ -78,7 +78,7 @@ export function loadWorkspace(path: string): Promise<WorkspaceFile> {
   return call("load_workspace", { path });
 }
 
-/** `sales.csv` → `sales.bigview`; no tabs → `workspace.bigview`. */
+/** `sales.csv` → `sales.dataliq`; no tabs → `workspace.dataliq`. */
 export function workspaceFileName(firstTitle: string | undefined): string {
   const base = (firstTitle ?? "").split(/[\\/]/).pop()?.split(".")[0]?.trim();
   return `${base || "workspace"}.${WORKSPACE_EXTENSION}`;
@@ -88,7 +88,7 @@ export async function pickWorkspaceSave(name: string): Promise<string | null> {
   const { save } = await import("@tauri-apps/plugin-dialog");
   return save({
     defaultPath: name,
-    filters: [{ name: "BigView workspace", extensions: [WORKSPACE_EXTENSION] }],
+    filters: [{ name: "DataLiq workspace", extensions: [WORKSPACE_EXTENSION] }],
   });
 }
 
@@ -97,7 +97,7 @@ export async function pickWorkspaceOpen(): Promise<string | null> {
   const picked = await open({
     multiple: false,
     directory: false,
-    filters: [{ name: "BigView workspace", extensions: [WORKSPACE_EXTENSION] }],
+    filters: [{ name: "DataLiq workspace", extensions: [WORKSPACE_EXTENSION] }],
   });
   return Array.isArray(picked) ? (picked[0] ?? null) : picked;
 }

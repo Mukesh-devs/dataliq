@@ -1,7 +1,7 @@
 [package]
 name = "gen_fixtures"
 version = "0.0.0"
-description = "Generates BigView's large, git-ignored test fixtures"
+description = "Generates DataLiq's large, git-ignored test fixtures"
 edition = "2024"
 license = "MIT"
 publish = false

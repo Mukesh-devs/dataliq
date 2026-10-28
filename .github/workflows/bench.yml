@@ -46,7 +46,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           # Same cache as the CI check job on this OS.
-          shared-key: bigview-${{ matrix.os }}
+          shared-key: dataliq-${{ matrix.os }}
 
       - name: Benchmarks
         run: node scripts/bench.mjs
