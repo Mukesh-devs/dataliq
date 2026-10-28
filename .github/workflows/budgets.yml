@@ -1,0 +1,109 @@
+name: Budgets
+
+# Every performance budget of docs/BENCHMARKS.md on Windows, macOS and Linux,
+# on the large generated fixtures (5 GB files, 50M rows). Run by hand before a
+# release: about an hour per OS. Each 5 GB file is generated, measured and
+# deleted in turn so the runner's disk holds one at a time.
+#
+# Budgets with an assertion (first rows, Parquet open and page) fail the job;
+# the others print their numbers for the per-OS tables. The log of each OS is
+# uploaded, and its measurements are copied to the job summary.
+on:
+  workflow_dispatch:
+  # Also when this workflow changes, so a new version measures at once.
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/budgets.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  budgets:
+    name: Budgets (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      LOG: ${{ github.workspace }}/target/budgets.log
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space (Linux)
+        if: runner.os == 'Linux'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Install Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Same cache as the CI check job on this OS.
+          shared-key: bigview-${{ matrix.os }}
+
+      - name: Build
+        run: |
+          mkdir -p target
+          cargo build --release -p gen_fixtures
+          cargo test -p bigview --test it --no-run
+
+      # `measure <fixture> <test>...`: generates the fixture, runs the tests,
+      # deletes the fixture. Test names are exact (`module::test`).
+      - name: Measure
+        run: |
+          set -o pipefail
+          measure() {
+            local fixture=$1; shift
+            echo "::group::$fixture"
+            cargo run -q --release -p gen_fixtures -- "$fixture" 2>&1 | tee -a "$LOG"
+            for t in "$@"; do
+              cargo test -q -p bigview --test it "$t" -- --ignored --nocapture --exact \
+                --test-threads=1 2>&1 | tee -a "$LOG"
+            done
+            rm -f "fixtures/generated/$fixture"
+            echo "::endgroup::"
+          }
+          export PERF_CACHE_DB="$RUNNER_TEMP/sales_50m.duckdb"
+          status=0
+          measure sales_5gb.csv perf_preview::preview_5gb_csv perf_import::import_5gb_csv || status=1
+          measure sales_5gb.csv.gz perf_preview::preview_5gb_csv_gz perf_import::import_5gb_csv_gz || status=1
+          measure logs_5gb.ndjson.gz perf_preview::preview_5gb_ndjson_gz || status=1
+          # The 50M-row table is imported once (PERF_CACHE_DB) and shared.
+          cargo run -q --release -p gen_fixtures -- sales_50m.parquet 2>&1 | tee -a "$LOG"
+          for t in perf_preview::parquet_50m_open_and_page perf_sort::perf_views_50m \
+                   perf_sort::perf_profile_50m perf_export::perf_charts_50m \
+                   perf_export::perf_quality_50m; do
+            cargo test -q -p bigview --test it "$t" -- --ignored --nocapture --exact \
+              --test-threads=1 2>&1 | tee -a "$LOG" || status=1
+          done
+          exit $status
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Budgets on ${{ matrix.os }}"
+            echo '```'
+            grep -vE '^(running|test result|$)|^test .* \.\.\. ' "$LOG" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: budgets-${{ matrix.os }}
+          path: target/budgets.log
