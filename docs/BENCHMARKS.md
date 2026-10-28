@@ -51,6 +51,7 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Grid scroll, 50M rows (Chromium, mocked backend) | ~60 fps, no blank page > 100 ms | 60 fps; page wait p95 42 ms / max 51 ms (fast scroll), p95 56 / max 77 ms (fling) | v0.1.0 |
 | Simple filter on 50M rows (first rows + count) | < 2 s | 0.06–0.79 s | v0.2 step 3 |
 | Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
+| Sort 50M rows: every page readable | < 10 s | 5.7 s by date and price, 12.2 s by a text column (row order, D29) | v1.0 step 1 |
 | Column stats on 50M rows | < 3 s | 0.44–2.78 s per column | v0.2 step 6 |
 | Export 50M rows to Parquet / CSV | — (report) | 7.6 s / 23.9 s | v0.3.0 |
 | Export 1M rows to Excel | — (report) | 14.7 s, peak memory +2 MiB | v0.3.0 |

@@ -105,10 +105,15 @@ pub fn close_dataset(engine: &Engine, id: &str) -> Result<()> {
             DatasetSource::Materialized { table } => {
                 engine.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
             }
-            DatasetSource::Sorting { head, tail, .. } => {
+            DatasetSource::Sorting {
+                head,
+                tail,
+                ordered,
+                ..
+            } => {
                 engine.execute_batch(&format!("DROP TABLE IF EXISTS {head}"))?;
-                if let Some(tail) = tail {
-                    engine.execute_batch(&format!("DROP TABLE IF EXISTS {tail}"))?;
+                for table in tail.iter().chain(&ordered) {
+                    engine.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
                 }
             }
             DatasetSource::Query { .. } | DatasetSource::Parquet { .. } => {}

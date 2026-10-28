@@ -14,7 +14,7 @@ pub use open::{MAX_VALUES, OpenedView, ValueCount, ValueList, materialize_reques
 pub use profile::{
     BINS, Bin, ColumnHistogram, ColumnProfile, EXACT_DISTINCT_ROWS, ProfileKind, TOP_VALUES,
 };
-pub use sql::{BuiltView, Relation, build, build_at, standalone_sql};
+pub use sql::{BuiltView, ORDER_TABLE, Relation, RowOrder, build, build_at, standalone_sql};
 
 pub(crate) use profile::numeric_expr;
 

@@ -428,6 +428,101 @@ fn big_sorts_show_first_and_last_rows_before_the_full_sort() {
 }
 
 #[test]
+fn pages_in_between_read_through_the_row_order_before_the_full_sort() {
+    use bigview_lib::engine::datasets::MAX_HEAD;
+    let fx = fx();
+    let n: u64 = 4 * MAX_HEAD;
+    fx.engine
+        .execute_batch(&format!(
+            "CREATE TABLE ord AS SELECT range AS id, hash(range) % 997 AS k, \
+             'n' || (range % 13) AS name FROM range({n})"
+        ))
+        .unwrap();
+    fx.engine.datasets.insert(bigview_lib::engine::Dataset {
+        id: "ord".into(),
+        source: DatasetSource::Table("ord".into()),
+        row_count: n,
+        cached: true,
+    });
+    let conn = fx.engine.connection().unwrap();
+    let ids = |sql: &str| -> Vec<i64> {
+        conn.prepare(sql)
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    };
+    // Every column, and chosen columns under a filter (id still first).
+    let cases = [
+        (
+            ViewSpec {
+                sort: vec![key("k", false)],
+                ..ViewSpec::default()
+            },
+            "SELECT id FROM ord ORDER BY k, id",
+            3,
+        ),
+        (
+            ViewSpec {
+                sort: vec![key("name", true), key("k", false)],
+                filters: vec![Filter {
+                    column: "k".into(),
+                    op: FilterOp::Gt {
+                        value: Param::Int(100),
+                    },
+                    not: false,
+                }],
+                columns: Some(vec!["id".into(), "name".into()]),
+                ..ViewSpec::default()
+            },
+            "SELECT id FROM ord WHERE k > 100 ORDER BY name DESC, k, id",
+            2,
+        ),
+    ];
+    for (spec, sql, width) in cases {
+        let want = ids(sql);
+        let v = fx
+            .engine
+            .open_view("ord", &spec, &RequestKey::default())
+            .unwrap();
+        assert!(fx.engine.prepare_sorted_view(&v.dataset.id).unwrap());
+        assert!(matches!(
+            fx.engine.datasets.get(&v.dataset.id).unwrap().source,
+            DatasetSource::Sorting {
+                ordered: Some(_),
+                ..
+            }
+        ));
+        // A page in the middle, before the full sort: the view's rows and
+        // columns, in order.
+        let start = v.dataset.row_count / 2;
+        let bytes = fx
+            .engine
+            .fetch_rows(&v.dataset.id, start, 500, &RequestKey::default())
+            .unwrap();
+        let batches: Vec<_> = StreamReader::try_new(Cursor::new(bytes), None)
+            .unwrap()
+            .map(|b| b.unwrap())
+            .collect();
+        assert_eq!(batches[0].num_columns(), width, "{sql}");
+        let got: Vec<i64> = batches
+            .iter()
+            .flat_map(|b| b.column(0).as_primitive::<Int64Type>().values().to_vec())
+            .collect();
+        assert_eq!(got, want[start as usize..start as usize + 500], "{sql}");
+        // Then the full sort; every table but its own is gone.
+        assert!(fx.engine.materialize_view(&v.dataset.id).unwrap());
+        assert_eq!(
+            all_ids(&fx.engine, &v.dataset.id, v.dataset.row_count),
+            want
+        );
+        import::close_dataset(&fx.engine, &v.dataset.id).unwrap();
+        assert!(scratch_tables(&fx.engine).is_empty());
+    }
+}
+
+#[test]
 fn the_tail_serves_the_last_rows_in_order() {
     use bigview_lib::engine::datasets::MAX_HEAD;
     let fx = fx();

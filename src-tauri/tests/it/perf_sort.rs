@@ -294,6 +294,18 @@ fn perf_views_50m() {
                 ", deep page before write {:.2} s",
                 t2.elapsed().as_secs_f64()
             )
+        } else if v.materializing {
+            // Sorted: the last rows and the order by row id, then any page.
+            engine.prepare_sorted_view(&v.dataset.id).unwrap();
+            let ready = t2.elapsed().as_secs_f64();
+            let t = Instant::now();
+            engine
+                .fetch_rows(&v.dataset.id, rows / 2, 500, &key)
+                .unwrap();
+            format!(
+                ", every page readable after {ready:.1} s (middle page {:.2} s)",
+                t.elapsed().as_secs_f64()
+            )
         } else {
             String::new()
         };

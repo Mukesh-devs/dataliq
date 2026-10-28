@@ -267,7 +267,15 @@ from a crash are removed at the next start. Ties keep file order for
 imported tables (rowid tiebreak).
 
 Sorting only the row ids (15.6 s) and joining back for each page was
-rejected: pages took over a second each.
+rejected as a replacement: pages took over a second each. Measured again
+at v1.0 (DuckDB 1.5.6) it is a good bridge: over an imported table, the
+background job writes the view's order by row id right after the tail
+(one 8-byte value per row: 50M rows in about 4 s), and pages in the middle
+are read through it (0.3 s each) until the full sort lands (then about
+10 ms). Every page of a 50M-row sort by date and price is readable after
+5.7 s instead of 24 s, by a text column after 12.2 s instead of 43 s;
+the 10 s budget is met for number and date keys. Views over a query or a
+Parquet file (no stable row ids) still wait for the full sort.
 
 ## D30 — Column profiles from one aggregate query per column, not SUMMARIZE
 

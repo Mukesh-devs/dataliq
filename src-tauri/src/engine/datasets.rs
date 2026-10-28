@@ -26,8 +26,10 @@ pub enum DatasetSource {
     Materialized { table: String },
     /// A sorted view whose full sort is still being written (see
     /// `Engine::materialize_view`). Its first rows (`head`) and, once
-    /// written, last rows (`tail`, stored in reverse) are small tables;
-    /// pages in between wait for the full table.
+    /// written, last rows (`tail`, stored in reverse) are small tables.
+    /// Over a table, the rows' order by row id (`ordered`, from `order`) is
+    /// written next, and pages in between read through it; otherwise they
+    /// wait for the full table.
     Sorting {
         head: String,
         head_rows: u64,
@@ -37,6 +39,8 @@ pub enum DatasetSource {
         select: String,
         reversed: String,
         params: Vec<Param>,
+        order: Option<crate::view::RowOrder>,
+        ordered: Option<String>,
     },
 }
 
@@ -123,10 +127,12 @@ impl Engine {
                     head_rows,
                     tail,
                     tail_rows,
+                    ordered,
                     ..
                 } => {
                     end <= *head_rows
                         || (tail.is_some() && start >= ds.row_count.saturating_sub(*tail_rows))
+                        || ordered.is_some()
                 }
                 _ => true,
             };
@@ -182,8 +188,10 @@ impl Engine {
                 self.query_ipc(&sql, &params, count as usize, key)
             }
             DatasetSource::Sorting {
-                tail: Some(tail), ..
-            } => {
+                tail: Some(tail),
+                tail_rows,
+                ..
+            } if start >= ds.row_count.saturating_sub(*tail_rows) => {
                 // The tail holds the last rows in reverse: row `i` of the view
                 // is tail row `row_count - 1 - i`.
                 let sql = format!(
@@ -193,6 +201,15 @@ impl Engine {
                     Param::Int(ds.row_count as i64 - 1 - end as i64),
                     Param::Int(ds.row_count as i64 - 1 - start as i64),
                 ];
+                self.query_ipc(&sql, &params, count as usize, key)
+            }
+            DatasetSource::Sorting {
+                order: Some(order),
+                ordered: Some(ordered),
+                ..
+            } => {
+                let sql = order.page.replace(crate::view::ORDER_TABLE, ordered);
+                let params = [Param::Int(start as i64), Param::Int(end as i64)];
                 self.query_ipc(&sql, &params, count as usize, key)
             }
             DatasetSource::Sorting { .. } => unreachable!("wait_for_rows only returns ready rows"),
