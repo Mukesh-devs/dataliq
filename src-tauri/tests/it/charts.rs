@@ -4,9 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use bigview_lib::chart::{Agg, Bucket, ChartData, ChartKind, ChartSpec, Measure, XKind};
-use bigview_lib::engine::{Param, RequestKey};
-use bigview_lib::view::{Filter, FilterOp, ViewSpec};
+use dataliq_lib::chart::{Agg, Bucket, ChartData, ChartKind, ChartSpec, Measure, XKind};
+use dataliq_lib::engine::{Param, RequestKey};
+use dataliq_lib::view::{Filter, FilterOp, ViewSpec};
 
 use crate::filters::{Fx, Person, fx};
 
@@ -280,7 +280,7 @@ fn plain(sql: &str, cols: &str) -> Vec<Vec<Option<String>>> {
 fn reader(fx: &Fx) -> String {
     let path =
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/csv/people.csv");
-    bigview_lib::sources::Source::new(&path, bigview_lib::sources::OpenOptions::default())
+    dataliq_lib::sources::Source::new(&path, dataliq_lib::sources::OpenOptions::default())
         .unwrap()
         .resolve_dialect(&fx.engine)
         .unwrap()

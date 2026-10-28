@@ -1,4 +1,4 @@
-//! BigView desktop app: Tauri entry point and module tree.
+//! DataLiq desktop app: Tauri entry point and module tree.
 
 pub mod cache;
 pub mod chart;
@@ -12,6 +12,7 @@ pub mod import;
 pub mod quality;
 pub mod recipe;
 pub mod remote;
+pub mod sample;
 pub mod settings;
 pub mod sources;
 pub mod sql;
@@ -19,8 +20,7 @@ pub mod view;
 pub mod workspace;
 
 mod logging;
-#[cfg(target_os = "macos")]
-mod menu;
+pub mod menu;
 
 use std::sync::Arc;
 
@@ -34,7 +34,11 @@ pub fn run() {
     let started = std::time::Instant::now();
     let cwd = std::env::current_dir().unwrap_or_default();
     let startup = cli::files_from_args(&std::env::args().collect::<Vec<_>>(), &cwd);
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    // The release workflow adds the updater's key and manifest URL to the
+    // config (D51); without them the plugin would fail to start.
+    let updates = context.config().plugins.0.contains_key("updater");
+    let builder = tauri::Builder::default()
         // Must be registered first: a second launch forwards its files here
         // and exits.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
@@ -47,7 +51,17 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+    let builder = if updates {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
+    builder
+        .manage(commands::update::UpdateState {
+            configured: updates,
+            pending: parking_lot::Mutex::new(None),
+        })
         .manage(commands::app::StartupFiles {
             files: parking_lot::Mutex::new(startup),
             started,
@@ -90,7 +104,7 @@ pub fn run() {
                 enabled: settings.cache_enabled,
             })?;
             // Uncached imports live only for this session.
-            let temp_dir = std::env::temp_dir().join(format!("bigview-{}", std::process::id()));
+            let temp_dir = std::env::temp_dir().join(format!("dataliq-{}", std::process::id()));
             app.manage(Arc::new(commands::import::ImportState {
                 cache,
                 imports: import::Imports::default(),
@@ -100,7 +114,11 @@ pub fn run() {
                 paths.app_data_dir()?,
             )));
             app.manage(Arc::new(export::Exports::default()));
-            app.manage(settings);
+            app.manage(commands::settings::SettingsState {
+                path: settings_path,
+                current: parking_lot::RwLock::new(settings.clone()),
+                started: settings,
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -115,8 +133,15 @@ pub fn run() {
             commands::import::close_dataset,
             commands::import::cache_info,
             commands::import::clear_cache,
-            commands::import::get_settings,
+            commands::settings::get_settings,
+            commands::settings::settings_info,
+            commands::settings::save_settings,
             commands::app::take_startup_files,
+            commands::app::set_native_menu,
+            commands::app::sample_dataset,
+            commands::update::update_status,
+            commands::update::check_update,
+            commands::update::install_update,
             commands::view::open_view,
             commands::view::column_values,
             commands::view::column_profile,
@@ -150,14 +175,30 @@ pub fn run() {
             commands::workspace::save_workspace,
             commands::workspace::load_workspace
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building BigView")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
+        .build(context)
+        .expect("error while building DataLiq")
+        .run(|app, event| match event {
+            tauri::RunEvent::Exit => {
                 // Uncached imports are session-only.
                 if let Some(state) = app.try_state::<Arc<commands::import::ImportState>>() {
                     let _ = std::fs::remove_dir_all(&state.temp_dir);
                 }
             }
+            // macOS hands files opened from the Finder (file associations)
+            // to the running app as an event, not as arguments.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => {
+                let files: Vec<std::path::PathBuf> =
+                    urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
+                if let Some(startup) = app.try_state::<commands::app::StartupFiles>() {
+                    // Before the UI has asked for them: with the startup files.
+                    if !startup.ready.is_completed() {
+                        startup.files.lock().extend(files);
+                        return;
+                    }
+                }
+                let _ = app.emit("open-files", files);
+            }
+            _ => {}
         });
 }

@@ -106,7 +106,8 @@ function ColumnList({
         {layout.order.map((name) => (
           <li key={name}>
             <label
-              className="flex items-center gap-2 rounded-[var(--radius)] px-1.5 py-0.5 text-[12px] text-fg-muted hover:bg-hover"
+              // At least 24px tall: each checkbox gets a 24px target (WCAG 2.5.8).
+              className="flex min-h-6 items-center gap-2 rounded-[var(--radius)] px-1.5 text-[12px] text-fg-muted hover:bg-hover"
               title={name}
             >
               <input

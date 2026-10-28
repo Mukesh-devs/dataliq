@@ -26,6 +26,7 @@ const amount: ColumnProfile = {
     { value: "", count: 3 },
   ],
   topTruncated: true,
+  topApprox: false,
   elapsedMs: 1250,
 };
 
@@ -79,6 +80,15 @@ describe("ProfilePanel", () => {
     expect(screen.queryByRole("region", { name: "Histogram" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Top values" })).not.toBeInTheDocument();
     expect(stat("Distinct")).toBe("3");
+  });
+
+  it("says when the most common values come from an estimate", () => {
+    render(
+      <ProfilePanel title="Amount" profile={{ ...amount, topApprox: true }} onClose={() => {}} />,
+    );
+    const panel = screen.getByRole("complementary", { name: "Profile of Amount" });
+    expect(panel).toHaveTextContent("Nearly every value is different");
+    expect(panel).not.toHaveTextContent("Showing the 10 most common values");
   });
 
   it("shows loading and errors, and closes", async () => {

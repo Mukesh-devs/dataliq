@@ -126,7 +126,7 @@ impl Source {
             let detected = detect::detect_from_name(crate::remote::url_file_part(&url))
                 .ok_or_else(|| {
                     AppError::Query(
-                        "BigView tells a file's type from its URL: it should end in .csv, .tsv, \
+                        "DataLiq tells a file's type from its URL: it should end in .csv, .tsv, \
                          .json, .ndjson or .parquet (optionally .gz or .zst)."
                             .into(),
                     )
@@ -498,23 +498,23 @@ impl Source {
             &opts,
             &[
                 ("store_rejects", Param::Bool(true)),
-                ("rejects_table", Param::Text("bv_rejects".into())),
-                ("rejects_scan", Param::Text("bv_reject_scans".into())),
+                ("rejects_table", Param::Text("dl_rejects".into())),
+                ("rejects_scan", Param::Text("dl_reject_scans".into())),
             ],
         );
         // Temp tables live only on this connection.
         let conn = engine.connection().ok()?;
         conn.execute(
-            &format!("CREATE TEMP TABLE bv_probe AS SELECT * FROM {call} LIMIT 20480"),
+            &format!("CREATE TEMP TABLE dl_probe AS SELECT * FROM {call} LIMIT 20480"),
             duckdb::params_from_iter(params.iter()),
         )
         .ok()?;
         let expected: i64 = conn
-            .query_row("SELECT count(*) FROM (DESCRIBE bv_probe)", [], |r| r.get(0))
+            .query_row("SELECT count(*) FROM (DESCRIBE dl_probe)", [], |r| r.get(0))
             .ok()?;
         let (line, kind, col): (i64, String, i64) = conn
             .query_row(
-                "SELECT line, error_type::VARCHAR, column_idx FROM bv_rejects ORDER BY line LIMIT 1",
+                "SELECT line, error_type::VARCHAR, column_idx FROM dl_rejects ORDER BY line LIMIT 1",
                 [],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
@@ -569,10 +569,10 @@ impl Source {
             first.root = None;
             first.files.truncate(1);
             let names: Vec<String> = first.columns(engine)?.into_iter().map(|c| c.name).collect();
-            self.file_column = ["filename", "source_file", "bigview_file"]
+            self.file_column = ["filename", "source_file", "dataliq_file"]
                 .into_iter()
                 .find(|n| !names.iter().any(|c| c.eq_ignore_ascii_case(n)))
-                .unwrap_or("bigview_source_file")
+                .unwrap_or("dataliq_source_file")
                 .to_string();
             return Ok(self);
         }
@@ -718,8 +718,8 @@ impl Source {
             }
             let conn = engine.connection()?;
             let never = std::sync::atomic::AtomicBool::new(false);
-            excel::write_table(&conn, None, "bv_preview", &sheet, &never, &|_| {})?;
-            return Engine::query_ipc_on(&conn, "SELECT * FROM temp.bv_preview", limit);
+            excel::write_table(&conn, None, "dl_preview", &sheet, &never, &|_| {})?;
+            return Engine::query_ipc_on(&conn, "SELECT * FROM temp.dl_preview", limit);
         }
         let (reader, params) = self.reader()?;
         let sql = format!("SELECT * FROM {reader} LIMIT {limit}");

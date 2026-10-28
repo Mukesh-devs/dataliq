@@ -24,6 +24,20 @@ describe("EmptyState", () => {
     expect(onOpen).toHaveBeenCalledOnce();
   });
 
+  it("opens the sample dataset", async () => {
+    const onOpenSample = vi.fn();
+    render(
+      <EmptyState
+        onOpen={() => {}}
+        onOpenSample={onOpenSample}
+        recent={[]}
+        onOpenRecent={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Try a sample dataset/ }));
+    expect(onOpenSample).toHaveBeenCalledOnce();
+  });
+
   it("highlights the drop zone while dragging", () => {
     render(<EmptyState onOpen={() => {}} recent={[]} onOpenRecent={() => {}} dragging />);
     expect(screen.getByTestId("drop-zone")).toHaveAttribute("data-dragging", "true");

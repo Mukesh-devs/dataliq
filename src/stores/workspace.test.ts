@@ -109,8 +109,8 @@ describe("savedTabs", () => {
   });
 
   it("names the file after the first tab", () => {
-    expect(workspaceFileName("sales.csv.gz")).toBe("sales.bigview");
-    expect(workspaceFileName(undefined)).toBe("workspace.bigview");
+    expect(workspaceFileName("sales.csv.gz")).toBe("sales.dataliq");
+    expect(workspaceFileName(undefined)).toBe("workspace.dataliq");
   });
 });
 
@@ -123,7 +123,7 @@ describe("workspace store", () => {
   afterEach(() => clearMocks());
 
   it("saves the tabs and SQL panel, and opens them again in their place", async () => {
-    const calls = backend({ save: "/w/sales.bigview" });
+    const calls = backend({ save: "/w/sales.dataliq" });
     await useTabs.getState().openPaths(["/data/a.csv", "/data/b.csv"]);
     await settle();
     const [a, b] = useTabs.getState().tabs;
@@ -137,7 +137,7 @@ describe("workspace store", () => {
 
     await useWorkspace.getState().save();
     const saved = calls.find((c) => c.cmd === "save_workspace")!;
-    expect(saved.args.path).toBe("/w/sales.bigview");
+    expect(saved.args.path).toBe("/w/sales.dataliq");
     expect(saved.args.workspace).toMatchObject({
       active: 0,
       tabs: [
@@ -160,7 +160,7 @@ describe("workspace store", () => {
     // Something else is open now; the workspace replaces it.
     await useTabs.getState().openPath("/data/other.csv");
     useSql.setState({ text: "", open: false });
-    await useWorkspace.getState().open("/w/sales.bigview");
+    await useWorkspace.getState().open("/w/sales.dataliq");
     await settle();
     await settle();
     const tabs = useTabs.getState().tabs;

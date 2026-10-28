@@ -1,6 +1,6 @@
 //! Workspaces: the open tabs (each file with its import settings, view,
 //! column layout, recipe and chart), the SQL panel and the side panels,
-//! saved as a `.bigview` JSON file and opened again later.
+//! saved as a `.dataliq` JSON file and opened again later.
 //!
 //! The backend owns the file and its paths; what each tab keeps is the
 //! frontend's (passed through unread), so new tab settings need no change
@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, Result};
 
-const FORMAT: &str = "bigview-workspace";
+const FORMAT: &str = "dataliq-workspace";
 const VERSION: u32 = 1;
-pub const EXTENSION: &str = "bigview";
+pub const EXTENSION: &str = "dataliq";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,7 +61,7 @@ fn folder_of(path: &Path) -> PathBuf {
     path.parent().map(Path::to_path_buf).unwrap_or_default()
 }
 
-/// Saves `workspace` at `path` (a `.bigview` file), adding each file's path
+/// Saves `workspace` at `path` (a `.dataliq` file), adding each file's path
 /// from the workspace's folder.
 pub fn save(path: &Path, workspace: &WorkspaceFile) -> Result<()> {
     if !has_extension(path) {
@@ -110,13 +110,13 @@ pub fn load(path: &Path) -> Result<WorkspaceFile> {
         .map_err(|e| AppError::Query(format!("This file is not valid JSON: {e}")))?;
     if value.get("format").and_then(|f| f.as_str()) != Some(FORMAT) {
         return Err(AppError::Query(
-            "This file is not a BigView workspace.".into(),
+            "This file is not a DataLiq workspace.".into(),
         ));
     }
     let version = value.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
     if version == 0 || version > u64::from(VERSION) {
         return Err(AppError::Query(format!(
-            "This workspace was saved by a newer BigView (version {version}); update BigView to open it."
+            "This workspace was saved by a newer DataLiq (version {version}); update DataLiq to open it."
         )));
     }
     let mut file: WorkspaceFile = serde_json::from_value(value)
@@ -176,10 +176,10 @@ mod tests {
             sql: Some(json!({"text": "SELECT 1", "open": true})),
             panels: None,
         };
-        let file = project.join("work.bigview");
+        let file = project.join("work.dataliq");
         save(&file, &ws).unwrap();
         let text = std::fs::read_to_string(&file).unwrap();
-        assert!(text.contains("\"format\": \"bigview-workspace\""), "{text}");
+        assert!(text.contains("\"format\": \"dataliq-workspace\""), "{text}");
         assert!(text.contains("\"relative\": \"data/sales.csv\""), "{text}");
 
         let back = load(&file).unwrap();
@@ -195,7 +195,7 @@ mod tests {
         let moved = root.path().join("moved");
         std::fs::rename(&project, &moved).unwrap();
         std::fs::remove_file(&outside).unwrap();
-        let back = load(&moved.join("work.bigview")).unwrap();
+        let back = load(&moved.join("work.dataliq")).unwrap();
         let found = PathBuf::from(&back.tabs[0].path);
         assert_eq!(
             std::fs::canonicalize(found).unwrap(),
@@ -218,26 +218,26 @@ mod tests {
         let err = save(&dir.path().join("w.json"), &ws)
             .unwrap_err()
             .to_string();
-        assert!(err.contains(".bigview files"), "{err}");
-        let p = dir.path().join("x.bigview");
-        std::fs::write(&p, "{\"format\": \"bigview-recipe\", \"version\": 1}").unwrap();
+        assert!(err.contains(".dataliq files"), "{err}");
+        let p = dir.path().join("x.dataliq");
+        std::fs::write(&p, "{\"format\": \"dataliq-recipe\", \"version\": 1}").unwrap();
         assert!(
             load(&p)
                 .unwrap_err()
                 .to_string()
-                .contains("not a BigView workspace")
+                .contains("not a DataLiq workspace")
         );
         std::fs::write(
             &p,
-            "{\"format\": \"bigview-workspace\", \"version\": 9, \"tabs\": []}",
+            "{\"format\": \"dataliq-workspace\", \"version\": 9, \"tabs\": []}",
         )
         .unwrap();
-        assert!(load(&p).unwrap_err().to_string().contains("newer BigView"));
+        assert!(load(&p).unwrap_err().to_string().contains("newer DataLiq"));
         std::fs::write(&p, "nope").unwrap();
         assert!(load(&p).unwrap_err().to_string().contains("not valid JSON"));
         std::fs::write(
             &p,
-            "{\"format\": \"bigview-workspace\", \"version\": 1, \"tabs\": [], \"active\": 4}",
+            "{\"format\": \"dataliq-workspace\", \"version\": 1, \"tabs\": [], \"active\": 4}",
         )
         .unwrap();
         assert_eq!(load(&p).unwrap().active, None);

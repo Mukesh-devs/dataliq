@@ -192,7 +192,7 @@ test("save a recipe, export it as SQL, and load it onto another file", async ({ 
   await bar.getByRole("button", { name: "Copy SQL" }).click();
   await expect(status(page)).toHaveText("Copied the recipe as SQL");
   const sql = await page.evaluate(() => navigator.clipboard.readText());
-  expect(sql).toMatch(/^-- BigView recipe for comma\.csv: 1 step\.\n-- Runs as-is in DuckDB/);
+  expect(sql).toMatch(/^-- DataLiq recipe for comma\.csv: 1 step\.\n-- Runs as-is in DuckDB/);
   expect((await invokes(page, "recipe_script")).at(-1)).toMatchObject({
     datasetId: "ds-1",
     steps: [{ op: "trim", column: "name" }],
@@ -206,7 +206,7 @@ test("save a recipe, export it as SQL, and load it onto another file", async ({ 
   });
   expect((await invokes(page, "save_recipe_script")).at(-1)).toMatchObject({
     path: "/out/comma-recipe.sql",
-    script: expect.stringMatching(/^-- BigView recipe for comma\.csv/) as unknown,
+    script: expect.stringMatching(/^-- DataLiq recipe for comma\.csv/) as unknown,
   });
 
   await bar.getByRole("button", { name: /Save/ }).click();
@@ -214,7 +214,7 @@ test("save a recipe, export it as SQL, and load it onto another file", async ({ 
   expect((await invokes(page, "save_recipe")).at(-1)).toMatchObject({
     path: "/out/comma-recipe.json",
     recipe: {
-      format: "bigview-recipe",
+      format: "dataliq-recipe",
       version: 1,
       source: "comma.csv",
       columns: expect.arrayContaining([{ name: "joined", type: expect.any(String) }]) as unknown,

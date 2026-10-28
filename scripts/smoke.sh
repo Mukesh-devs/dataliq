@@ -6,7 +6,7 @@ set -euo pipefail
 out="${1:?output png path}"; shift
 wait_s="${1:-6}"; [[ $# -gt 0 ]] && shift
 [[ "${1:-}" == "--" ]] && shift
-bin="$(cd "$(dirname "$0")/.." && pwd)/target/debug/bigview"
+bin="$(cd "$(dirname "$0")/.." && pwd)/target/debug/dataliq"
 xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
   "$0" "${@:3}" > "$2.log" 2>&1 & pid=$!
   sleep "$1"

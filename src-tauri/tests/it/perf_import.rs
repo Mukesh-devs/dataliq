@@ -1,14 +1,14 @@
 //! Full-import timings on generated large files. Ignored by default:
-//!   cargo test -p bigview --test it perf_import -- --ignored --nocapture --test-threads=1
+//!   cargo test -p dataliq --test it perf_import -- --ignored --nocapture --test-threads=1
 
 use std::path::PathBuf;
 use std::time::Instant;
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::settings::Settings;
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::settings::Settings;
+use dataliq_lib::sources::{OpenOptions, Source};
 
 fn generated(name: &str) -> Option<PathBuf> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -157,7 +157,7 @@ fn rss_mib() -> Option<u64> {
 }
 
 /// Memory held after an import, and what releasing DuckDB's cache gives back.
-/// `cargo test -p bigview --test it perf_memory -- --ignored --nocapture`
+/// `cargo test -p dataliq --test it perf_memory -- --ignored --nocapture`
 #[test]
 #[ignore = "needs generated fixtures"]
 fn perf_memory_after_import() {

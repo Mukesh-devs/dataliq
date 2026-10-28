@@ -1,6 +1,6 @@
 //! Small benchmark suite on the 100 MB fixtures (`pnpm fixtures small`), used
 //! by the CI regression guard (`scripts/bench.mjs`). Ignored by default:
-//!   BENCH_OUT=bench.json cargo test -p bigview --test it bench_small -- --ignored --nocapture
+//!   BENCH_OUT=bench.json cargo test -p dataliq --test it bench_small -- --ignored --nocapture
 //!
 //! Each flow runs a few times and keeps the fastest run, which is the most
 //! stable number on a shared CI runner. `BENCH_RUNS=n` changes the number of
@@ -10,11 +10,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::settings::Settings;
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::settings::Settings;
+use dataliq_lib::sources::{OpenOptions, Source};
 
 const RUNS: usize = 5;
 

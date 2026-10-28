@@ -19,6 +19,6 @@ export const useLayout = create<LayoutState>()(
       setSidebar: (sidebar) => set({ sidebar }),
       setProfile: (profile) => set({ profile }),
     }),
-    { name: "bigview.layout", partialize: (s) => ({ sidebar: s.sidebar, profile: s.profile }) },
+    { name: "dataliq.layout", partialize: (s) => ({ sidebar: s.sidebar, profile: s.profile }) },
   ),
 );

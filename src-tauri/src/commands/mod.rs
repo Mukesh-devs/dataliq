@@ -10,6 +10,8 @@ pub mod quality;
 pub mod query;
 pub mod recipe;
 pub mod remote;
+pub mod settings;
 pub mod sql;
+pub mod update;
 pub mod view;
 pub mod workspace;

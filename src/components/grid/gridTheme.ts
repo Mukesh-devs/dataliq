@@ -19,9 +19,9 @@ export function gridTheme(root: HTMLElement = document.documentElement): Partial
     accentLight: v("--accent-soft", "rgba(79,70,229,0.12)"),
     textDark: v("--fg", "#18181b"),
     textMedium: v("--fg-muted", "#52525b"),
-    textLight: v("--fg-subtle", "#8b8b94"),
+    textLight: v("--fg-subtle", "#65656e"),
     textBubble: v("--fg", "#18181b"),
-    bgIconHeader: v("--fg-subtle", "#8b8b94"),
+    bgIconHeader: v("--fg-subtle", "#65656e"),
     fgIconHeader: v("--bg", "#ffffff"),
     textHeader: v("--fg", "#18181b"),
     textHeaderSelected: v("--accent-fg", "#ffffff"),
@@ -62,7 +62,7 @@ export function chartColor(root: HTMLElement = document.documentElement): string
 }
 
 export function nullColor(root: HTMLElement = document.documentElement): string {
-  return getComputedStyle(root).getPropertyValue("--null").trim() || "#a1a1aa";
+  return getComputedStyle(root).getPropertyValue("--null").trim() || "#65656e";
 }
 
 /** Row height in px for the current density (from the --row-height token). */

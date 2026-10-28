@@ -4,7 +4,7 @@ Deviations from, or clarifications of, `BUILD_PLAN.md`, with the reasoning.
 
 ## D1 — Repository root is the project root
 
-The plan shows a `bigview/` folder. This repository *is* the project, so
+The plan shows a `dataliq/` folder. This repository *is* the project, so
 `src-tauri/`, `src/`, `scripts/` etc. live at the repo root. A Cargo workspace
 at the root lets `cargo fmt/clippy/test` run from the root as the check script
 expects.
@@ -178,8 +178,10 @@ written by `scripts/make_xls.py` (xlwt), since no Rust crate writes BIFF8.
 
 ## D22 — Native menu on macOS only
 
+_Replaced by D47 (v1.0): every OS has a menu bar now._
+
 macOS apps are expected to have a menu bar (and it provides Copy/Paste in
-text fields), so BigView installs the standard menu plus File > Open… /
+text fields), so DataLiq installs the standard menu plus File > Open… /
 Close Tab there. On Windows and Linux a menu bar would add a row of chrome
 the layout doesn't have; the same actions are on the keyboard (Ctrl+O,
 Ctrl+W, Ctrl+Tab), in the tab bar, and in the command palette (v0.2).
@@ -240,7 +242,7 @@ logic would. Sorts are always `NULLS LAST`, in both directions.
 
 DuckDB's CSV reader treats `""` as NULL by default (`allow_quoted_nulls`).
 That erases the difference between "no value" and "an empty string" that a
-file states explicitly, and BigView shows NULL and empty text differently.
+file states explicitly, and DataLiq shows NULL and empty text differently.
 We read CSV/TSV with `allow_quoted_nulls = false`: an unquoted empty field is
 NULL and `""` is an empty string. The cache format version was bumped so
 files imported before the change are imported again.
@@ -267,7 +269,15 @@ from a crash are removed at the next start. Ties keep file order for
 imported tables (rowid tiebreak).
 
 Sorting only the row ids (15.6 s) and joining back for each page was
-rejected: pages took over a second each.
+rejected as a replacement: pages took over a second each. Measured again
+at v1.0 (DuckDB 1.5.6) it is a good bridge: over an imported table, the
+background job writes the view's order by row id right after the tail
+(one 8-byte value per row: 50M rows in about 4 s), and pages in the middle
+are read through it (0.3 s each) until the full sort lands (then about
+10 ms). Every page of a 50M-row sort by date and price is readable after
+5.7 s instead of 24 s, by a text column after 12.2 s instead of 43 s;
+the 10 s budget is met for number and date keys. Views over a query or a
+Parquet file (no stable row ids) still wait for the full sort.
 
 ## D30 — Column profiles from one aggregate query per column, not SUMMARIZE
 
@@ -373,7 +383,7 @@ session (D32), which other connections can't see, so its rows can't be
 paged by re-running it elsewhere. The panel's last statement, when it is a
 query (SELECT, WITH, FROM, VALUES, TABLE, DESCRIBE, SHOW, SUMMARIZE, PIVOT),
 is written once on the session connection as
-`CREATE TABLE bv_scratch.main.r_<n> AS SELECT * FROM (<query>)` (DuckDB
+`CREATE TABLE dl_scratch.main.r_<n> AS SELECT * FROM (<query>)` (DuckDB
 keeps the query's order) and becomes a dataset like a written-out view: the
 grid pages all of its rows, a tab can own it (filters, sort, profiles, copy,
 "Copy view as SQL" over the query), and it is a SQL table itself
@@ -467,7 +477,7 @@ recipe.
 
 ## D40 — Recipe files: JSON with the columns they were made for
 
-A saved recipe is a small JSON file (`"format": "bigview-recipe"`,
+A saved recipe is a small JSON file (`"format": "dataliq-recipe"`,
 `"version": 1`) holding the steps exactly as the app sends them to the
 backend, the name of the file it was made on and that file's columns with
 their types. Loading it onto any open file replaces that tab's recipe (one
@@ -548,7 +558,7 @@ file's path, size and modification time, so adding, removing or editing
 any file is a new version), views, SQL and "Copy as SQL" work as for one
 file; a Parquet folder is queried in place. Open it with Open folder
 (Shift+Ctrl+O, the empty window, the macOS File menu), a pattern from the
-palette, by dropping a folder, or with `bigview <folder>`.
+palette, by dropping a folder, or with `dataliq <folder>`.
 
 Matching columns by name makes DuckDB sniff every file, which costs
 seconds for a large folder (200 small `.csv.gz` files: 4.5 s before the
@@ -564,7 +574,7 @@ takes longer.
 ## D44 — URLs: httpfs on demand, not cached, credentials in the keychain
 
 `https://`, `http://` and `s3://` files open like local ones (Open URL… in
-the palette, or `bigview <url>`), read by DuckDB's httpfs extension. The
+the palette, or `dataliq <url>`), read by DuckDB's httpfs extension. The
 app stays offline by default (the engine turns off DuckDB's extension autoloading and
 autoinstalling): httpfs is installed once into the app's cache folder
 (`duckdb-extensions`) and loaded only when the first URL is opened, with a
@@ -603,15 +613,15 @@ DuckDB files need nothing. SQLite has no date type, so its dates arrive as
 text (Clean changes the type). "Copy as SQL" gives `sqlite_scan(path,
 table)` for SQLite, which runs in plain DuckDB with the extension; a DuckDB
 table is given by its attached name (`"shop"."main"."orders"`), which
-needs `ATTACH 'path' AS shop (READ_ONLY)` outside BigView. Databases can't
+needs `ATTACH 'path' AS shop (READ_ONLY)` outside DataLiq. Databases can't
 be combined in a folder or read from a URL. A file another program holds
 open for writing, and one from another DuckDB version, are said in words.
 
-## D46 — Workspaces: a `.bigview` file of tabs, opened in place of the tabs
+## D46 — Workspaces: a `.dataliq` file of tabs, opened in place of the tabs
 
 "Save workspace" (Ctrl/Cmd+S; "Save workspace as…" with Shift) writes the
 open tabs, the SQL panel (text, open, height) and the side panels to a
-`.bigview` JSON file (`format: bigview-workspace`, `version: 1`). For each
+`.dataliq` JSON file (`format: dataliq-workspace`, `version: 1`). For each
 tab it keeps the file and only what was set on it: import settings (CSV
 options, Excel sheet, database table), filters, sort and search, column
 layout, SQL table name, chart and mode, recipe, and which side panel was
@@ -621,8 +631,186 @@ and passes each tab's settings through unread, so new tab settings need no
 backend change. Every file is stored by absolute path and, when inside the
 workspace's folder, by its path from there: a moved or shared project
 folder finds its files again. Opening a workspace (palette, file dialog,
-drop, recent files, `bigview work.bigview`) replaces the open tabs, since a
+drop, recent files, `dataliq work.dataliq`) replaces the open tabs, since a
 workspace is a whole working state; each file opens as usual (from the
 cache when unchanged) and its view and recipe apply when its data is ready,
 the way a reload does. A missing file's tab says it is missing. Save writes
 the same file again; data files are never touched.
+
+## D47 — A menu bar on every OS, made of the palette's commands
+
+D22 left Windows and Linux without a menu bar; people looking for Open,
+Save workspace or Recent files expect one. The menus (File, Edit, View,
+Data, Help) are a list of command ids (`src/lib/menus.ts`): each item runs
+the same command as the palette and the keyboard, shows its title and
+shortcut, and is disabled while the command isn't available (Export with
+no file open), so the menus keep their shape. File has New workspace
+(Ctrl+N: closes the tabs and forgets the workspace file; a viewer has no
+"new file"), the open commands, Open recent (with Clear recent files),
+Open / Save / Save as workspace, Export, Settings, Close tab and Exit.
+
+On Windows and Linux the menus are drawn in the window, at the start of
+the tab row (no extra row of chrome), with Radix's menubar: Alt alone or
+F10 moves the focus to it, arrows and Enter work as in native menus. A
+native menu there would register its shortcuts with the window and take
+keys like Ctrl+F or Ctrl+E from the web view, whose handlers depend on
+focus and timing (D-grid focus fixes). On macOS the menu bar is native
+and built by the backend from the same list (`set_native_menu`), plus
+macOS's own items: the app menu (About, Settings… ⌘,, Hide, Quit), text
+editing in Edit, and Window. Native shortcuts there are only given to
+app-wide actions (⌘N, ⌘O, ⇧⌘O, ⌘S, ⇧⌘S, ⌘W); the rest stay with the page
+and show in the palette. A click sends the command id back as a `menu`
+event. The menus are resolved in their own component, which alone
+re-renders when commands change (commands register while rendering).
+
+## D48 — Settings screen: saved to settings.json, applied at once where possible
+
+Settings (Ctrl+, / File › Settings… / ⌘, on macOS) edits a draft and Save
+applies everything; Cancel drops it. Appearance (theme, density, column
+histograms) and export defaults (format, CSV delimiter, header) are UI
+preferences kept by the webview, as before. Memory limit, worker threads,
+the quiet-import size, the cache (on/off, size, location) and the
+temporary folder are the backend's `settings.json`; the backend checks
+them (memory ≥ 256 MB and ≤ the computer's, threads ≥ 1, cache ≥ 1 GB) and
+says what's wrong in words, and applies memory and threads (DuckDB `SET`)
+and the cache's on/off and size (a smaller size cleans up at once) without
+a restart. A new cache or temporary folder applies after a restart, which
+the notice says. Empty means automatic, with the automatic value shown
+(half of the memory, every core, the default folders).
+
+File associations are the installers' job: the bundle registers DataLiq
+as a viewer for CSV/TSV, JSON/NDJSON, Parquet, Excel, SQLite and DuckDB
+files and as the editor of `.dataliq` workspaces (`.gz` is left alone).
+Making it the default app is the user's choice in the OS (Windows and
+macOS don't let apps take it), so Settings says how. On macOS files opened
+from the Finder arrive as an `Opened` event, which is handled like the
+command line (held until the UI is ready).
+
+## D49 — Most common values of near-unique columns: found by an estimate, counted exactly
+
+Listing a column's most common values meant grouping by every value: on a
+column where nearly every value differs (39.5M timestamps in 50M rows) that
+is one group per row, 3–4 s on four cores, over the 3 s budget for column
+stats. Above 1M distinct values (`APPROX_TOP_DISTINCT`, from the estimate
+the statistics already compute), the candidates now come from DuckDB's
+`approx_top_k` sketch and one more scan counts them exactly (about 0.8 s).
+NULL, which the sketch skips, is added from the null count.
+
+The sketch always finds values frequent enough to matter (a sentinel date in
+5 % of the rows, say), which is what the list is for on such a column; it
+can miss or swap values about as common as the last one listed (usually
+values seen once or twice). So the counts shown are exact, and the panel
+says the list was found by an estimate. Skipping the list on near-unique
+columns was rejected: it would hide exactly those sentinels. Below 1M
+distinct values exact counting stays: it is as fast or faster there.
+
+## D50 — Onboarding: tips on the start screen, a sample made on demand
+
+The first run shows three short tips on the start screen, under the drop
+zone (opening big files; sorting, filtering and profiles; the palette and
+SQL), one at a time with Back / Next. Closing them is remembered; Help ›
+Show getting-started tips opens the same three in a dialog at any time, so
+they don't depend on the start screen being visible. No tour that points at
+the UI: it would need a file open and break whenever the layout changes.
+
+"Try a sample dataset" (start screen and Help menu) opens 50,000 made-up
+orders as a CSV: dates, text, decimals, booleans and a few empty customers,
+so filters, charts, profiles and the quality check all have something to
+show. The file is generated by DuckDB from the row number (`hash`, so the
+same every time) into the app's data folder the first time it's asked for,
+then reused: nothing large ships in the installers, and it opens through
+the normal path (preview, quiet import) like any file the user drops.
+
+## D51 — Updates: Tauri's updater, turned on by the release build only
+
+DataLiq updates itself with Tauri's updater plugin: it reads a `latest.json`
+manifest from the latest GitHub release, downloads the bundle for this OS
+and checks its minisign signature against the public key built into the app
+before installing it (Windows: the installer in passive mode; macOS: the
+.app; Linux: the AppImage, .deb or .rpm it was installed from), then
+restarts. `requireSignedVersion` is on: the signature must also name the
+version the manifest announces, so an older, genuinely signed build can't
+be served as an update (there are no older signed releases to re-sign).
+
+The signing key belongs to whoever publishes releases, so nothing about it
+is in the repository. The release workflow writes a config overlay
+(`scripts/updater-config.mjs`) with the public key and manifest URL from
+repository settings, and the bundler signs with the private key from a
+secret. Every other build (local, CI, `check.sh`) has no updater at all:
+the plugin is registered only when the config has its section (it fails to
+start without a key), and Help › Check for updates says this build can't
+update itself. docs/RELEASING.md says how to make and store the keys.
+
+The app looks for an update at startup at most once a day (Settings ›
+Updates, on by default; the request carries only the version), and never
+installs on its own: the dialog shows the version, date and notes, and
+installs on "Install and restart". Help › Check for updates asks at any
+time. Our own commands wrap the plugin (rather than its JS API), so the UI
+gets progress events and errors in words and the e2e mock can stand in for
+it.
+
+## D52 — Accessibility: WCAG 2.2 AA, checked by tests
+
+The target is WCAG 2.2 AA, and each part is a test rather than a one-off
+review:
+
+- **Contrast** (`src/styles/contrast.test.ts`): every text colour token is
+  at least 4.5:1 on every background it is drawn on, including the accent
+  tint of selected rows, in both themes; the focus ring is at least 3:1.
+  This darkened the light theme's subtle grey, null and status colours and
+  lightened the dark theme's subtle grey (the old ones were 2.2–3.9:1).
+- **Automated rules** (`e2e/a11y.spec.ts`, axe-core): no WCAG A/AA violation
+  on the start screen, an open file, the palette, the filter editor, the
+  shortcuts list, the SQL panel and Settings, in both themes.
+- **Keyboard** (`e2e/keyboard.spec.ts`): a walkthrough with no mouse — the
+  tips, opening files, sorting and filtering (the palette has a command per
+  column), search, tabs, the SQL editor, the menu bar and Settings — with
+  the focus checked at each step.
+
+Fixes it led to: the tab bar follows the ARIA tabs pattern (one tab in the
+Tab order, arrows/Home/End move, Delete closes; the close buttons are for
+the mouse and no longer sit inside the tablist); targets are at least 24 px
+(tab close, table rename, sidebar column rows); the SQL editor no longer
+traps the keyboard (Escape then Tab leaves it, or Ctrl+M) and shows a focus
+ring; the grid shows a ring while its canvas has the focus; the menu bar
+and chart selects show the focus ring; the tips' Next button keeps the
+focus when it becomes "Got it".
+
+The grid itself is a canvas (Glide): it is navigated with the arrow keys and
+exposes its visible cells as an accessible table to screen readers; data
+beyond the visible cells is reached by scrolling, Go to row and SQL.
+
+## D53 — The name is DataLiq, and the icon is a database with a forward chevron
+
+The app is called **DataLiq** (data + liquid: data that flows), written with two
+capitals. The name replaces the working title everywhere: the window, menus and
+dialogs, installers and their file names, the bundle identifier
+(`app.dataliq.desktop`, so its folders are new), the command (`dataliq file.csv`),
+the workspace files (`.dataliq`, format `dataliq-workspace`), recipe files, the
+crate (`dataliq` / `dataliq_lib`), internal SQL names (`dl_` prefix), local
+storage keys and the release variables (`DATALIQ_UPDATER_PUBKEY`). No build has
+been published, so nothing reads the old names.
+
+The icon (`assets/icon.svg`, rendered into every size by `tauri icon`) follows
+the current desktop style: bold, flat shapes on a dark graphite tile sized to
+Apple's icon grid. A database stack of three discs in a cyan-to-violet
+gradient says data; an amber chevron pointing forward beside it says fast.
+It stays legible at 32 px and on light and dark backgrounds, and also appears
+in Help › About. It was chosen from three concepts (a "D" with a lightning
+bolt, a table struck by a bolt, this one), after two earlier drafts (a drop
+made of data rows, an arrow made of bars) were set aside at review.
+
+## D54 — The grid, SQL editor and charts load on first use
+
+By 1.0 the UI was one 2.2 MB JavaScript bundle (Glide, CodeMirror, ECharts,
+Arrow), and parsing it at startup pushed "UI ready" to 1.05–1.43 s against
+the 1 s budget. `FileView` (grid), `SqlPanel` (CodeMirror) and `ChartPanel`
+(ECharts) are now `React.lazy` chunks behind `Suspense` with no fallback (the
+area stays empty for the few milliseconds the chunk takes from disk). The
+start screen loads a 681 kB bundle and is ready in 0.89–0.93 s. No
+prefetching: the chunks come from the app's own files, not the network.
+
+Anything that reaches into a lazily mounted component must wait for it:
+the SQL store's `focusEditor` (Ctrl+J) and `load` call the editor once it
+has registered itself, not on the next tick.
+

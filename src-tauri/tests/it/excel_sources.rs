@@ -7,11 +7,11 @@ use std::path::PathBuf;
 use arrow::array::{Array, AsArray};
 use arrow::ipc::reader::StreamReader;
 use arrow::record_batch::RecordBatch;
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::error::AppError;
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{ExcelOptions, FileFormat, OpenOptions, Source, SourceInfo};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::error::AppError;
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{ExcelOptions, FileFormat, OpenOptions, Source, SourceInfo};
 
 fn fixture(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -235,7 +235,7 @@ fn excel_imports_into_the_cache() {
 
 /// The reader SQL ("Copy as SQL") gives the same table in DuckDB's `excel`
 /// extension. Ignored by default: it downloads the extension.
-/// `cargo test -p bigview --test it excel_reader_sql -- --ignored`
+/// `cargo test -p dataliq --test it excel_reader_sql -- --ignored`
 #[test]
 #[ignore = "downloads DuckDB's excel extension"]
 fn excel_reader_sql_reads_the_same_table_in_duckdb() {

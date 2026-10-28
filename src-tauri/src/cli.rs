@@ -1,4 +1,4 @@
-//! Command line: `bigview [files...]`. Files from a second launch are
+//! Command line: `dataliq [files...]`. Files from a second launch are
 //! forwarded to the running app by the single-instance plugin.
 
 use std::path::{Path, PathBuf};
@@ -39,7 +39,7 @@ mod tests {
         let cwd = Path::new("/work");
         let got = files_from_args(
             &[
-                "bigview",
+                "dataliq",
                 "a.csv",
                 "--verbose",
                 "/abs/b.parquet",
@@ -62,17 +62,17 @@ mod tests {
     fn double_dash_allows_dash_names_and_no_args_is_empty() {
         let cwd = Path::new("/w");
         assert_eq!(
-            files_from_args(&["bigview", "--", "-odd.csv"], cwd),
+            files_from_args(&["dataliq", "--", "-odd.csv"], cwd),
             vec![PathBuf::from("/w/-odd.csv")]
         );
-        assert!(files_from_args(&["bigview"], cwd).is_empty());
+        assert!(files_from_args(&["dataliq"], cwd).is_empty());
     }
 
     #[test]
     fn urls_are_kept_as_they_are() {
         assert_eq!(
             files_from_args(
-                &["bigview", "https://x.org/a.csv?t=1", "s3://b/k.parquet"],
+                &["dataliq", "https://x.org/a.csv?t=1", "s3://b/k.parquet"],
                 Path::new("/w")
             ),
             vec![

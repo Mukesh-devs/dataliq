@@ -128,8 +128,17 @@ export function ProfilePanel({ title, profile, loading, error, onClose }: Profil
                   </li>
                 ))}
               </ul>
-              {p.topTruncated && (
-                <p className="mt-1 text-[11px] text-fg-subtle">Showing the 10 most common values</p>
+              {p.topApprox ? (
+                <p className="mt-1 text-[11px] text-fg-subtle">
+                  Nearly every value is different: these are the most common values found by an
+                  estimate (counts are exact)
+                </p>
+              ) : (
+                p.topTruncated && (
+                  <p className="mt-1 text-[11px] text-fg-subtle">
+                    Showing the 10 most common values
+                  </p>
+                )
               )}
             </section>
           )}

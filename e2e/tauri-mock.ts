@@ -36,7 +36,7 @@ export interface MockOptions {
    * `stepMs`) and the final row count. Paths not listed never finish.
    */
   imports?: Record<string, { progress: number[]; rows: number; stepMs?: number }>;
-  /** Files the app "was started with" (`bigview <files>`). */
+  /** Files the app "was started with" (`dataliq <files>`). */
   startupFiles?: string[];
   /** Paths returned by successive "Save" dialogs (null = cancelled). */
   savePaths?: (string | null)[];
@@ -323,7 +323,56 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             case "take_startup_files":
               return startupFiles.splice(0);
             case "get_settings":
-              return { memoryLimitMb: null, cacheEnabled: true, cacheMaxGb: 20, smallFileMb: 0 };
+              return (
+                w.__settings ?? {
+                  memoryLimitMb: null,
+                  tempDir: null,
+                  threads: null,
+                  cacheEnabled: true,
+                  cacheMaxGb: 20,
+                  cacheDir: null,
+                  smallFileMb: 0,
+                }
+              );
+            case "settings_info":
+              return {
+                totalMemoryMb: 16384,
+                defaultMemoryLimitMb: 8192,
+                cores: 8,
+                defaultCacheDir: "/home/me/.cache/dataliq/datasets",
+                defaultTempDir: "/tmp/dataliq-spill",
+                settingsFile: "/home/me/.config/dataliq/settings.json",
+              };
+            case "save_settings": {
+              const next = args.settings as {
+                memoryLimitMb: number | null;
+                cacheDir: string | null;
+              };
+              if (next.memoryLimitMb !== null && next.memoryLimitMb < 256)
+                throw { kind: "query", message: "The memory limit must be at least 256 MB." };
+              w.__settings = next;
+              return { settings: next, restartNeeded: next.cacheDir !== null };
+            }
+            case "update_status":
+              return (
+                (w.__update as { status?: unknown } | undefined)?.status ?? {
+                  configured: false,
+                  currentVersion: "0.6.0",
+                }
+              );
+            case "check_update": {
+              const update = w.__update as { info?: unknown; error?: string } | undefined;
+              if (update?.error) throw { kind: "query", message: update.error };
+              return update?.info ?? null;
+            }
+            case "install_update":
+              // The real app downloads, installs and restarts: it never answers.
+              emit("update-progress", { downloaded: 6_000_000, total: 12_000_000 });
+              return new Promise(() => {});
+            case "sample_dataset":
+              return "/data/comma.csv";
+            case "set_native_menu":
+              return null;
             case "cache_info":
               return {
                 dir: "/cache",

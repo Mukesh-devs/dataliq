@@ -43,6 +43,7 @@ async function open(page: Page) {
       histogram: [],
       top: [],
       topTruncated: false,
+      topApprox: false,
       elapsedMs: 3,
     }),
   });

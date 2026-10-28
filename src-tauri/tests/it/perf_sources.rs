@@ -1,17 +1,17 @@
 //! v0.6 sources on generated large files: a folder of gzipped CSV files,
 //! a 50M-row DuckDB file queried in place, a SQLite import and Parquet
 //! over HTTP. Ignored by default (needs `pnpm fixtures`, a few minutes):
-//!   cargo test -p bigview --test it perf_sources -- --ignored --nocapture --test-threads=1
+//!   cargo test -p dataliq --test it perf_sources -- --ignored --nocapture --test-threads=1
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::settings::Settings;
-use bigview_lib::sources::{DatabaseOptions, OpenOptions, Source};
-use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::settings::Settings;
+use dataliq_lib::sources::{DatabaseOptions, OpenOptions, Source};
+use dataliq_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
 
 fn generated(name: &str) -> Option<PathBuf> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

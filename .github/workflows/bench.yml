@@ -25,12 +25,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-22.04, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Linux system packages
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
@@ -45,7 +46,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           # Same cache as the CI check job on this OS.
-          shared-key: bigview-${{ matrix.os }}
+          shared-key: dataliq-${{ matrix.os }}
 
       - name: Benchmarks
         run: node scripts/bench.mjs

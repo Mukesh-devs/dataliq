@@ -56,6 +56,13 @@
   ::selection {
     background: var(--accent-soft);
   }
+
+  /* The grid draws on a canvas: ring the whole grid while it has the
+     keyboard focus (the selected cell shows where in it). */
+  [data-testid="data-grid"]:has(canvas:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
 }
 
 @layer utilities {

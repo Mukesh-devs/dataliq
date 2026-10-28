@@ -341,7 +341,7 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
                 />
                 <select
                   aria-label={`Measure ${i + 1}`}
-                  className="h-6 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-fg outline-none"
+                  className="h-6 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-fg"
                   value={m.agg}
                   onChange={(e) =>
                     setMeasure(
@@ -369,7 +369,7 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
                 {m.agg !== "count" && (
                   <select
                     aria-label={`Measure ${i + 1} column`}
-                    className="h-6 max-w-40 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-fg outline-none"
+                    className="h-6 max-w-40 rounded-[var(--radius-sm)] bg-transparent text-[12px] text-fg"
                     value={m.column ?? ""}
                     onChange={(e) => setMeasure(i, m.agg, e.target.value)}
                   >

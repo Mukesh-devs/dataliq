@@ -225,7 +225,7 @@ function SavedList() {
               type="button"
               aria-label={`Delete ${q.name}`}
               onClick={() => void deleteSavedQuery(q.name).then(() => setVersion((v) => v + 1))}
-              className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-60 hover:bg-hover hover:text-danger group-hover:opacity-100"
+              className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-80 hover:bg-hover hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
             >
               <Trash2 className="size-3.5" aria-hidden />
             </button>

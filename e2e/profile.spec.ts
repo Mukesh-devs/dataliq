@@ -59,6 +59,7 @@ async function open(page: Page) {
         ],
         top: [{ value: "0.0", count: 1 }],
         topTruncated: true,
+        topApprox: false,
         elapsedMs: 42,
       };
     },

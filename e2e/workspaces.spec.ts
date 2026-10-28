@@ -6,8 +6,8 @@ type Invoke = { cmd: string; args: Record<string, unknown> };
 test("save the open tabs as a workspace and open it again", async ({ page }) => {
   await mockTauri(page, {
     startupFiles: ["/data/comma.csv", "/data/nulls.csv"],
-    savePaths: ["/work/comma.bigview"],
-    dialogPaths: ["/work/comma.bigview"],
+    savePaths: ["/work/comma.dataliq"],
+    dialogPaths: ["/work/comma.dataliq"],
   });
   await page.goto("/");
   await expect(page.getByRole("tab", { name: /nulls\.csv/ })).toBeVisible();
@@ -21,7 +21,7 @@ test("save the open tabs as a workspace and open it again", async ({ page }) => 
   await page.keyboard.type("SELECT 42 AS answer");
 
   await page.keyboard.press("Control+s");
-  await expect(page.getByText("Workspace saved: comma.bigview")).toBeVisible();
+  await expect(page.getByText("Workspace saved: comma.dataliq")).toBeVisible();
   const saved = await page.evaluate(
     () =>
       (window as unknown as { __invokes: Invoke[] }).__invokes.filter(
@@ -29,7 +29,7 @@ test("save the open tabs as a workspace and open it again", async ({ page }) => 
       )[0]!.args,
   );
   expect(saved).toMatchObject({
-    path: "/work/comma.bigview",
+    path: "/work/comma.dataliq",
     workspace: {
       active: 0,
       tabs: [{ path: "/data/comma.csv", view: { search: "Alice" } }, { path: "/data/nulls.csv" }],
@@ -39,13 +39,15 @@ test("save the open tabs as a workspace and open it again", async ({ page }) => 
 
   // Close everything, then open the workspace from the palette.
   await page.keyboard.press("Control+j");
-  await page.getByRole("button", { name: "Close comma.csv" }).click();
-  await page.getByRole("button", { name: "Close nulls.csv" }).click();
+  await page.getByRole("tab", { name: /comma\.csv/ }).focus();
+  await page.keyboard.press("Delete");
+  await page.getByRole("tab", { name: /nulls\.csv/ }).focus();
+  await page.keyboard.press("Delete");
   await expect(page.getByRole("tab")).toHaveCount(0);
   await page.keyboard.press("Control+k");
   await page.getByRole("combobox", { name: "Search commands" }).fill("open workspace");
   await page.keyboard.press("Enter");
-  await expect(page.getByText(/Workspace opened: comma\.bigview \(2 tabs\)/)).toBeVisible();
+  await expect(page.getByText(/Workspace opened: comma\.dataliq \(2 tabs\)/)).toBeVisible();
   await expect(page.getByRole("tab")).toHaveCount(2);
   await expect(page.getByRole("tab", { name: /comma\.csv/ })).toHaveAttribute(
     "aria-selected",

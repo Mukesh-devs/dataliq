@@ -1,7 +1,7 @@
 {
-  "name": "bigview",
+  "name": "dataliq",
   "private": true,
-  "version": "0.6.0",
+  "version": "1.0.0",
   "description": "Open huge tabular files instantly. Filter, query with SQL, chart and export without loading them into RAM.",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,7 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/release/release.test.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:perf": "playwright test -c playwright.perf.config.ts",
@@ -33,6 +33,7 @@
     "@fontsource-variable/jetbrains-mono": "5.3.0",
     "@glideapps/glide-data-grid": "6.0.3",
     "@lezer/highlight": "1.2.5",
+    "@radix-ui/react-menubar": "1.2.1",
     "@radix-ui/react-popover": "1.2.0",
     "@tauri-apps/api": "2.12.3",
     "@tauri-apps/plugin-dialog": "2.8.2",
@@ -49,6 +50,7 @@
     "zustand": "5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",

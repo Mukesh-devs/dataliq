@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use arrow::array::AsArray;
 use arrow::datatypes::Int64Type;
 use arrow::ipc::reader::StreamReader;
-use bigview_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, RequestKey};
+use dataliq_lib::engine::{Dataset, DatasetSource, Engine, EngineConfig, RequestKey};
 
 fn engine_with_table(rows: u64) -> (Engine, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();

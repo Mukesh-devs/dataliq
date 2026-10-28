@@ -48,7 +48,7 @@ jobs:
       # DuckDB's bundled C++ build is slow: cache target/ aggressively.
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: bigview-${{ matrix.os }}
+          shared-key: dataliq-${{ matrix.os }}
           cache-on-failure: true
 
       - run: pnpm install --frozen-lockfile

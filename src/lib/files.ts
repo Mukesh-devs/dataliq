@@ -121,11 +121,26 @@ export interface CacheInfo {
   entries: number;
 }
 
+/** Mirrors `Settings` in src-tauri/src/settings.rs. Unset = automatic. */
 export interface AppSettings {
   memoryLimitMb: number | null;
+  /** Folder for DuckDB's spill files. */
+  tempDir: string | null;
+  threads: number | null;
   cacheEnabled: boolean;
   cacheMaxGb: number;
+  cacheDir: string | null;
   smallFileMb: number;
+}
+
+/** Defaults and limits shown next to the settings. */
+export interface SettingsInfo {
+  totalMemoryMb: number;
+  defaultMemoryLimitMb: number;
+  cores: number;
+  defaultCacheDir: string;
+  defaultTempDir: string;
+  settingsFile: string;
 }
 
 export interface SourceInfo {
@@ -199,6 +214,17 @@ export function getSettings(): Promise<AppSettings> {
   return call<AppSettings>("get_settings");
 }
 
+export function settingsInfo(): Promise<SettingsInfo> {
+  return call<SettingsInfo>("settings_info");
+}
+
+/** Saves and applies the settings; a new folder needs a restart. */
+export function saveSettings(
+  settings: AppSettings,
+): Promise<{ settings: AppSettings; restartNeeded: boolean }> {
+  return call("save_settings", { settings });
+}
+
 /** Subscribes to import progress events. Resolves to an unsubscribe function. */
 export async function onImportProgress(
   handler: (progress: ImportProgress) => void,
@@ -227,7 +253,7 @@ export const FILE_EXTENSIONS = [
   "duckdb",
   "ddb",
   // Workspaces (open the tabs they saved).
-  "bigview",
+  "dataliq",
 ];
 
 /** Shows the native open dialog. Resolves to [] when cancelled. */
@@ -255,12 +281,17 @@ export async function pickFolder(): Promise<string | null> {
 /** A path with wildcards: several files opened as one table. */
 export const isPattern = (path: string) => /[*?[]/.test(path);
 
+/** The sample dataset's path (written to the app's data folder the first time). */
+export function sampleDataset(): Promise<string> {
+  return call<string>("sample_dataset");
+}
+
 /** Files passed on the command line when the app started (returned once). */
 export function takeStartupFiles(): Promise<string[]> {
   return call<string[]>("take_startup_files");
 }
 
-/** Files forwarded by a second `bigview <files>` launch. */
+/** Files forwarded by a second `dataliq <files>` launch. */
 export async function onOpenFiles(handler: (paths: string[]) => void): Promise<() => void> {
   const { listen } = await import("@tauri-apps/api/event");
   return listen<string[]>("open-files", (e) => handler(e.payload));

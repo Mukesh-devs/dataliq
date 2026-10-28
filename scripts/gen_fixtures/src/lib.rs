@@ -1,4 +1,4 @@
-//! Generator for BigView's large test fixtures (git-ignored). Output is
+//! Generator for DataLiq's large test fixtures (git-ignored). Output is
 //! deterministic: the same target always produces the same rows, and text
 //! formats are byte-identical on every platform.
 

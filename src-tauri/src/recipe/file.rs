@@ -10,7 +10,7 @@ use crate::error::{AppError, Result};
 use crate::sources::ColumnMeta;
 
 /// What a recipe file says it is.
-pub const FORMAT: &str = "bigview-recipe";
+pub const FORMAT: &str = "dataliq-recipe";
 /// The newest file version this build reads (and the one it writes).
 pub const VERSION: u32 = 1;
 
@@ -66,12 +66,12 @@ pub fn load_recipe(path: &Path) -> Result<RecipeFile> {
     let value: serde_json::Value = serde_json::from_str(&text)
         .map_err(|e| AppError::Query(format!("This file is not valid JSON: {e}")))?;
     if value.get("format").and_then(|f| f.as_str()) != Some(FORMAT) {
-        return Err(AppError::Query("This file is not a BigView recipe.".into()));
+        return Err(AppError::Query("This file is not a DataLiq recipe.".into()));
     }
     let version = value.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
     if version == 0 || version > u64::from(VERSION) {
         return Err(AppError::Query(format!(
-            "This recipe was saved by a newer BigView (version {version}); update BigView to open it."
+            "This recipe was saved by a newer DataLiq (version {version}); update DataLiq to open it."
         )));
     }
     serde_json::from_value(value)
@@ -130,7 +130,7 @@ mod tests {
         let path = dir.path().join("clean.json");
         save_recipe(&path, &recipe()).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
-        assert!(text.contains(r#""format": "bigview-recipe""#), "{text}");
+        assert!(text.contains(r#""format": "dataliq-recipe""#), "{text}");
         assert!(text.contains(r#""op": "changeCase""#), "{text}");
         let back = load_recipe(&path).unwrap();
         assert_eq!(back.version, VERSION);
@@ -149,13 +149,13 @@ mod tests {
             load_recipe(&p).unwrap_err().to_string()
         };
         assert!(msg("not json").contains("not valid JSON"));
-        assert!(msg(r#"{"a": 1}"#).contains("not a BigView recipe"));
+        assert!(msg(r#"{"a": 1}"#).contains("not a DataLiq recipe"));
         assert!(
-            msg(r#"{"format": "bigview-recipe", "version": 9, "steps": []}"#)
-                .contains("newer BigView")
+            msg(r#"{"format": "dataliq-recipe", "version": 9, "steps": []}"#)
+                .contains("newer DataLiq")
         );
         assert!(
-            msg(r#"{"format": "bigview-recipe", "version": 1, "steps": [{"op": "nope"}]}"#)
+            msg(r#"{"format": "dataliq-recipe", "version": 1, "steps": [{"op": "nope"}]}"#)
                 .contains("damaged")
         );
         assert!(save_recipe(&dir.path().join("x.txt"), &recipe()).is_err());

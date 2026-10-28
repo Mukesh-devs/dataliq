@@ -29,7 +29,13 @@ describe("TabBar", () => {
     expect(screen.getByRole("tab", { name: "a.csv" })).toHaveAttribute("aria-selected", "true");
     await userEvent.click(screen.getByRole("tab", { name: "b.csv" }));
     expect(onSelect).toHaveBeenCalledWith("2");
-    await userEvent.click(screen.getByRole("button", { name: "Close a.csv" }));
+    // The close button is for the mouse; Delete on the tab closes it too.
+    const [close] = screen.getAllByTitle(/^Close/);
+    await userEvent.click(close!);
+    expect(onClose).toHaveBeenCalledWith("1");
+    onClose.mockClear();
+    screen.getByRole("tab", { name: "a.csv" }).focus();
+    await userEvent.keyboard("{Delete}");
     expect(onClose).toHaveBeenCalledWith("1");
     fireEvent(
       screen.getByRole("tab", { name: "b.csv" }),

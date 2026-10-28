@@ -2,13 +2,13 @@
 
 use arrow::array::AsArray;
 use arrow::datatypes::Int64Type;
-use bigview_lib::engine::{Engine, RequestKey};
-use bigview_lib::import;
-use bigview_lib::sources::Source;
+use dataliq_lib::engine::{Engine, RequestKey};
+use dataliq_lib::import;
+use dataliq_lib::sources::Source;
 
 use crate::filters::fx;
 
-fn count(engine: &Engine, sql: &str) -> bigview_lib::error::Result<i64> {
+fn count(engine: &Engine, sql: &str) -> dataliq_lib::error::Result<i64> {
     let out = engine.query(sql, &[], 1, &RequestKey::default())?;
     Ok(out.batches[0]
         .column(0)
@@ -138,15 +138,15 @@ fn a_newer_panel_query_cancels_the_running_one() {
         assert!(started.elapsed().as_secs() < 5, "waited for the slow query");
         assert!(matches!(
             slow.join().unwrap(),
-            Err(bigview_lib::error::AppError::Cancelled)
+            Err(dataliq_lib::error::AppError::Cancelled)
         ));
     });
 }
 
 #[test]
 fn current_view_follows_a_filtered_sorted_view() {
-    use bigview_lib::engine::Param;
-    use bigview_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
+    use dataliq_lib::engine::Param;
+    use dataliq_lib::view::{Filter, FilterOp, SortKey, ViewSpec};
     let fx = fx();
     let spec = ViewSpec {
         filters: vec![Filter {

@@ -146,7 +146,7 @@ impl Engine {
     }
 
     /// Schema for session-only tables (materialized views), attached on first
-    /// use: `bv_scratch.main`. On disk, so big views are compressed and
+    /// use: `dl_scratch.main`. On disk, so big views are compressed and
     /// don't count against the memory limit.
     pub fn scratch_schema(&self) -> Result<&'static str> {
         let mut scratch = self.scratch.lock();
@@ -158,12 +158,12 @@ impl Engine {
             ));
             let _ = std::fs::remove_file(&path);
             self.execute_batch(&format!(
-                "ATTACH '{}' AS bv_scratch",
+                "ATTACH '{}' AS dl_scratch",
                 path.to_string_lossy().replace('\'', "''")
             ))?;
             *scratch = Some(path);
         }
-        Ok("bv_scratch.main")
+        Ok("dl_scratch.main")
     }
 
     /// Runs a statement that returns no rows (e.g. `CREATE TABLE … AS`),
@@ -350,6 +350,17 @@ impl Engine {
         Ok(true)
     }
 
+    /// New memory and thread limits from Settings, for every connection.
+    pub fn set_limits(&self, memory_limit_bytes: u64, threads: Option<u32>) -> Result<()> {
+        let mib = (memory_limit_bytes / (1024 * 1024)).max(1);
+        let threads = threads
+            .map(|t| t.max(1) as usize)
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()));
+        self.execute_batch(&format!(
+            "SET memory_limit = '{mib}MiB'; SET threads = {threads};"
+        ))
+    }
+
     /// Marks work in progress for [`Engine::release_memory`] until dropped.
     /// Nesting is fine: the exclusive side is only ever tried, never waited for.
     pub fn busy(&self) -> parking_lot::RwLockReadGuard<'_, ()> {
@@ -378,7 +389,7 @@ impl Drop for Engine {
             let _ = self
                 .root
                 .lock()
-                .execute_batch("DETACH DATABASE IF EXISTS bv_scratch");
+                .execute_batch("DETACH DATABASE IF EXISTS dl_scratch");
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(path.with_extension("duckdb.wal"));
         }

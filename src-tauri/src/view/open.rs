@@ -160,6 +160,8 @@ impl Engine {
                     select: view.select,
                     reversed: view.reversed.unwrap_or_default(),
                     params: view.params,
+                    order: view.order,
+                    ordered: None,
                 };
                 (source, rows, true)
             }
@@ -192,36 +194,16 @@ impl Engine {
             group: None,
         };
         let ds = self.datasets.get(view_id)?;
-        let (select, params, partial) = match ds.source {
-            DatasetSource::Query { sql, params } => (format!("SELECT * FROM {sql}"), params, None),
-            DatasetSource::Sorting {
-                head,
-                select,
-                reversed,
-                params,
-                ..
-            } => {
-                let tail_view = BuiltView {
-                    select: format!("{reversed} LIMIT {MAX_HEAD}"),
-                    count: String::new(),
-                    reversed: None,
-                    params: params.clone(),
-                };
-                let tail = self.write_view(&format!("{view_id}_tail"), &tail_view, &key)?;
-                let switched = self.datasets.update_source(view_id, |source| {
-                    if let DatasetSource::Sorting {
-                        tail: t, tail_rows, ..
-                    } = source
-                    {
-                        *t = Some(tail.clone());
-                        *tail_rows = MAX_HEAD;
-                    }
-                });
-                if !switched {
-                    self.execute_batch(&format!("DROP TABLE IF EXISTS {tail}"))?;
+        let (select, params) = match ds.source {
+            DatasetSource::Query { sql, params } => (format!("SELECT * FROM {sql}"), params),
+            DatasetSource::Sorting { .. } => {
+                if !self.prepare_sorted_view(view_id)? {
                     return Ok(false);
                 }
-                (select, params, Some((head, tail)))
+                match self.datasets.get(view_id)?.source {
+                    DatasetSource::Sorting { select, params, .. } => (select, params),
+                    _ => return Ok(false),
+                }
             }
             _ => return Ok(false),
         };
@@ -230,8 +212,10 @@ impl Engine {
             count: String::new(),
             reversed: None,
             params,
+            order: None,
         };
         let table = self.write_view(view_id, &view, &key)?;
+        let before = self.datasets.get(view_id).map(|d| d.source);
         let switched = self.datasets.replace_source(
             view_id,
             DatasetSource::Materialized {
@@ -241,13 +225,84 @@ impl Engine {
         if !switched {
             self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
         }
-        if let Some((head, tail)) = partial {
+        if let Ok(DatasetSource::Sorting {
+            head,
+            tail,
+            ordered,
+            ..
+        }) = before
+        {
             // Pages still reading the small tables hold their own snapshot.
-            self.execute_batch(&format!(
-                "DROP TABLE IF EXISTS {head}; DROP TABLE IF EXISTS {tail}"
-            ))?;
+            for t in std::iter::once(&head).chain(&tail).chain(&ordered) {
+                self.execute_batch(&format!("DROP TABLE IF EXISTS {t}"))?;
+            }
         }
         Ok(switched)
+    }
+
+    /// The first background stages of a sorted view: its last rows (so the
+    /// end shows at once), then, over a table, its rows' order by row id,
+    /// after which every page can be read while the full sort is written.
+    /// Returns false if it isn't a view being sorted, or it was closed.
+    pub fn prepare_sorted_view(&self, view_id: &str) -> Result<bool> {
+        let key = RequestKey {
+            id: Some(materialize_request_id(view_id)),
+            group: None,
+        };
+        let DatasetSource::Sorting {
+            tail,
+            reversed,
+            params,
+            order,
+            ordered,
+            ..
+        } = self.datasets.get(view_id)?.source
+        else {
+            return Ok(false);
+        };
+        if tail.is_none() {
+            let tail_view = BuiltView {
+                select: format!("{reversed} LIMIT {MAX_HEAD}"),
+                count: String::new(),
+                reversed: None,
+                params: params.clone(),
+                order: None,
+            };
+            let tail = self.write_view(&format!("{view_id}_tail"), &tail_view, &key)?;
+            let switched = self.datasets.update_source(view_id, |source| {
+                if let DatasetSource::Sorting {
+                    tail: t, tail_rows, ..
+                } = source
+                {
+                    *t = Some(tail.clone());
+                    *tail_rows = MAX_HEAD;
+                }
+            });
+            if !switched {
+                self.execute_batch(&format!("DROP TABLE IF EXISTS {tail}"))?;
+                return Ok(false);
+            }
+        }
+        if let (Some(order), None) = (order, ordered) {
+            let order_view = BuiltView {
+                select: order.rows,
+                count: String::new(),
+                reversed: None,
+                params,
+                order: None,
+            };
+            let table = self.write_view(&format!("{view_id}_order"), &order_view, &key)?;
+            let switched = self.datasets.update_source(view_id, |source| {
+                if let DatasetSource::Sorting { ordered, .. } = source {
+                    *ordered = Some(table.clone());
+                }
+            });
+            if !switched {
+                self.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// The most frequent values of `column` among the rows matching the

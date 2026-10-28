@@ -15,6 +15,12 @@ lto = true
 opt-level = 3
 strip = true
 
+# zlib-rs keeps zlib's `total_in`, an unsigned long: 32 bits on Windows, so
+# it wraps after 4 GiB of compressed input, as in zlib (flate2 keeps its own
+# 64-bit totals). Release builds wrap; debug builds would panic instead.
+[profile.dev.package.zlib-rs]
+overflow-checks = false
+
 # The fixture generator formats billions of bytes; keep it fast in dev builds.
 [profile.dev.package.gen_fixtures]
 opt-level = 3

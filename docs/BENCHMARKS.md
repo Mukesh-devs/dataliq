@@ -45,13 +45,15 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Full import of a 1M-row .xlsx | — | 14.9 s, peak RSS 419 MB | v0.1 step 9 |
 | Reopen a cached file | < 1 s | 1–2 ms | v0.1 step 7 |
 | Peak memory while importing 5 GB | < DuckDB limit + 300 MB (8,045 + 300 MiB) | 1.9 GB (CSV), 3.2 GB (.csv.gz) | v0.1 step 7 |
-| App cold start to usable window (release) | < 1 s | window mapped 0.13 s, UI ready 0.87 s | v0.1.0 |
-| Idle memory, whole app incl. webview (release) | < 200 MB | 241 MiB PSS, of which 77 MiB private — see below | v0.1.0 |
-| Installer size (Linux) | < 40 MB | .deb 19.4 MB, .rpm 19.4 MB, .AppImage 92.5 MB — see below | v0.1.0 |
+| App cold start to usable window (release) | < 1 s | window mapped 0.09–0.11 s, UI ready 0.89–0.93 s | v1.0.0 |
+| Idle memory, whole app incl. webview (release) | < 200 MB | 407 MiB PSS, 195 MiB private, of which ~115 MiB software-GL buffers (no GPU) — see v1.0.0 | v1.0.0 |
+| Installer size | < 40 MB | Windows setup 13.9 MiB, MSI 18.9 MiB; macOS universal .dmg 37.2 MiB; .deb / .rpm 22.3 MiB; .AppImage 95.1 MiB (D24) | v1.0.0 |
 | Grid scroll, 50M rows (Chromium, mocked backend) | ~60 fps, no blank page > 100 ms | 60 fps; page wait p95 42 ms / max 51 ms (fast scroll), p95 56 / max 77 ms (fling) | v0.1.0 |
 | Simple filter on 50M rows (first rows + count) | < 2 s | 0.06–0.79 s | v0.2 step 3 |
 | Sort 50M rows | < 10 s | first and last rows 0.8–1.2 s; full sort 20–37 s in the background (missed, D29) | v0.2 step 3 |
+| Sort 50M rows: every page readable | < 10 s | 5.7 s by date and price, 12.2 s by a text column (row order, D29) | v1.0 step 1 |
 | Column stats on 50M rows | < 3 s | 0.44–2.78 s per column | v0.2 step 6 |
+| Column stats, 39.5M distinct timestamps in 50M rows | < 3 s | 1.59 s (was 4.81 s; most common values by estimate, D49) | v1.0 step 1 |
 | Export 50M rows to Parquet / CSV | — (report) | 7.6 s / 23.9 s | v0.3.0 |
 | Export 1M rows to Excel | — (report) | 14.7 s, peak memory +2 MiB | v0.3.0 |
 | SQL aggregate over 50M rows | — (report) | 0.19 s (8 groups), 1.44 s (100K groups) | v0.3.0 |
@@ -60,33 +62,33 @@ Measured on `linux-dev`. Full tables per OS are recorded at each version tag.
 | Compare 50M against 50M rows by key (5M differences) | — (report) | 14.0 s; differences written in full 8.5 s | v0.5 step 3 |
 | Data quality check of 50M rows (9 columns) | — (report) | 6.5 s | v0.5 step 4 |
 
-Import numbers come from `cargo test -p bigview --test it perf_import -- --ignored --nocapture
+Import numbers come from `cargo test -p dataliq --test it perf_import -- --ignored --nocapture
 --test-threads=1`; peak memory is the process's `VmHWM`. Gzip decompression is single-threaded,
 so `.csv.gz` imports are bounded by it (plus our parallel integrity check on another core).
 
-Preview numbers come from `cargo test -p bigview --test it perf_preview -- --ignored --nocapture`
+Preview numbers come from `cargo test -p dataliq --test it perf_preview -- --ignored --nocapture`
 (dev profile) and the app's status bar.
 
 ## v0.1.0 — linux-dev
 
 **Startup** (release build, Xvfb with software rendering, 6 runs): the window
 is mapped 0.12–0.16 s after launch; the UI is ready (React mounted, first IPC
-call, logged as `frontend ready`) after 0.86–0.89 s. With `bigview comma.csv`
+call, logged as `frontend ready`) after 0.86–0.89 s. With `dataliq comma.csv`
 the file's rows are on screen after ~1.0 s.
 
 **Idle memory** (release, no file open, 12 s after launch, PSS summed over the
-`bigview`, `WebKitWebProcess` and `WebKitNetworkProcess` processes):
+`dataliq`, `WebKitWebProcess` and `WebKitNetworkProcess` processes):
 
 | Process | PSS | of which private (anonymous) |
 | --- | --- | --- |
-| bigview (Rust + DuckDB + GTK) | 104 MiB | 33 MiB |
+| dataliq (Rust + DuckDB + GTK) | 104 MiB | 33 MiB |
 | WebKitWebProcess (UI) | 115 MiB | 36 MiB |
 | WebKitNetworkProcess | 22 MiB | 8 MiB |
 | **Total** | **241 MiB** | **77 MiB** |
 
 The budget is missed on PSS but met on private memory. Most of the rest is
 shared library code mapped from disk: WebKitGTK and JavaScriptCore (~85 MiB
-across the three processes), the bigview binary itself (29 MiB, mostly
+across the three processes), the dataliq binary itself (29 MiB, mostly
 DuckDB) and `libLLVM` (36 MiB), which is only loaded because Xvfb has no GPU
 and WebKit falls back to llvmpipe software GL. On a desktop with a GPU driver
 that part goes away. These pages are clean and shared with other WebKitGTK
@@ -142,14 +144,14 @@ Found while benchmarking: every import waited for its progress thread's
 250 ms poll to end, so imports finished up to 250 ms late. Fixed (the thread
 is woken when the import ends).
 
-### Not yet measured per OS
+### Per OS
 
-Windows and macOS numbers (all budgets) are not measured yet: CI only builds
-and tests there. They are part of the v1.0 performance pass.
+Measured on Windows, macOS and Linux in the v1.0 performance pass: see
+[v1.0 — every budget on three OSes](#v10--every-budget-on-three-oses).
 
 ## v0.2 — views on 50M cached rows (linux-dev)
 
-`cargo test -p bigview --test it perf_views_50m -- --ignored --nocapture` on
+`cargo test -p dataliq --test it perf_views_50m -- --ignored --nocapture` on
 `sales_50m.parquet` imported into a cache database (9 columns: ids, dates,
 timestamps, text, decimals, booleans). "First rows" is `open_view` plus the
 first 500-row page, i.e. what the user waits for.
@@ -198,7 +200,7 @@ The CI guard (baseline from the runner, D26) runs on the v0.2.0 tag.
 
 ### Column profiles (v0.2 step 6)
 
-`cargo test -p bigview --test it perf_profile_50m -- --ignored --nocapture`, same 50M rows,
+`cargo test -p dataliq --test it perf_profile_50m -- --ignored --nocapture`, same 50M rows,
 warm cache. One profile is the stats query (count, nulls, min, max, mean, std dev, distinct —
 HyperLogLog above 10M rows), the histogram and the 10 most common values.
 
@@ -220,7 +222,7 @@ or date column; they load behind the grid and are cancelled by the next view cha
 
 ## v0.3 — exports and SQL on 50M cached rows (linux-dev)
 
-`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_export -- --ignored --nocapture
+`PERF_CACHE_DB=<db> cargo test -p dataliq --test it perf_export -- --ignored --nocapture
 --test-threads=1` (dev profile, warm cache): the same 50M rows (9 columns) as v0.2, exported
 through `export::export` exactly as the app does (view query, `.partial` file and rename).
 "Peak" is the growth of the process's peak memory during that export.
@@ -284,7 +286,7 @@ CI guard on the tag is the one that counts (D26).
 
 ## v0.4 — charts on 50M cached rows (linux-dev)
 
-`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_charts_50m -- --ignored --nocapture`
+`PERF_CACHE_DB=<db> cargo test -p dataliq --test it perf_charts_50m -- --ignored --nocapture`
 (dev profile, warm cache), through `Engine::chart_data` exactly as the chart panel asks.
 
 | Chart | Points | Time |
@@ -306,7 +308,7 @@ after the cache file had not been read for a day waited for this container's dis
 
 ## v0.5 — cleaning, comparing and quality on 50M cached rows (linux-dev)
 
-`PERF_CACHE_DB=<db> cargo test -p bigview --test it perf_recipe_compare_50m perf_quality_50m --
+`PERF_CACHE_DB=<db> cargo test -p dataliq --test it perf_recipe_compare_50m perf_quality_50m --
 --ignored --nocapture --test-threads=1` (dev profile, warm cache), through the engine calls the
 panels make.
 
@@ -344,7 +346,7 @@ importing or paging; the guard against the CI runner's baseline passes (all with
 
 ## v0.6 — folders, databases and URLs (linux-dev)
 
-`cargo test -p bigview --test it perf_sources -- --ignored --nocapture --test-threads=1` (dev
+`cargo test -p dataliq --test it perf_sources -- --ignored --nocapture --test-threads=1` (dev
 profile), through the calls the app makes when opening each kind of source. Measured on a
 fresh container (the machine changed since v0.5.0; see the small suite below).
 
@@ -393,3 +395,142 @@ are not comparable to earlier ones; the runner is the steady reference.
 
 v0.6 doesn't change the Excel path; the two Excel flows are the closest to the guard and are
 on the v1.0 performance pass's list.
+
+## v1.0 — every budget on three OSes
+
+The **Budgets** workflow (`.github/workflows/budgets.yml`, on demand) generates each large
+fixture on a GitHub-hosted runner, runs the exact ignored tests that measure its budgets, and
+deletes the fixture before the next one (5 GB at a time fits the runners' disks). Dev profile
+(dependencies at `opt-level = 2`), like every other number on this page. Runners: `ubuntu-22.04`
+and `windows-latest` (4 vCPU, 16 GB), `macos-latest` (Apple silicon). Run
+[40678094551](https://github.com/mukesh-dsnl/dataliq/actions/runs/40678094551), on cf8fe76.
+
+| Flow | Budget | Linux | Windows | macOS |
+| --- | --- | --- | --- | --- |
+| First rows of a 5 GB CSV | < 1 s | 0.28 s | 0.34 s | 0.30 s |
+| First rows of a 5 GB .csv.gz | < 2 s | 1.22 s | 1.41 s | 0.93 s |
+| First rows of a 5 GB .ndjson.gz | < 2 s | 0.34 s | 0.43 s | 0.24 s |
+| Full import of a 5 GB CSV (45.8M rows) | report (aim < 60 s) | 39.7 s | 47.5 s | 18.7 s |
+| Full import of a 5 GB .csv.gz (109M rows) | report | 122.8 s | 145.1 s | 62.3 s |
+| Reopen a cached file | < 1 s | 1–2 ms | 2–3 ms | 1–2 ms |
+| Peak memory while importing 5 GB | < DuckDB limit + 300 MB | 1.9 GB (CSV), 3.2 GB (.csv.gz); limit 7,994 MiB | not measured¹ | not measured¹ |
+| Open a 50M-row Parquet | < 1 s | 0.047 s | 0.068 s | 0.036 s |
+| Random 500-row page of it | < 100 ms | 18.9 ms | 30.2 ms | 10.9 ms |
+| Filter 50M cached rows: first rows | < 2 s | 0.07–0.92 s | 0.07–1.14 s | 0.02–0.23 s |
+| Sort 50M cached rows: first and last rows | < 10 s | 0.76–1.00 s | 0.91–1.15 s | 0.28–0.29 s |
+| Sort 50M cached rows: written in full (background) | — | 22–32 s | 44 s | 7–11 s |
+| Column stats, one column of 50M rows | < 3 s | 0.70–**3.11 s** | 0.63–**3.30 s** | 0.15–1.14 s |
+| Chart aggregation over 50M rows | < 2 s | 0.11–1.73 s | 0.12–1.97 s | 0.04–0.54 s |
+| Header histograms, 7 columns of 50M rows | — | 5.8 s | 6.6 s | 1.9 s |
+| Data quality check of 50M rows | — | 9.3 s | 10.1 s | 3.1 s |
+
+¹ Peak memory comes from Linux's `VmHWM`; the test reports none elsewhere. DuckDB's own memory
+limit (half of RAM by default, D48) bounds the engine on every OS.
+
+**Second run** ([40699638818](https://github.com/mukesh-dsnl/dataliq/actions/runs/40699638818),
+on b632bc2, with the row-order bridge and the estimated top values):
+
+| Flow | Budget | Linux | Windows | macOS¹ |
+| --- | --- | --- | --- | --- |
+| Sort 50M rows: every page readable (by customer / by date, price) | < 10 s | 9.1 / 6.2 s | 9.6 / **10.5 s** | 7.1 / 3.7 s |
+| Column stats, slowest column (`order_ts`, 39.5M distinct) | < 3 s | 2.69 s | 2.56 s | 2.91 s |
+| Chart aggregation, slowest (distinct customers per country) | < 2 s | 1.91 s | **2.29 s** | 1.50 s |
+| Full import of a 5 GB .csv.gz | report | 122.7 s | 147.5 s | 134.2 s |
+
+¹ A smaller macOS runner this time (DuckDB limit 3,584 MiB, i.e. 7 GB of RAM), slower than in
+the first run.
+
+The Windows gzip import ran without the zlib-rs panic. Column stats now meet the budget on every
+OS. Two Windows numbers are over by under 10 %, on a 4-vCPU runner in the dev profile (the
+budgets are for an 8-core laptop): every page of a two-key sort readable after 10.5 s (the
+first and last pages are there in 1.05 s, and any page in the middle in about 1 s while the
+order is written), and `count(DISTINCT customer)` per country in 2.29 s (1.97 s in the first
+run). Both are a single DuckDB pass already (a parallel sort, and a grouped distinct
+aggregate), so they scale with cores; documented rather than approximated, since a chart of
+distinct counts must be exact.
+
+**Missed: column stats of `order_ts`** (39.5M distinct timestamps) on the 4-vCPU Linux and Windows
+runners. Of its 3–4 s, the most common values took 3.3 s here: counting every value means one
+group per row. Above 1M distinct values the candidates now come from DuckDB's `approx_top_k`
+sketch and are counted exactly in one more scan (`APPROX_TOP_DISTINCT`): a value common enough
+to matter is always found, and the panel says the list comes from an estimate. On linux-dev,
+`order_ts` went from 4.81 s to 1.59 s (stats 0.5 s, histogram 0.3 s, values 0.8 s); the other columns are unchanged (they stay
+on exact counting).
+
+**Found: zlib-rs panics on Windows after 4 GiB of gzip input in debug builds.** The integrity
+check of the 5 GB `.csv.gz` stopped with "attempt to add with overflow" in `zlib-rs`'s
+`total_in`, an unsigned long (32 bits on Windows) that zlib lets wrap. flate2 keeps its own
+64-bit totals, and release builds wrap as zlib does, so the app was not affected; debug builds
+now build zlib-rs without overflow checks too. The import also ignored the panicked check (the
+thread's result was dropped): it is now logged as an error.
+
+Not measurable on the hosted runners (no desktop session): cold start, idle memory and grid
+frame rate on Windows and macOS (measured on Linux, see v1.0.0 below). Installer sizes per OS
+are in the same section.
+
+### Small suite on three OSes
+
+`pnpm bench` on the same runners (run
+[40678094490](https://github.com/mukesh-dsnl/dataliq/actions/runs/40678094490)). Windows and macOS
+had no baseline, so these runs are now theirs (`bench/baseline/<os>.json`); the guard covers
+all three OSes from here on.
+
+| Flow | Linux (baseline) | Linux | Windows | macOS |
+| --- | --- | --- | --- | --- |
+| first_rows_100mb_csv | 216 ms | 131 ms | 323 ms | 359 ms |
+| first_rows_100mb_csv_gz | 1,243 ms | 821 ms | 1,287 ms | 1,145 ms |
+| first_rows_100mb_ndjson_gz | 354 ms | 217 ms | 354 ms | 315 ms |
+| first_rows_100k_xlsx | 52 ms | 36 ms | 76 ms | 129 ms |
+| import_100mb_csv | 1,456 ms | 976 ms | 1,775 ms | 1,315 ms |
+| import_100mb_csv_gz | 3,437 ms | 2,218 ms | 3,700 ms | 2,551 ms |
+| import_100mb_ndjson_gz | 2,975 ms | 1,823 ms | 3,445 ms | 1,979 ms |
+| import_100k_xlsx | 1,403 ms | 960 ms | 2,083 ms | 2,510 ms |
+| reopen_cached_100mb_csv | 0.85 ms | 0.93 ms | 1.75 ms | 0.82 ms |
+| page_1m_parquet | 7.8 ms | 4.8 ms | 12.8 ms | 7.0 ms |
+
+**Excel at v0.6.0 (+23 % / +27 %) was the runner, not the code.** The Excel code and its
+libraries are unchanged since v0.1.0, and on this run every Linux flow, Excel included, came in
+30–39 % *under* the same baseline: hosted runners of one label differ by about a third from
+run to run. A guard failure is therefore re-run once before it is investigated.
+
+## v1.0.0 — the release build (linux-dev)
+
+Measured on the release build of 1.0.0 as at v0.1.0: Xvfb with software rendering, 5 runs.
+
+**Startup**: window mapped after 0.09–0.11 s; UI ready (`frontend ready`) after
+**0.89–0.93 s**. The first measurement of 1.0.0 missed the budget (1.05–1.43 s): the start
+screen parsed one 2.2 MB bundle holding the grid (Glide), the SQL editor (CodeMirror), the
+charts (ECharts) and Arrow. They are now chunks loaded the first time a file, the SQL panel or a
+chart is shown (D54); the first bundle is 681 kB, and opening a file loads its chunk in well
+under the 1 s of the first rows.
+
+**Idle memory** (no file open, PSS over the three processes):
+
+| Process | PSS | of which private (anonymous) |
+| --- | --- | --- |
+| dataliq (Rust + DuckDB + GTK) | 117 MiB | 29 MiB |
+| WebKitWebProcess (UI) | 266 MiB | 159 MiB |
+| WebKitNetworkProcess | 23 MiB | 7 MiB |
+| **Total** | **407 MiB** | **195 MiB** |
+
+The UI process grew since v0.1.0 (36 MiB private) because of how WebKitGTK draws on a
+display without a GPU: with its DMA-BUF renderer turned off (`WEBKIT_DISABLE_DMABUF_RENDERER=1`)
+the same process holds **46 MiB** private. The ~115 MiB difference is frame buffers that
+llvmpipe (software GL) keeps in ordinary memory; with a GPU driver they live in the GPU's
+memory. Our own code adds ~10 MiB over v0.1.0 (a larger UI). The renderer stays on, since
+turning it off would also take the GPU path away from real desktops. Windows (WebView2) and
+macOS (WKWebView) can't be measured on hosted runners (no desktop session).
+
+**Installer sizes** (release build, as `tauri build` prints them; Windows and macOS from release
+dry run [40731722788](https://github.com/mukesh-dsnl/dataliq/actions/runs/40731722788) on 1.0.0):
+
+| OS | Installer | Size |
+| --- | --- | --- |
+| Windows | `DataLiq_1.0.0_x64-setup.exe` | 13.9 MiB |
+| Windows | `DataLiq_1.0.0_x64_en-US.msi` | 18.9 MiB |
+| macOS | `DataLiq_1.0.0_universal.dmg` (Apple silicon and Intel) | 37.2 MiB |
+| Linux | `.deb` / `.rpm` | 22.3 MiB (23.4 MB) each |
+| Linux | `.AppImage` | 95.1 MiB, bundles WebKitGTK and GStreamer (D24) |
+
+Every installer but the AppImage is under the 40 MB budget; the macOS image holds two complete
+builds (arm64 and x86_64). The release workflow prints every file's size.

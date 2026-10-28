@@ -1,0 +1,225 @@
+name: Release
+
+# Builds the installers on Windows, macOS and Linux and puts them in a draft
+# GitHub release with SHA-256 checksums and, when the update key is set up,
+# the updater manifest (latest.json; see docs/RELEASING.md and D51).
+#
+# - Pushing a tag `vX.Y.Z` (matching the app version) makes the draft release.
+# - Run it by hand to try a release: with "dry run" (the default) everything is
+#   built and checked, and the files are kept as a workflow artifact instead.
+# - A branch push that changes this workflow or its scripts is a dry run too.
+on:
+  push:
+    tags: ["v*"]
+    # Path filters only apply to branch pushes; tag pushes always run.
+    branches: ["**"]
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/release/**"
+      - "scripts/updater-config.mjs"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (vX.Y.Z); empty: v + the app version"
+        required: false
+        default: ""
+      dry_run:
+        description: "Build and check only; don't create the release"
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # Only a pushed tag (or a run by hand with "dry run" unticked) publishes.
+  DRY_RUN: ${{ github.ref_type != 'tag' && (github.event_name != 'workflow_dispatch' || inputs.dry_run) }}
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            args: ""
+            bundle: target/release/bundle
+          - name: macos
+            os: macos-latest
+            # One app for Apple silicon and Intel.
+            args: "--target universal-apple-darwin"
+            bundle: target/universal-apple-darwin/release/bundle
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: linux
+            os: ubuntu-22.04
+            args: ""
+            bundle: target/release/bundle
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release tag
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then tag="$GITHUB_REF_NAME"; else tag="${INPUT_TAG:-v$version}"; fi
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::The tag $tag doesn't match the app version $version (package.json, tauri.conf.json)."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-${{ matrix.name }}
+
+      - run: pnpm install --frozen-lockfile
+
+      # Updates: only when the public key is set up (repository variable); the
+      # build then signs its update bundles with the private key (secret).
+      - name: Updater config
+        shell: bash
+        env:
+          DATALIQ_UPDATER_PUBKEY: ${{ vars.DATALIQ_UPDATER_PUBKEY }}
+          HAS_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$DATALIQ_UPDATER_PUBKEY" ]; then
+            echo "::notice::No DATALIQ_UPDATER_PUBKEY: this release can't update itself (docs/RELEASING.md)."
+            exit 0
+          fi
+          if [ "$HAS_PRIVATE_KEY" != "true" ]; then
+            echo "::error::DATALIQ_UPDATER_PUBKEY is set but the TAURI_SIGNING_PRIVATE_KEY secret is missing."
+            exit 1
+          fi
+          node scripts/updater-config.mjs target/updater.conf.json
+          {
+            echo "CONFIG_ARGS=--config target/updater.conf.json"
+            echo "TAURI_SIGNING_PRIVATE_KEY=$TAURI_SIGNING_PRIVATE_KEY"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      # macOS signing and notarization, when the Apple secrets are set up;
+      # otherwise the app is unsigned (README: right-click › Open the first time).
+      - name: Apple signing
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::notice::No Apple certificate: the macOS app is not signed."
+            exit 0
+          fi
+          {
+            echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+          } >> "$GITHUB_ENV"
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            {
+              echo "APPLE_ID=$APPLE_ID"
+              echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::notice::No notarization credentials: the macOS app is signed but not notarized."
+          fi
+
+      - name: Build installers
+        shell: bash
+        run: pnpm tauri build ${{ matrix.args }} $CONFIG_ARGS
+
+      - name: Collect release files
+        shell: bash
+        run: node scripts/release/collect.mjs "${{ matrix.bundle }}" "release/${{ matrix.name }}" "$VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: release/${{ matrix.name }}
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: collected
+
+      - name: Checksums, updater manifest and notes
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then tag="$GITHUB_REF_NAME"; else tag="${INPUT_TAG:-v$version}"; fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          node scripts/release/finish.mjs collected out "$tag" "$GITHUB_REPOSITORY"
+          cat out/SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the files (dry run)
+        if: env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run
+          path: out
+          retention-days: 7
+
+      - name: Create the draft release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(find out -maxdepth 1 -type f ! -name notes.md | sort)
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # A re-run: replace the files of the existing draft.
+            gh release upload "$TAG" $files --clobber
+          else
+            gh release create "$TAG" $files --draft --verify-tag \
+              --title "DataLiq $VERSION" --notes-file out/notes.md
+          fi
+          echo "Draft release $TAG: review it on GitHub, then publish." >> "$GITHUB_STEP_SUMMARY"

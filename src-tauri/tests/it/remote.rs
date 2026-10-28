@@ -10,10 +10,10 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use bigview_lib::cache::{Cache, CacheConfig};
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::import::{self, ImportTarget, Imports};
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::cache::{Cache, CacheConfig};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::import::{self, ImportTarget, Imports};
+use dataliq_lib::sources::{OpenOptions, Source};
 
 /// Serves `dir` on 127.0.0.1; records each request line.
 pub(crate) struct Server {

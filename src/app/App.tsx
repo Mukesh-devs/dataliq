@@ -1,15 +1,19 @@
 import { FileUp } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { CommandPalette } from "../components/palette/CommandPalette";
 import { ExportDialog } from "../components/export/ExportDialog";
-import { SqlPanel } from "../components/sql/SqlPanel";
 import { EmptyState } from "../components/shell/EmptyState";
-import { FileView } from "../components/shell/FileView";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { TabBar } from "../components/shell/TabBar";
 import { OpenPattern } from "../components/shell/OpenPattern";
 import { OpenUrl } from "../components/shell/OpenUrl";
+import { HelpDialog, type HelpTopic } from "../components/shell/HelpDialog";
+import { MenuBar } from "../components/shell/MenuBar";
+import { UpdateDialog } from "../components/shell/UpdateDialog";
+import { SettingsDialog } from "../components/settings/SettingsDialog";
+import { call } from "../lib/ipc";
+import { MENUS, resolveMenus, toNative } from "../lib/menus";
 import {
   onFileDrop,
   onImportProgress,
@@ -17,15 +21,17 @@ import {
   onOpenFiles,
   pickFiles,
   pickFolder,
+  sampleDataset,
   takeStartupFiles,
 } from "../lib/files";
 import { formatCount, formatDuration } from "../lib/format";
-import { modKey } from "../lib/platform";
+import { isMac, modKey } from "../lib/platform";
 import { onViewReady } from "../lib/view";
 import { useApp } from "../stores/app";
-import { useRegisterCommands, type Command } from "../stores/commands";
+import { allCommands, useCommands, useRegisterCommands, type Command } from "../stores/commands";
 import { useLayout } from "../stores/layout";
 import { useNotice } from "../stores/notice";
+import { useUpdate } from "../stores/update";
 import { useWorkspace } from "../stores/workspace";
 import { isWorkspacePath } from "../lib/workspace";
 import { useSettings, type ThemePreference } from "../stores/settings";
@@ -38,6 +44,15 @@ import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
 import { useSqlTables } from "./useSqlTables";
+
+// Loaded on first use, so the start screen doesn't parse the grid, SQL
+// editor and chart libraries (about 1.5 MB of JavaScript).
+const FileView = lazy(() =>
+  import("../components/shell/FileView").then((m) => ({ default: m.FileView })),
+);
+const SqlPanel = lazy(() =>
+  import("../components/sql/SqlPanel").then((m) => ({ default: m.SqlPanel })),
+);
 
 /** "filtered", "sorted" or "filtered and sorted", for the status bar. */
 function viewVerb(tab: Tab): { ed: string; ing: string } {
@@ -113,6 +128,38 @@ function useSubscription(subscribe: () => Promise<() => void>) {
   }, [subscribe]);
 }
 
+/** Runs a registered command by id: what a menu item does. */
+function runCommand(id: string) {
+  allCommands(useCommands.getState().sources)
+    .find((c) => c.id === id)
+    ?.run();
+}
+
+/**
+ * The menus, following the commands there are right now and the recent
+ * files: drawn in the window on Windows and Linux, sent to the native menu
+ * bar on macOS. Its own component, so only it re-renders when the commands
+ * change (commands are registered while rendering the rest of the app).
+ */
+function AppMenus() {
+  const sources = useCommands((s) => s.sources);
+  const recent = useRecent((s) => s.files);
+  const menus = useMemo(
+    () => resolveMenus(MENUS, allCommands(sources), recent, isMac),
+    [sources, recent],
+  );
+  useEffect(() => {
+    if (!isMac) return;
+    // Commands change in bursts (a file opening registers many): once settled.
+    const timer = setTimeout(
+      () => void call("set_native_menu", { menus: toNative(menus) }).catch(() => {}),
+      150,
+    );
+    return () => clearTimeout(timer);
+  }, [menus]);
+  return isMac ? null : <MenuBar menus={menus} onRun={runCommand} />;
+}
+
 export function App() {
   const {
     tabs,
@@ -171,7 +218,8 @@ export function App() {
   useEffect(() => {
     void probeEngine();
     void loadApp();
-    // `bigview file.csv` at startup.
+    if (useSettings.getState().checkUpdates) void useUpdate.getState().autoCheck();
+    // `dataliq file.csv` at startup.
     void takeStartupFiles()
       .then((paths) => {
         if (paths.length > 0) void openPaths(paths);
@@ -188,6 +236,10 @@ export function App() {
   );
 
   const [patternOpen, setPatternOpen] = useState(false);
+  const [help, setHelp] = useState<HelpTopic | null>(null);
+  const setSettingsOpen = useApp((s) => s.setSettingsOpen);
+  const startNewWorkspace = useWorkspace((s) => s.startNew);
+  const clearRecent = useRecent((s) => s.clear);
   // Open URL, and whether it starts on the S3 settings.
   const [urlOpen, setUrlOpen] = useState<{ s3: boolean } | null>(null);
   const openFolder = useMemo(
@@ -196,6 +248,18 @@ export function App() {
       if (dir) await openPaths([dir]);
     },
     [openPaths],
+  );
+  const openSample = useMemo(
+    () => async () => {
+      try {
+        await openPaths([await sampleDataset()]);
+      } catch (err) {
+        notice(
+          `Couldn't make the sample dataset: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    },
+    [openPaths, notice],
   );
 
   const shortcuts = useMemo(
@@ -212,10 +276,12 @@ export function App() {
       copyAs: () => setPalette({ query: "Copy " }),
       saveWorkspace: () => void saveWorkspace(),
       saveWorkspaceAs: () => void saveWorkspace(true),
+      newWorkspace: startNewWorkspace,
+      settings: () => setSettingsOpen(true),
       toggleSql: () => {
         const open = !useSql.getState().open;
         setSqlOpen(open);
-        if (open) setTimeout(() => useSql.getState().editor?.focus(), 0);
+        if (open) useSql.getState().focusEditor();
       },
       toggleSidebar: () => {
         const l = useLayout.getState();
@@ -226,13 +292,30 @@ export function App() {
         l.setProfile(!l.profile);
       },
     }),
-    [openFile, openFolder, close, cycle, setSqlOpen, saveWorkspace],
+    [
+      openFile,
+      openFolder,
+      close,
+      cycle,
+      setSqlOpen,
+      saveWorkspace,
+      startNewWorkspace,
+      setSettingsOpen,
+    ],
   );
   useShortcuts(shortcuts);
 
   // App-wide commands; the open file adds its own (FileView).
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [
+      {
+        id: "new-workspace",
+        title: "New workspace",
+        group: "File",
+        shortcut: `${modKey}+N`,
+        keywords: "close all tabs start fresh empty",
+        run: shortcuts.newWorkspace,
+      },
       {
         id: "open-file",
         title: "Open file…",
@@ -327,6 +410,14 @@ export function App() {
         run: () => void openPaths([file.path]),
       });
     }
+    if (recent.length > 0)
+      list.push({
+        id: "clear-recent",
+        title: "Clear recent files",
+        group: "File",
+        keywords: "history forget",
+        run: clearRecent,
+      });
     list.push(
       {
         id: "toggle-sidebar",
@@ -429,10 +520,70 @@ export function App() {
         group: "App",
         run: () => void clearCache(),
       },
+      {
+        id: "settings",
+        title: "Settings…",
+        group: "App",
+        shortcut: `${modKey}+,`,
+        keywords: "preferences options memory cache theme density export",
+        run: shortcuts.settings,
+      },
+      {
+        id: "command-palette",
+        title: "Command palette…",
+        group: "App",
+        shortcut: `${modKey}+K`,
+        keywords: "actions search commands",
+        run: shortcuts.commandPalette,
+      },
+      {
+        id: "open-sample",
+        title: "Open the sample dataset",
+        group: "Help",
+        keywords: "example demo try orders",
+        run: () => void openSample(),
+      },
+      {
+        id: "show-tips",
+        title: "Show getting-started tips",
+        group: "Help",
+        keywords: "onboarding help intro",
+        run: () => setHelp("tips"),
+      },
+      {
+        id: "check-updates",
+        title: "Check for updates",
+        group: "Help",
+        keywords: "new version upgrade install",
+        run: () => void useUpdate.getState().check(),
+      },
+      {
+        id: "keyboard-shortcuts",
+        title: "Keyboard shortcuts",
+        group: "Help",
+        keywords: "keys hotkeys",
+        run: () => setHelp("shortcuts"),
+      },
+      {
+        id: "about",
+        title: "About DataLiq",
+        group: "Help",
+        keywords: "version",
+        run: () => setHelp("about"),
+      },
     );
+    if (!isMac)
+      list.push({
+        id: "exit",
+        title: "Exit",
+        group: "App",
+        keywords: "quit close app",
+        run: () => void import("@tauri-apps/api/window").then((w) => w.getCurrentWindow().close()),
+      });
     return list;
   }, [
     shortcuts,
+    openSample,
     activeId,
     active,
     recent,
@@ -450,22 +601,20 @@ export function App() {
     formatEditor,
     notice,
     pickWorkspace,
+    clearRecent,
   ]);
   useRegisterCommands("app", commands);
 
   useSubscription(useMemo(() => () => onImportProgress(applyProgress), [applyProgress]));
   useSubscription(useMemo(() => () => onViewReady(applyViewReady), [applyViewReady]));
-  // A second `bigview <files>` launch forwards its files here.
+  // A second `dataliq <files>` launch forwards its files here.
   useSubscription(useMemo(() => () => onOpenFiles((p) => void openPaths(p)), [openPaths]));
   useSubscription(
     useMemo(
       () => () =>
-        onMenu((id) => {
-          if (id === "open-file") shortcuts.openFile();
-          if (id === "open-folder") shortcuts.openFolder();
-          if (id === "close-tab") shortcuts.closeTab();
-        }),
-      [shortcuts],
+        // The native macOS menu: every item is a command (see `MENUS`).
+        onMenu(runCommand),
+      [],
     ),
   );
   useSubscription(
@@ -507,6 +656,7 @@ export function App() {
         onClose={close}
         onOpen={() => void openFile()}
         onCommands={() => setPalette({ query: "" })}
+        menu={isMac ? undefined : <AppMenus />}
         panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
         onTogglePanel={(panel) =>
           panel === "left"
@@ -530,6 +680,10 @@ export function App() {
         showS3={urlOpen?.s3}
         onOpen={(u) => void openPaths([u])}
       />
+      {isMac && <AppMenus />}
+      <SettingsDialog />
+      <HelpDialog topic={help} onClose={() => setHelp(null)} />
+      <UpdateDialog />
       <CommandPalette
         // A fresh body (and starting text) each time it opens.
         key={palette ? `open:${palette.query}` : "closed"}
@@ -547,27 +701,34 @@ export function App() {
         )}
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
           {active ? (
-            <FileView
-              key={active.id}
-              tab={active}
-              onReopen={(o) => void reopen(active.id, o)}
-              onReload={active.path ? () => void reload(active.id) : undefined}
-              onCancelImport={() => void cancelImport(active.id)}
-              onReadDirect={() => void readDirect(active.id)}
-              onViewChange={(v) => void setView(active.id, v)}
-              onLayoutChange={(l) => setLayout(active.id, l)}
-            />
+            <Suspense fallback={null}>
+              <FileView
+                key={active.id}
+                tab={active}
+                onReopen={(o) => void reopen(active.id, o)}
+                onReload={active.path ? () => void reload(active.id) : undefined}
+                onCancelImport={() => void cancelImport(active.id)}
+                onReadDirect={() => void readDirect(active.id)}
+                onViewChange={(v) => void setView(active.id, v)}
+                onLayoutChange={(l) => setLayout(active.id, l)}
+              />
+            </Suspense>
           ) : (
             <EmptyState
               onOpen={() => void openFile()}
               onOpenFolder={() => void openFolder()}
+              onOpenSample={() => void openSample()}
               recent={recent}
               onOpenRecent={(p) => void openPaths([p])}
               dragging={dragging}
             />
           )}
           <ExportDialog />
-          {sqlOpen && <SqlPanel />}
+          {sqlOpen && (
+            <Suspense fallback={null}>
+              <SqlPanel />
+            </Suspense>
+          )}
           {active && dragging && (
             <div
               data-testid="drop-overlay"

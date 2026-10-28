@@ -1,12 +1,12 @@
 //! Records real backend responses for the Playwright UI flows, which run the
 //! frontend against a mocked Tauri IPC (e2e/tauri-mock.ts). Regenerate with
-//! `RECORD_UI=1 cargo test -p bigview --test it ui_recordings`; a normal run
+//! `RECORD_UI=1 cargo test -p dataliq --test it ui_recordings`; a normal run
 //! checks the recordings are still what the backend returns.
 
 use std::path::PathBuf;
 
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
-use bigview_lib::sources::{OpenOptions, Source};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
+use dataliq_lib::sources::{OpenOptions, Source};
 
 /// Fixtures used by the UI flows, recorded under a stable fake path.
 const FILES: &[(&str, &str)] = &[
@@ -63,7 +63,7 @@ fn record() -> serde_json::Value {
         // Mirror `open_file`: Parquet is queried in place, so it has a dataset
         // at once (with a stable id; real ids hash the file's mtime).
         if source.is_queried_in_place() {
-            let ds = bigview_lib::import::open_in_place(&engine, &source).unwrap();
+            let ds = dataliq_lib::import::open_in_place(&engine, &source).unwrap();
             info["dataset"] = serde_json::json!({
                 "id": "pq-recorded",
                 "rowCount": ds.row_count,

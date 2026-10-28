@@ -1,0 +1,12 @@
+{
+  "first_rows_100k_xlsx": 129.27,
+  "first_rows_100mb_csv": 359.09,
+  "first_rows_100mb_csv_gz": 1145.06,
+  "first_rows_100mb_ndjson_gz": 315.12,
+  "import_100k_xlsx": 2509.79,
+  "import_100mb_csv": 1315.05,
+  "import_100mb_csv_gz": 2551.34,
+  "import_100mb_ndjson_gz": 1979.26,
+  "page_1m_parquet": 6.98,
+  "reopen_cached_100mb_csv": 0.82
+}

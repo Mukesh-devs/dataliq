@@ -3,6 +3,10 @@ import { cacheInfo, clearCache, getSettings, type AppSettings, type CacheInfo } 
 
 interface AppState {
   settings: AppSettings | null;
+  /** The Settings screen is open. */
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
+  setSettings: (settings: AppSettings) => void;
   cache: CacheInfo | null;
   load: () => Promise<void>;
   refreshCache: () => Promise<void>;
@@ -12,6 +16,9 @@ interface AppState {
 /** Backend settings and cache status. */
 export const useApp = create<AppState>()((set) => ({
   settings: null,
+  settingsOpen: false,
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setSettings: (settings) => set({ settings }),
   cache: null,
   load: async () => {
     const [settings, cache] = await Promise.all([

@@ -87,7 +87,7 @@ export function saveRecipe(
   path: string,
   recipe: Pick<RecipeFile, "source" | "columns" | "steps">,
 ): Promise<void> {
-  return call("save_recipe", { path, recipe: { format: "bigview-recipe", version: 1, ...recipe } });
+  return call("save_recipe", { path, recipe: { format: "dataliq-recipe", version: 1, ...recipe } });
 }
 
 export function loadRecipe(path: string): Promise<RecipeFile> {
@@ -108,7 +108,7 @@ export async function readableScript(
   const script = await recipeScript(datasetId, steps, reader, steps.map(describeStep));
   const n = steps.filter(isEnabled).length;
   return (
-    `-- BigView recipe for ${title}: ${n} step${n === 1 ? "" : "s"}.\n` +
+    `-- DataLiq recipe for ${title}: ${n} step${n === 1 ? "" : "s"}.\n` +
     "-- Runs as-is in DuckDB: it reads the file and gives the cleaned rows.\n" +
     script
   );
@@ -122,7 +122,7 @@ export async function pickRecipeSave(name: string, ext: "json" | "sql"): Promise
   const { save } = await import("@tauri-apps/plugin-dialog");
   return save({
     defaultPath: name,
-    filters: [{ name: ext === "json" ? "BigView recipe" : "SQL script", extensions: [ext] }],
+    filters: [{ name: ext === "json" ? "DataLiq recipe" : "SQL script", extensions: [ext] }],
   });
 }
 
@@ -131,7 +131,7 @@ export async function pickRecipeOpen(): Promise<string | null> {
   const picked = await open({
     multiple: false,
     directory: false,
-    filters: [{ name: "BigView recipe", extensions: ["json"] }],
+    filters: [{ name: "DataLiq recipe", extensions: ["json"] }],
   });
   return Array.isArray(picked) ? (picked[0] ?? null) : picked;
 }

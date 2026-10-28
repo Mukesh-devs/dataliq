@@ -16,6 +16,10 @@ export interface ShortcutHandlers {
   toggleSql: () => void;
   saveWorkspace: () => void;
   saveWorkspaceAs: () => void;
+  /** Ctrl+N: close every tab and forget the workspace file. */
+  newWorkspace: () => void;
+  /** Ctrl+,. */
+  settings: () => void;
   /** Ctrl+B: left sidebar; Ctrl+Alt+B: right panel (column profile). */
   toggleSidebar: () => void;
   toggleProfile: () => void;
@@ -50,6 +54,12 @@ export function useShortcuts(handlers: ShortcutHandlers) {
         e.preventDefault();
         if (e.altKey) handlers.toggleProfile();
         else handlers.toggleSidebar();
+      } else if (mod && !e.shiftKey && key === "n") {
+        e.preventDefault();
+        handlers.newWorkspace();
+      } else if (mod && !e.shiftKey && e.key === ",") {
+        e.preventDefault();
+        handlers.settings();
       } else if (mod && key === "s") {
         e.preventDefault();
         if (e.shiftKey) handlers.saveWorkspaceAs();

@@ -15,7 +15,8 @@ export function Kbd({ shortcut, tone = "default", className }: KbdProps) {
       className={cn(
         "rounded-[var(--radius-sm)] border px-1.5 py-px font-sans text-[11px]",
         tone === "onAccent"
-          ? "border-transparent bg-black/20 text-accent-fg"
+          ? // An outline: the text sits on the accent itself (readable in both themes).
+            "border-current/50 bg-transparent text-accent-fg"
           : "border-border bg-surface text-fg-subtle",
         className,
       )}

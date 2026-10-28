@@ -105,7 +105,7 @@ fn base_alias(path: &Path) -> String {
         alias = format!("db_{alias}");
     }
     // Names DuckDB (or the app's cache) already uses.
-    if matches!(alias.as_str(), "memory" | "system" | "temp" | "main") || alias.starts_with("bv_") {
+    if matches!(alias.as_str(), "memory" | "system" | "temp" | "main") || alias.starts_with("dl_") {
         alias = format!("{alias}_db");
     }
     alias
@@ -181,12 +181,12 @@ fn attach_error(raw: &str, format: FileFormat) -> AppError {
     }
     if format == FileFormat::Duckdb && lower.contains("version") {
         return AppError::Query(format!(
-            "This DuckDB file was written by a different DuckDB version than BigView's ({}).",
+            "This DuckDB file was written by a different DuckDB version than DataLiq's ({}).",
             raw.lines().next().unwrap_or_default()
         ));
     }
     if lower.contains("not a database") || lower.contains("file is not a valid") {
-        return AppError::Query("This file isn't a database BigView can read.".into());
+        return AppError::Query("This file isn't a database DataLiq can read.".into());
     }
     friendly_error(raw)
 }
@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(base_alias(Path::new("/d/Sales 2024.duckdb")), "sales_2024");
         assert_eq!(base_alias(Path::new("/d/2024.db")), "db_2024");
         assert_eq!(base_alias(Path::new("/d/memory.db")), "memory_db");
-        assert_eq!(base_alias(Path::new("/d/bv_cache.db")), "bv_cache_db");
+        assert_eq!(base_alias(Path::new("/d/dl_cache.db")), "dl_cache_db");
         assert_eq!(base_alias(Path::new("/d/.db")), "db");
     }
 

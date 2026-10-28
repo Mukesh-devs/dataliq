@@ -172,7 +172,7 @@ pub fn export_query(engine: &Engine, req: &ExportRequest) -> Result<String> {
         .join(", ");
     Ok(match &req.options.rows {
         Some(ranges) if !ranges.is_empty() => {
-            let pos = quote_ident("__bigview_pos");
+            let pos = quote_ident("__dataliq_pos");
             let keep = ranges
                 .iter()
                 .map(|[a, b]| format!("({pos} >= {a} AND {pos} < {b})"))

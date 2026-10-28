@@ -11,6 +11,9 @@ interface SettingsState {
   /** Small histograms under the column titles. */
   headerCharts: boolean;
   setHeaderCharts: (on: boolean) => void;
+  /** Look for a new version when the app starts (at most daily). */
+  checkUpdates: boolean;
+  setCheckUpdates: (on: boolean) => void;
   setTheme: (theme: ThemePreference) => void;
   setDensity: (density: Density) => void;
   /** Cycles system -> light -> dark -> system. */
@@ -31,13 +34,20 @@ export const useSettings = create<SettingsState>()(
       density: "comfortable",
       headerCharts: true,
       setHeaderCharts: (headerCharts) => set({ headerCharts }),
+      checkUpdates: true,
+      setCheckUpdates: (checkUpdates) => set({ checkUpdates }),
       setTheme: (theme) => set({ theme }),
       setDensity: (density) => set({ density }),
       cycleTheme: () => set((s) => ({ theme: nextTheme[s.theme] })),
     }),
     {
-      name: "bigview.settings",
-      partialize: (s) => ({ theme: s.theme, density: s.density, headerCharts: s.headerCharts }),
+      name: "dataliq.settings",
+      partialize: (s) => ({
+        theme: s.theme,
+        density: s.density,
+        headerCharts: s.headerCharts,
+        checkUpdates: s.checkUpdates,
+      }),
     },
   ),
 );

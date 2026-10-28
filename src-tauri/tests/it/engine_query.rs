@@ -13,8 +13,8 @@ use arrow::array::{
 use arrow::datatypes::{DataType, TimeUnit};
 use arrow::ipc::reader::StreamReader;
 use arrow::record_batch::RecordBatch;
-use bigview_lib::engine::{Engine, EngineConfig, Param, RequestKey};
-use bigview_lib::error::AppError;
+use dataliq_lib::engine::{Engine, EngineConfig, Param, RequestKey};
+use dataliq_lib::error::AppError;
 
 const KNOWN_QUERY: &str = "SELECT * FROM (VALUES
     (1::BIGINT, 'alpha', 1.5::DOUBLE, true, DATE '2024-01-31', TIMESTAMP '2024-01-31 12:34:56.789', [1, 2]),
@@ -354,4 +354,29 @@ fn releasing_memory_keeps_the_limit_and_waits_for_idle() {
     assert!(!engine.release_memory().unwrap());
     drop(busy);
     assert!(engine.release_memory().unwrap());
+}
+
+#[test]
+fn memory_and_thread_limits_change_while_running() {
+    let (engine, _tmp) = engine();
+    engine.set_limits(512 << 20, Some(3)).unwrap();
+    let conn = engine.connection().unwrap();
+    let (memory, threads): (String, i64) = conn
+        .query_row(
+            "SELECT current_setting('memory_limit'), current_setting('threads')",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert!(memory.starts_with("512"), "{memory}");
+    assert_eq!(threads, 3);
+    // Unset threads: every core.
+    engine.set_limits(1 << 30, None).unwrap();
+    let threads: i64 = conn
+        .query_row("SELECT current_setting('threads')", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        threads as usize,
+        std::thread::available_parallelism().unwrap().get()
+    );
 }

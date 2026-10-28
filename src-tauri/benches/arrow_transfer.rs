@@ -3,8 +3,8 @@
 
 use std::hint::black_box;
 
-use bigview_lib::engine::{Engine, EngineConfig, RequestKey};
 use criterion::{Criterion, criterion_group, criterion_main};
+use dataliq_lib::engine::{Engine, EngineConfig, RequestKey};
 
 const PAGE_SQL: &str = "SELECT i AS id, 'name_' || i AS name, i * 1.5 AS amount, \
      i % 2 = 0 AS flag, DATE '2024-01-01' + (i % 365)::INTEGER AS day, \

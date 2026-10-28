@@ -105,10 +105,15 @@ pub fn close_dataset(engine: &Engine, id: &str) -> Result<()> {
             DatasetSource::Materialized { table } => {
                 engine.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
             }
-            DatasetSource::Sorting { head, tail, .. } => {
+            DatasetSource::Sorting {
+                head,
+                tail,
+                ordered,
+                ..
+            } => {
                 engine.execute_batch(&format!("DROP TABLE IF EXISTS {head}"))?;
-                if let Some(tail) = tail {
-                    engine.execute_batch(&format!("DROP TABLE IF EXISTS {tail}"))?;
+                for table in tail.iter().chain(&ordered) {
+                    engine.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
                 }
             }
             DatasetSource::Query { .. } | DatasetSource::Parquet { .. } => {}
@@ -175,7 +180,7 @@ fn import_once(
     let key = cache::cache_key(&stamp, &source.options);
     let cache = target.cache;
     // Files on the web may change without notice: imported for this session only.
-    let caching = cache.config.enabled && !source.is_remote();
+    let caching = cache.enabled() && !source.is_remote();
 
     // Already open in this session.
     if let Ok(ds) = engine.datasets.get(&key) {
@@ -199,7 +204,7 @@ fn import_once(
     }
 
     let dir = if caching {
-        cache.config.dir.clone()
+        cache.dir().to_path_buf()
     } else {
         target.temp_dir.clone()
     };
@@ -323,8 +328,12 @@ fn import_once(
                 other => other,
             })?;
             // The table must be complete: wait for the integrity check.
-            if let Some(c) = checker {
-                let _ = c.join();
+            if let Some(c) = checker
+                && c.join().is_err()
+            {
+                // A bug in the check, not in the file: say so in the log
+                // rather than calling a good file damaged.
+                tracing::error!("the gzip integrity check stopped unexpectedly");
             }
             if corrupt.load(Ordering::SeqCst) {
                 return Err(AppError::Query(
