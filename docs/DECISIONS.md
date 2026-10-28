@@ -557,7 +557,11 @@ the palette, or `bigview <url>`), read by DuckDB's httpfs extension. The
 app stays offline by default (the engine turns off DuckDB's extension autoloading and
 autoinstalling): httpfs is installed once into the app's cache folder
 (`duckdb-extensions`) and loaded only when the first URL is opened, with a
-plain message when there is no internet to fetch it. The format comes from
+plain message when there is no internet to fetch it. The plan asked for
+httpfs to be bundled; the `duckdb` crate can build in json and parquet
+(and icu, autocomplete) but has no httpfs feature, so the signed extension
+is downloaded from DuckDB on first use instead. That one download is the
+only network access the app makes on its own behalf. The format comes from
 the URL's file name (no query), since there is no file to sniff; Excel URLs
 are refused. Parquet is queried in place in byte ranges, a page at a time;
 CSV and JSON import into the session as usual but are never cached, because
