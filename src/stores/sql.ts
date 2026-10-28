@@ -96,6 +96,8 @@ interface SqlState {
    * (undoable: Ctrl+Z brings the old text back).
    */
   load: (text: string) => void;
+  /** Focuses the editor, once it has mounted (its code loads on first use). */
+  focusEditor: () => void;
 }
 
 let nextRun = 1;
@@ -111,128 +113,133 @@ function remember(script: string, started: number, outcome: { rows?: number; err
 
 export const useSql = create<SqlState>()(
   persist(
-    (set, get, api) => ({
-      open: false,
-      height: 320,
-      text: "",
-      tables: [],
-      running: null,
-      editor: null,
-      library: null,
-      setLibrary: (library) => set({ library }),
-      setEditor: (editor) => set({ editor }),
-      runEditor: () => {
-        const r = get().editor?.runnable();
-        if (r) void get().run(r.script, r.base);
-      },
-      formatEditor: () => {
-        try {
-          get().editor?.replace(formatSql(get().text));
-          return null;
-        } catch (e) {
-          return e instanceof Error ? (e.message.split("\n")[0] ?? e.message) : String(e);
-        }
-      },
-      load: (text) => {
-        const put = (editor: EditorHandle) => {
-          editor.replace(text);
-          setTimeout(() => editor.focus(), 0);
-        };
-        set({ open: true, library: null });
+    (set, get, api) => {
+      /** Calls `fn` with the editor now, or when the panel's editor mounts. */
+      const withEditor = (fn: (editor: EditorHandle) => void) => {
         const editor = get().editor;
-        if (editor) return put(editor);
-        // The panel was closed: wait for its editor to mount.
+        if (editor) return fn(editor);
         const stop = api.subscribe((s) => {
           if (!s.editor) return;
           stop();
-          put(s.editor);
+          fn(s.editor);
         });
-      },
-      setOpen: (open) => set({ open }),
-      setHeight: (height) => set({ height: Math.max(MIN_PANEL_HEIGHT, Math.round(height)) }),
-      setText: (text) => set({ text }),
-      setTables: (tables) => set({ tables }),
-      run: async (script, base = 0) => {
-        const statements = splitStatements(script);
-        if (statements.length === 0) return;
-        const requestId = `sql-${nextRun++}`;
-        const isCurrent = () => get().running === requestId;
-        set({ running: requestId, error: undefined });
-        const started = performance.now();
-        let table: Table | undefined;
-        let dataset: DatasetInfo | undefined;
-        for (const [i, st] of statements.entries()) {
-          const last = i === statements.length - 1;
+      };
+      return {
+        open: false,
+        height: 320,
+        text: "",
+        tables: [],
+        running: null,
+        editor: null,
+        library: null,
+        setLibrary: (library) => set({ library }),
+        setEditor: (editor) => set({ editor }),
+        runEditor: () => {
+          const r = get().editor?.runnable();
+          if (r) void get().run(r.script, r.base);
+        },
+        formatEditor: () => {
           try {
-            if (last && returnsRows(st.text)) {
-              // A query: keep all its rows, show the first page now.
-              dataset = await sqlResult(st.text, requestId);
-              if (!isCurrent()) {
-                void closeDataset(dataset.id).catch(() => {});
-                return;
-              }
-              table = await fetchRows(dataset.id, 0, RESULT_PAGE);
-            } else {
-              table = await runQuery(st.text, {
-                // Only the last statement's rows are shown.
-                maxRows: last ? MAX_RESULT_ROWS + 1 : 1,
-                requestId,
-                group: "sql",
-                session: true,
-              });
-            }
+            get().editor?.replace(formatSql(get().text));
+            return null;
           } catch (e) {
-            if (!isCurrent()) return;
-            const kind = (e as { kind?: string }).kind;
-            const message = e instanceof Error ? e.message : String(e);
-            const at = errorOffset(message, st.text);
-            if (kind !== "cancelled") {
-              remember(script, started, { error: errorText(message) });
-            }
-            set({
-              running: null,
-              error:
-                kind === "cancelled"
-                  ? { message: "The query was cancelled.", offset: null }
-                  : {
-                      message: errorText(message),
-                      offset: at === null ? null : base + st.from + at,
-                    },
-            });
-            return;
+            return e instanceof Error ? (e.message.split("\n")[0] ?? e.message) : String(e);
           }
-          if (!isCurrent()) return;
-        }
-        const last = statements[statements.length - 1]!;
-        const truncated = !dataset && table!.numRows > MAX_RESULT_ROWS;
-        remember(script, started, { rows: dataset?.rowCount ?? table!.numRows });
-        const previous = get().result;
-        if (previous?.dataset && !previous.owned) {
-          void closeDataset(previous.dataset.id).catch(() => {});
-        }
-        set({
-          running: null,
-          result: {
-            table: truncated ? table!.slice(0, MAX_RESULT_ROWS) : table!,
-            dataset,
-            statement: last.text,
-            count: statements.length,
-            elapsedMs: Math.round(performance.now() - started),
-            truncated,
-          },
-        });
-      },
-      markOwned: () => {
-        const r = get().result;
-        if (r) set({ result: { ...r, owned: true } });
-      },
-      cancel: () => {
-        const id = get().running;
-        if (!id) return;
-        void cancelQuery(id).catch(() => {});
-        set({ running: null, error: { message: "The query was cancelled.", offset: null } });
-      },
-    }),
+        },
+        load: (text) => {
+          set({ open: true, library: null });
+          withEditor((editor) => {
+            editor.replace(text);
+            setTimeout(() => editor.focus(), 0);
+          });
+        },
+        focusEditor: () => withEditor((editor) => setTimeout(() => editor.focus(), 0)),
+        setOpen: (open) => set({ open }),
+        setHeight: (height) => set({ height: Math.max(MIN_PANEL_HEIGHT, Math.round(height)) }),
+        setText: (text) => set({ text }),
+        setTables: (tables) => set({ tables }),
+        run: async (script, base = 0) => {
+          const statements = splitStatements(script);
+          if (statements.length === 0) return;
+          const requestId = `sql-${nextRun++}`;
+          const isCurrent = () => get().running === requestId;
+          set({ running: requestId, error: undefined });
+          const started = performance.now();
+          let table: Table | undefined;
+          let dataset: DatasetInfo | undefined;
+          for (const [i, st] of statements.entries()) {
+            const last = i === statements.length - 1;
+            try {
+              if (last && returnsRows(st.text)) {
+                // A query: keep all its rows, show the first page now.
+                dataset = await sqlResult(st.text, requestId);
+                if (!isCurrent()) {
+                  void closeDataset(dataset.id).catch(() => {});
+                  return;
+                }
+                table = await fetchRows(dataset.id, 0, RESULT_PAGE);
+              } else {
+                table = await runQuery(st.text, {
+                  // Only the last statement's rows are shown.
+                  maxRows: last ? MAX_RESULT_ROWS + 1 : 1,
+                  requestId,
+                  group: "sql",
+                  session: true,
+                });
+              }
+            } catch (e) {
+              if (!isCurrent()) return;
+              const kind = (e as { kind?: string }).kind;
+              const message = e instanceof Error ? e.message : String(e);
+              const at = errorOffset(message, st.text);
+              if (kind !== "cancelled") {
+                remember(script, started, { error: errorText(message) });
+              }
+              set({
+                running: null,
+                error:
+                  kind === "cancelled"
+                    ? { message: "The query was cancelled.", offset: null }
+                    : {
+                        message: errorText(message),
+                        offset: at === null ? null : base + st.from + at,
+                      },
+              });
+              return;
+            }
+            if (!isCurrent()) return;
+          }
+          const last = statements[statements.length - 1]!;
+          const truncated = !dataset && table!.numRows > MAX_RESULT_ROWS;
+          remember(script, started, { rows: dataset?.rowCount ?? table!.numRows });
+          const previous = get().result;
+          if (previous?.dataset && !previous.owned) {
+            void closeDataset(previous.dataset.id).catch(() => {});
+          }
+          set({
+            running: null,
+            result: {
+              table: truncated ? table!.slice(0, MAX_RESULT_ROWS) : table!,
+              dataset,
+              statement: last.text,
+              count: statements.length,
+              elapsedMs: Math.round(performance.now() - started),
+              truncated,
+            },
+          });
+        },
+        markOwned: () => {
+          const r = get().result;
+          if (r) set({ result: { ...r, owned: true } });
+        },
+        cancel: () => {
+          const id = get().running;
+          if (!id) return;
+          void cancelQuery(id).catch(() => {});
+          set({ running: null, error: { message: "The query was cancelled.", offset: null } });
+        },
+      };
+    },
     {
       name: "dataliq.sql",
       partialize: (s) => ({ open: s.open, height: s.height, text: s.text }),

@@ -166,4 +166,30 @@ describe("sql store", () => {
     useSql.getState().setEditor(editor());
     expect(mounted.replace).toHaveBeenCalledTimes(1);
   });
+
+  it("focusEditor waits for an editor that is still loading", () => {
+    vi.useFakeTimers();
+    try {
+      const editor = () => ({
+        runnable: () => ({ script: "", base: 0 }),
+        replace: vi.fn(),
+        insert: vi.fn(),
+        focus: vi.fn(),
+      });
+      useSql.setState({ open: true, editor: null });
+      useSql.getState().focusEditor();
+      vi.runAllTimers();
+      const mounted = editor();
+      useSql.getState().setEditor(mounted);
+      vi.runAllTimers();
+      expect(mounted.focus).toHaveBeenCalledTimes(1);
+
+      // Already there: focused straight away.
+      useSql.getState().focusEditor();
+      vi.runAllTimers();
+      expect(mounted.focus).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

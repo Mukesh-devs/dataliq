@@ -281,7 +281,7 @@ export function App() {
       toggleSql: () => {
         const open = !useSql.getState().open;
         setSqlOpen(open);
-        if (open) setTimeout(() => useSql.getState().editor?.focus(), 0);
+        if (open) useSql.getState().focusEditor();
       },
       toggleSidebar: () => {
         const l = useLayout.getState();
