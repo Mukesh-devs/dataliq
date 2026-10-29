@@ -7,6 +7,7 @@ import { test } from "node:test";
 import {
   buildManifest,
   classify,
+  macArch,
   releaseName,
   releaseNotes,
   sha256sums,
@@ -17,8 +18,10 @@ const v = "1.0.0";
 const bundles = [
   `DataLiq_${v}_x64-setup.exe`,
   `DataLiq_${v}_x64_en-US.msi`,
-  `DataLiq_${v}_universal.dmg`,
-  `DataLiq_${v}_universal.app.tar.gz`,
+  `DataLiq_${v}_aarch64.dmg`,
+  `DataLiq_${v}_x64.dmg`,
+  `DataLiq_${v}_aarch64.app.tar.gz`,
+  `DataLiq_${v}_x64.app.tar.gz`,
   `DataLiq_${v}_amd64.AppImage`,
   `DataLiq_${v}_amd64.deb`,
   `DataLiq-${v}-1.x86_64.rpm`,
@@ -31,14 +34,21 @@ test("every installer Tauri builds is released, nothing else", () => {
     `DataLiq_${v}_amd64.AppImage.sig`,
     "dataliq",
     "latest.json",
-    `DataLiq_${v}_aarch64.dmg`,
+    `DataLiq_${v}_universal.dmg`,
+    "DataLiq.app.tar.gz",
   ])
     assert.equal(classify(name), null, name);
+  assert.equal(classify(`DataLiq_${v}_x64-setup.exe`).kind, "Windows installer");
+  assert.equal(classify(`DataLiq_${v}_x64.dmg`).kind, "macOS disk image (Intel)");
 });
 
-test("the macOS update bundle gets the version in its name", () => {
-  assert.equal(releaseName("DataLiq.app.tar.gz", v), `DataLiq_${v}_universal.app.tar.gz`);
-  assert.equal(releaseName(`DataLiq_${v}_amd64.deb`, v), `DataLiq_${v}_amd64.deb`);
+test("the macOS update bundle gets the version and architecture in its name", () => {
+  assert.equal(releaseName("DataLiq.app.tar.gz", v, "aarch64"), `DataLiq_${v}_aarch64.app.tar.gz`);
+  assert.equal(releaseName("DataLiq.app.tar.gz", v, "x64"), `DataLiq_${v}_x64.app.tar.gz`);
+  assert.equal(releaseName(`DataLiq_${v}_amd64.deb`, v, null), `DataLiq_${v}_amd64.deb`);
+  assert.equal(macArch("target/aarch64-apple-darwin/release/bundle"), "aarch64");
+  assert.equal(macArch("target/x86_64-apple-darwin/release/bundle"), "x64");
+  assert.equal(macArch("target/release/bundle"), null);
 });
 
 test("latest.json lists each signed bundle under every key the updater looks up", () => {
@@ -74,8 +84,16 @@ test("latest.json lists each signed bundle under every key the updater looks up"
   });
   assert.equal(
     manifest.platforms["darwin-aarch64"].url,
+    `https://github.com/o/r/releases/download/v1.0.0/DataLiq_${v}_aarch64.app.tar.gz`,
+  );
+  assert.equal(
     manifest.platforms["darwin-x86_64"].url,
-    "one universal bundle for both Mac architectures",
+    `https://github.com/o/r/releases/download/v1.0.0/DataLiq_${v}_x64.app.tar.gz`,
+  );
+  assert.equal(
+    manifest.platforms["darwin-x86_64-app"].signature,
+    `sig of DataLiq_${v}_x64.app.tar.gz`,
+    "one update bundle per Mac architecture",
   );
 });
 

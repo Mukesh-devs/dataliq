@@ -1,108 +1,141 @@
-<p align="center"><img src="assets/icon.svg" width="112" alt="DataLiq icon: a database stack with a forward chevron"></p>
+<div align="center">
+
+<img src="assets/icon.svg" width="120" alt="DataLiq icon: a database stack with a forward chevron">
 
 # DataLiq
 
-> Drag in a 5 GB file. See data in 1 second. Filter, query, and export without loading it into RAM.
+**Open huge data files in seconds. Filter, query and export without loading them into RAM.**
 
-DataLiq is a free, open-source, cross-platform desktop app for exploring huge
-tabular files: CSV, TSV, Parquet, JSON/NDJSON and Excel, including `.gz`
-compressed files of 5 GB and more. It is built with [Tauri v2](https://tauri.app),
-Rust and [DuckDB](https://duckdb.org). It works fully offline, with no telemetry
-and no account.
+Drag in a 5 GB **CSV**, **Parquet**, **JSON** or **Excel** file and see your data in about a
+second. Browse, filter, chart, clean and export millions of rows on **Windows**, **macOS** and
+**Linux**. No account. No telemetry. Fully offline.
 
-**Status:** v1.0.0 — see [CHANGELOG.md](CHANGELOG.md) for what's in each version,
-[PROGRESS.md](PROGRESS.md) for how each step was built and tested, and
-[docs/DECISIONS.md](docs/DECISIONS.md) for why things are the way they are.
+[![Latest release](https://img.shields.io/github/v/release/Mukesh-devs/dataliq?label=release&color=2563eb)](https://github.com/Mukesh-devs/dataliq/releases/latest)
+![Windows 10+](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows&logoColor=white)
+![macOS 12+](https://img.shields.io/badge/macOS-12%2B-000000?logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
+
+[**⬇ Download**](https://github.com/Mukesh-devs/dataliq/releases/latest) ·
+[**Features**](#features) ·
+[**Installation**](#installation) ·
+[**Changelog**](CHANGELOG.md)
+
+</div>
+
+<br>
 
 ![A CSV file open in the grid, with the profile of its unit_price column](docs/screenshots/grid-light.png)
 
-| SQL over every open file | Charts computed by DuckDB |
+| SQL over every open file | Charts of millions of rows |
 | --- | --- |
 | ![The SQL panel: a grouped query over the open file and its 20 result rows](docs/screenshots/sql-light.png) | ![A bar chart of the sum of unit_price by category, in the dark theme](docs/screenshots/chart-dark.png) |
 
-_The screenshots show the built-in sample dataset (Help › Open the sample dataset)._
+<p align="center"><sub>The screenshots show the built-in sample dataset (Help › Open the sample dataset).</sub></p>
 
 ## Features
 
-- Open CSV, TSV, JSON and NDJSON files, also compressed (`.gz`, `.zst`), with
-  the first 1,000 rows on screen in about a second, even for 5 GB `.gz` files.
-  Nested JSON values expand into pretty-printed JSON.
-- Parquet is queried in place: a 50M-row file opens in under 0.1 s.
-- Excel `.xlsx` and `.xls` with a sheet picker and header row choice.
-- SQLite and DuckDB databases, read-only, with a table picker; DuckDB tables
-  are queried in place, and every database can be queried and joined in the
-  SQL panel.
-- A folder or a pattern (`logs/*.csv.gz`, `data/**/*.parquet`) opens as one
-  table, columns matched by name, with a `filename` column.
-- **Open URL** for files on the web or in S3 (credentials in the system
-  keychain); the extension it needs downloads only when you first use it.
-- Delimiter, header, quoting and types are detected automatically; override
-  them in **Import settings** (delimiter, header, quote, encoding, skip rows,
-  date format, ignore bad rows).
-- The full file is imported in the background into a local cache (with
-  progress and Cancel) while you browse the preview; reopening an unchanged
-  file is instant.
-- A fast canvas data grid: type icons, right-aligned numbers, `null` shown
-  distinctly from empty text, column resize, range selection and copy, and
-  **Go to row** (Ctrl+G).
-- Filter any column by type (text: contains, equals, starts/ends with, regex,
-  empty; numbers: equals, ranges, greater/less; dates: ranges, before/after,
-  last N days; booleans; null / not null) or by picking values from a
-  searchable list with counts. Filters show as chips; "N of M rows".
-- Sort by one or several columns (click, Shift+click). On 50M rows the first
-  and last rows appear in about a second while the rest sorts in the
-  background.
-- Search all text columns (Ctrl+F) with matches highlighted in the grid.
-- Hide, reorder (drag), pin, rename and auto-fit columns.
-- Column profiles: rows, nulls, distinct values, min, max, mean, standard
-  deviation, a histogram and the most common values, following the current
-  filters; small histograms in the column headers.
-- Command palette (Ctrl+K) with every action; copy a selection as CSV, TSV,
-  JSON, Markdown or SQL INSERT (Shift+Ctrl+C); **Copy view as SQL** gives a
-  query that reproduces the current view in plain DuckDB; cancel running
-  queries from the status bar.
-- **SQL panel** (Ctrl+J): every open file is a table (`sales_2024`), plus
-  `current_view` for the active tab's filtered rows. Completion of tables and
-  columns, run all or the selection, format, errors pointed out in the editor;
-  results page through every row, open in their own tab and become tables
-  themselves. Searchable history and saved queries.
-- **Export** (Ctrl+E) the current view or a SQL result, exactly as shown, to
-  CSV, CSV.gz, TSV, Parquet, JSON, NDJSON or Excel (typed cells, more sheets
-  past Excel's row limit), with header, delimiter, quoting and date options,
-  the whole view or just the selection, progress and Cancel.
-- **Open view in SQL panel** turns the current view into a query to edit.
-- **Charts** of the current view: bar, horizontal bar, line, histogram and
-  scatter, grouped by any column (dates by day, week, month or year) with
-  count, sum, average, min, max or distinct count. DuckDB does the work, so a
-  chart of 50M rows takes about a second. Export as PNG or SVG, or copy the
-  chart as SQL.
-- **Clean** without touching the file: rename, change type (failed conversions
-  are counted), trim, change case, find and replace, split, fill empty cells,
-  remove duplicates or rows matching a filter, and calculated columns; turn
-  steps off, reorder them, undo and redo. Save a recipe and apply it to the
-  next file, or export it as a SQL script that runs in plain DuckDB.
-- **Compare** two open files by key columns: added, removed and changed rows
-  with the changed cells highlighted and their old values beside them.
-- **Data quality** warnings: mostly empty columns, stray spaces, mixed types,
-  inconsistent date formats, outliers and duplicate rows, each one showing
-  exactly the affected rows and, where it can, fixing them with one click.
-- **Workspaces** (Ctrl+S): save the open tabs with their filters, layout,
-  charts and recipes, and the SQL panel, as a `.dataliq` file and open it
-  again later, even after moving the project folder.
-- A **menu bar** with every action (File, Edit, View, Data, Help), recent
-  files and workspaces; **Settings** (Ctrl+,) for theme, density, memory,
-  threads, the cache's size and folder, and export defaults.
-- Light and dark themes that follow your OS.
-- **First run**: three short tips, and a sample dataset (50,000 made-up orders) to try
-  everything on before you have a file at hand.
-- **Updates** from signed GitHub releases: DataLiq checks at most once a day (you can turn it
-  off), shows what's new, and installs only when you say so.
-- **Accessible**: WCAG 2.2 AA contrast in both themes, every action reachable from the
-  keyboard (menus, the command palette, a command per column for sorting, filtering and
-  profiles), visible focus everywhere; checked by automated tests.
-- Tabs, recent files and drag and drop; open files from a terminal with
-  `dataliq data.csv.gz other.parquet` (a second launch opens them in the
-  running app).
+###  Open anything
+
+- CSV, TSV, JSON, NDJSON, Parquet and Excel files, also compressed (`.gz`, `.zst`).
+- SQLite and DuckDB databases (read-only).
+- A whole folder or a pattern such as `logs/*.csv.gz` as one table.
+- Files on the web or in S3 with **Open URL**.
+- Delimiters, headers and column types are detected for you, and you can change them.
+
+###  Explore
+
+- A fast grid that scrolls smoothly through millions of rows.
+- Filter, sort and search any column.
+- Hide, reorder, pin and rename columns.
+- Column profiles: nulls, distinct values, min, max, mean and a histogram.
+
+###  Analyze
+
+- **SQL panel**: query and join every open file as a table.
+- **Charts**: bar, line, histogram and scatter, export as PNG or SVG.
+- **Compare** two files and see the added, removed and changed rows.
+- **Data quality** warnings for empty columns, mixed types, outliers and duplicates.
+
+###  Clean and export
+
+- **Clean** without touching the original file: rename, change types, trim, find and
+  replace, fill empty cells, remove duplicates. Undo any step.
+- Save your steps as a recipe and reuse it on the next file.
+- **Export** to CSV, TSV, Parquet, JSON or Excel.
+- Copy a selection as CSV, JSON, Markdown or SQL.
+
+###  Everyday comforts
+
+- **Workspaces** save your open files, filters and charts to reopen later.
+- A command palette (Ctrl+K) with every action.
+- Light and dark themes, keyboard access to everything, and a sample dataset to try.
+- Updates from signed releases, installed only when you say so.
+
+###  Private by design
+
+Nothing leaves your computer. The only network requests are the URLs you open and, if you
+keep it on, a daily check for a new version.
+
+## Installation
+
+Download the file for your system from the
+[latest release](https://github.com/Mukesh-devs/dataliq/releases/latest). Each release lists
+SHA-256 checksums of its files.
+
+| System | Download |
+| --- | --- |
+| Windows 10/11 (x64) | `DataLiq_<version>_x64-setup.exe` |
+| macOS 12+, Apple silicon (M1–M4) | `DataLiq_<version>_aarch64.dmg` |
+| macOS 12+, Intel | `DataLiq_<version>_x64.dmg` |
+| Linux (x64), any distribution | `DataLiq_<version>_amd64.AppImage` |
+| Debian / Ubuntu | `DataLiq_<version>_amd64.deb` |
+| Fedora / openSUSE | `DataLiq-<version>-1.x86_64.rpm` |
+
+### Windows
+
+1. Download `DataLiq_<version>_x64-setup.exe`.
+2. Run it. It installs for your user only, so no admin rights are needed.
+3. If SmartScreen warns about an unrecognised app, click **More info › Run anyway**.
+
+> For managed machines, use `DataLiq_<version>_x64_en-US.msi` instead. WebView2 comes with
+> Windows 11 and is installed by the setup if it is missing.
+
+### macOS
+
+1. Check your Mac: **Apple menu › About This Mac**. Pick `aarch64` for Apple silicon (M1–M4)
+   or `x64` for Intel.
+2. Open the `.dmg` and drag **DataLiq** to **Applications**.
+3. If the release isn't notarized, the first time right-click **DataLiq › Open**.
+
+### Linux
+
+**AppImage** (any distribution):
+
+```sh
+chmod +x DataLiq_<version>_amd64.AppImage
+./DataLiq_<version>_amd64.AppImage
+```
+
+**Debian / Ubuntu**:
+
+```sh
+sudo apt install ./DataLiq_<version>_amd64.deb
+```
+
+**Fedora / openSUSE**:
+
+```sh
+sudo dnf install ./DataLiq-<version>-1.x86_64.rpm
+```
+
+> Linux needs WebKitGTK 4.1, which is preinstalled on most desktops.
+
+### After installing
+
+The installers register DataLiq for CSV, TSV, JSON, NDJSON, Parquet, Excel, SQLite and DuckDB
+files and `.dataliq` workspaces (Settings says how to make it the default app). From a
+terminal, `dataliq data.csv.gz other.parquet` opens files in a running DataLiq.
 
 ## Keyboard shortcuts
 
@@ -148,52 +181,6 @@ every number per OS is in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 | Column profile of 50M rows | 0.7–2.7 s | 0.6–2.6 s | 0.2–2.9 s |
 | Chart of 50M rows | 0.1–1.9 s | 0.1–2.3 s | 0.04–1.5 s |
 
-## How it works
-
-DataLiq is a [Tauri](https://tauri.app) app: a Rust backend with an embedded
-[DuckDB](https://duckdb.org) engine, and a React interface drawn in the system's web view
-(WebView2, WKWebView or WebKitGTK), so the installers are small and nothing runs in a browser.
-
-- **Opening** a file reads just enough to detect its format, dialect and types, and shows
-  the first rows straight from the file. Parquet, DuckDB databases and URLs are then queried
-  in place; text formats and Excel are imported in the background into a DuckDB database in
-  the cache folder (with progress and Cancel), keyed by the file's path, size and time, so
-  opening it again is instant.
-- **Every view is SQL.** Filters, search, sorting, cleaning steps and charts are turned into
-  one DuckDB query over the file's table (Copy view as SQL shows it). The grid asks for the
-  500 rows it needs at a time, delivered as Arrow, so scrolling through 50M rows never loads
-  them all; big sorts and filters show their first rows at once and are written in full in
-  the background.
-- **Nothing leaves your computer**: no account, no telemetry. The only network requests are
-  the URLs you open, the DuckDB extensions those need (downloaded once), and, if you keep it
-  on, a daily check for a new version.
-- Memory is bounded by DuckDB's limit (half the RAM by default, in Settings); larger work
-  spills to a temporary folder.
-
-The design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Installing
-
-Download the installer for your system from the
-[releases page](https://github.com/mukesh-dsnl/dataliq/releases); each release lists SHA-256
-checksums of its files.
-
-- **Windows 10/11 (x64)**: `DataLiq_<version>_x64-setup.exe` (installs for you only, no admin
-  rights needed) or `DataLiq_<version>_x64_en-US.msi` (for managed machines). WebView2 is
-  included in Windows 11 and installed by the setup if missing. If SmartScreen warns about an
-  unrecognised app, choose More info › Run anyway.
-- **macOS 12 or later**: `DataLiq_<version>_universal.dmg` (Apple silicon and Intel). Open it
-  and drag DataLiq to Applications. If the release isn't notarized, the first time
-  right-click DataLiq › Open.
-- **Linux (x64)**: `DataLiq_<version>_amd64.AppImage` (any distribution: `chmod +x`, then run
-  it), `.deb` (Debian, Ubuntu: `sudo apt install ./DataLiq_<version>_amd64.deb`) or `.rpm`
-  (Fedora, openSUSE: `sudo dnf install ./DataLiq-<version>-1.x86_64.rpm`). They need
-  WebKitGTK 4.1, preinstalled on most desktops.
-
-The installers register DataLiq for CSV, TSV, JSON, NDJSON, Parquet, Excel, SQLite and DuckDB
-files and `.dataliq` workspaces (Settings says how to make it the default app). From a
-terminal, `dataliq data.csv.gz other.parquet` opens files in a running DataLiq.
-
 ## Building from source
 
 Prerequisites:
@@ -208,16 +195,14 @@ pnpm install
 pnpm tauri dev          # run the app with hot reload
 pnpm tauri build        # build installers into target/release/bundle
 ./scripts/check.sh      # run every check (fmt, clippy, tests, lint, build)
-pnpm fixtures all       # generate the large test files (16+ GB, git-ignored)
-pnpm bench              # small benchmark suite with the regression guard
 ```
+
+The design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Contributing
 
 Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
-Releases are made as described in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## License
 
-[MIT](LICENSE). DataLiq uses DuckDB (MIT), Tauri (MIT/Apache-2.0) and other open-source
-libraries under their own licenses.
+[MIT](LICENSE) © DataLiq contributors

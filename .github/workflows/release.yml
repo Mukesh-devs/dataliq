@@ -8,6 +8,7 @@ name: Release
 # - Run it by hand to try a release: with "dry run" (the default) everything is
 #   built and checked, and the files are kept as a workflow artifact instead.
 # - A branch push that changes this workflow or its scripts is a dry run too.
+# - Only commits on main are released; a tag on another branch fails at once.
 on:
   push:
     tags: ["v*"]
@@ -39,8 +40,31 @@ env:
   DRY_RUN: ${{ github.ref_type != 'tag' && (github.event_name != 'workflow_dispatch' || inputs.dry_run) }}
 
 jobs:
+  # Tags can be pushed on any branch; check before the long builds start.
+  main-only:
+    name: Released from main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: The commit is on main
+        shell: bash
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: any branch is fine."
+            exit 0
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) isn't on main: releases are made from main only."
+            exit 1
+          fi
+
   build:
     name: Build (${{ matrix.name }})
+    needs: main-only
     strategy:
       fail-fast: false
       matrix:
@@ -49,12 +73,19 @@ jobs:
             os: windows-latest
             args: ""
             bundle: target/release/bundle
-          - name: macos
+          # One app per Mac architecture, built in parallel; both on Apple
+          # silicon runners (Intel is cross-compiled; GitHub is retiring
+          # its Intel runners).
+          - name: macos-arm64
             os: macos-latest
-            # One app for Apple silicon and Intel.
-            args: "--target universal-apple-darwin"
-            bundle: target/universal-apple-darwin/release/bundle
-            targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: "--target aarch64-apple-darwin"
+            bundle: target/aarch64-apple-darwin/release/bundle
+            targets: aarch64-apple-darwin
+          - name: macos-x64
+            os: macos-latest
+            args: "--target x86_64-apple-darwin"
+            bundle: target/x86_64-apple-darwin/release/bundle
+            targets: x86_64-apple-darwin
           - name: linux
             os: ubuntu-22.04
             args: ""

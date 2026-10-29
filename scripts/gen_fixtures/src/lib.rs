@@ -96,7 +96,7 @@ pub const SMALL: &[Target] = &[
     },
 ];
 
-/// Fixtures for the large-file budgets in BUILD_PLAN.md.
+/// Fixtures for the large-file budgets in docs/BENCHMARKS.md.
 pub const LARGE: &[Target] = &[
     Target {
         name: "sales_1gb",

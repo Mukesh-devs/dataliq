@@ -1,6 +1,6 @@
 # Design decisions
 
-Deviations from, or clarifications of, `BUILD_PLAN.md`, with the reasoning.
+Design decisions and clarifications, with the reasoning.
 
 ## D1 — Repository root is the project root
 

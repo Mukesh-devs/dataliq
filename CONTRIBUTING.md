@@ -69,8 +69,7 @@ request why the test was wrong.
 - Errors shown to people say what went wrong and what to do, in plain words.
 - Colours come from the tokens in `src/styles/tokens.css` (the contrast test checks them);
   every action is a command, so it shows in the palette and the menus.
-- Decisions that change the design or deviate from [BUILD_PLAN.md](BUILD_PLAN.md) are
-  recorded in [docs/DECISIONS.md](docs/DECISIONS.md).
+- Decisions that change the design are recorded in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Pull requests
 

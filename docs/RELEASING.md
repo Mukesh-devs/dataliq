@@ -21,7 +21,8 @@
 | Platform | Files |
 | --- | --- |
 | Windows x64 | `DataLiq_<v>_x64-setup.exe` (NSIS, per user), `DataLiq_<v>_x64_en-US.msi` |
-| macOS 12+ | `DataLiq_<v>_universal.dmg`, `DataLiq_<v>_universal.app.tar.gz` (updates) |
+| macOS 12+ (Apple silicon) | `DataLiq_<v>_aarch64.dmg`, `DataLiq_<v>_aarch64.app.tar.gz` (updates) |
+| macOS 12+ (Intel) | `DataLiq_<v>_x64.dmg`, `DataLiq_<v>_x64.app.tar.gz` (updates) |
 | Linux x64 | `DataLiq_<v>_amd64.AppImage`, `DataLiq_<v>_amd64.deb`, `DataLiq-<v>-1.x86_64.rpm` |
 
 ### macOS signing (optional)

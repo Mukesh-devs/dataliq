@@ -1,6 +1,6 @@
 # Benchmarks
 
-Performance budgets come from `BUILD_PLAN.md`. Numbers are recorded per OS
+Performance budgets and the numbers measured against them, recorded per OS
 and per version.
 
 **Machines**

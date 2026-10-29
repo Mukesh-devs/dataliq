@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- macOS installers: one disk image for Apple silicon and one for Intel Macs, built in
+  parallel, instead of a single universal one; each gets its own update bundle.
+
 ## [1.0.0] - 2026-10-28
 
 DataLiq 1.0: a new name and icon, a menu bar and settings, first-run tips and a sample

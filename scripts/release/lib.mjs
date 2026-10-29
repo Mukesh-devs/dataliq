@@ -14,12 +14,14 @@ export function classify(name) {
   const rules = [
     [/_x64-setup\.exe$/, "Windows installer", ["windows-x86_64", "windows-x86_64-nsis"]],
     [/_x64_[\w-]+\.msi$/, "Windows MSI package", ["windows-x86_64-msi"]],
-    [/_universal\.dmg$/, "macOS disk image (Apple silicon and Intel)", []],
+    [/_aarch64\.dmg$/, "macOS disk image (Apple silicon)", []],
+    [/_x64\.dmg$/, "macOS disk image (Intel)", []],
     [
-      /\.app\.tar\.gz$/,
-      "macOS update bundle",
-      ["darwin-aarch64", "darwin-x86_64", "darwin-aarch64-app", "darwin-x86_64-app"],
+      /_aarch64\.app\.tar\.gz$/,
+      "macOS update bundle (Apple silicon)",
+      ["darwin-aarch64", "darwin-aarch64-app"],
     ],
+    [/_x64\.app\.tar\.gz$/, "macOS update bundle (Intel)", ["darwin-x86_64", "darwin-x86_64-app"]],
     [/_amd64\.AppImage$/, "Linux AppImage", ["linux-x86_64", "linux-x86_64-appimage"]],
     [/_amd64\.deb$/, "Debian/Ubuntu package", ["linux-x86_64-deb"]],
     [/\.x86_64\.rpm$/, "Fedora/openSUSE package", ["linux-x86_64-rpm"]],
@@ -32,12 +34,20 @@ export function classify(name) {
 
 /**
  * The name a bundle is released under. Tauri names the macOS update bundle
- * `DataLiq.app.tar.gz` with no version; give it one, like the others.
+ * `DataLiq.app.tar.gz` with no version or architecture; give it both, like
+ * the others (`arch`: "aarch64" or "x64", as in the .dmg names).
  */
-export function releaseName(name, version) {
+export function releaseName(name, version, arch) {
   return name.endsWith(".app.tar.gz") && !name.includes(version)
-    ? name.replace(/\.app\.tar\.gz$/, `_${version}_universal.app.tar.gz`)
+    ? name.replace(/\.app\.tar\.gz$/, `_${version}_${arch}.app.tar.gz`)
     : name;
+}
+
+/** The Mac architecture of a bundle folder (`target/<triple>/release/bundle`), or null. */
+export function macArch(bundleDir) {
+  const match = /(aarch64|x86_64)-apple-darwin/.exec(bundleDir);
+  if (!match) return null;
+  return match[1] === "aarch64" ? "aarch64" : "x64";
 }
 
 /**
