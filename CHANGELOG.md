@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The status bar adds up the selected cells: count, sum, average, min and max (numerical
+  count, distinct and blank cells on request). Small selections are added up at once; whole
+  columns and millions of rows by DuckDB, cancelled when the selection changes. Click a value
+  to copy it; right-click (or the sliders button) to choose which ones show.
+- Summarize selection by column… in the cell menu: values, blanks, distinct, sum, average,
+  min and max of each selected column, ready to copy.
+- Sidebar columns: a "Show all columns" box selects or unselects every column at once (the
+  pinned or first column stays shown), Find columns for wide files (the box and Invert then
+  act on the matches), Invert, "Filtered" to show only the filtered columns, and a type icon
+  per column.
+- The sidebar's Files list switches tabs.
+
 ### Changed
 
 - macOS installers: one disk image for Apple silicon and one for Intel Macs, built in

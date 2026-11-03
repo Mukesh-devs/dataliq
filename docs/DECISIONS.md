@@ -814,3 +814,23 @@ Anything that reaches into a lazily mounted component must wait for it:
 the SQL store's `focusEditor` (Ctrl+J) and `load` call the editor once it
 has registered itself, not on the next tick.
 
+
+## D55 — Selection statistics: added up in the UI when small, by DuckDB when big
+
+The status bar shows count, sum, average, min and max of the grid's selection,
+like a spreadsheet. Up to 2,000 rows (`LOCAL_MAX_ROWS`) are added up in the UI
+from the paged rows (`readRows`, at most four pages), so dragging over cells
+gives numbers at once with no request. Bigger selections (whole columns, Ctrl+A,
+many rows) go to `selection_stats`: one aggregate query over the same view the
+export uses (dataset, filters, search and sort) and, for row ranges, the same
+`row_number() OVER ()` positions as "Export selection" (D36). A selection of
+every row sends no ranges and drops the sort, so it is a plain scan. Requests
+share a group per tab, so a newer selection cancels the older one, and they
+wait 150 ms for a drag to settle.
+
+Combining columns follows spreadsheets: Count is cells with a value (not NULL,
+not ""), Sum and Average cover number columns only, and Min/Max are numeric
+unless the selection is one date or text column, when they are its range.
+Distinct is off by default (it is the slow statistic, an estimate over 10M
+rows as in D30) and shown for one column only; the per-column summary in the
+cell menu always counts it.
