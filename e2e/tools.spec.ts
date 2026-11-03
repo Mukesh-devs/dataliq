@@ -125,3 +125,44 @@ test("append and join two open files", async ({ page }) => {
   await expect(page.getByRole("tab", { name: /comma\.csv ⋈ semicolon\.csv/ })).toBeVisible();
   expect((await toolQueries(page))[1]).toContain("ANTI JOIN");
 });
+
+/** Pixels of the grid canvas close to `rgb`. */
+function countColor(page: Page, rgb: [number, number, number]) {
+  return page.evaluate((target) => {
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='data-grid'] canvas");
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return 0;
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (
+        Math.abs(data[i]! - target[0]) < 5 &&
+        Math.abs(data[i + 1]! - target[1]) < 5 &&
+        Math.abs(data[i + 2]! - target[2]) < 5
+      )
+        n++;
+    }
+    return n;
+  }, rgb);
+}
+
+test("highlight cells with a rule, kept with the column", async ({ page }) => {
+  await open(page);
+  const box = (await page.getByTestId("data-grid").boundingBox())!;
+  // The amount column's header (row numbers 52 px, id 90, name 160).
+  await page.mouse.click(box.x + 340, box.y + 16, { button: "right" });
+  await page.getByRole("menuitem", { name: "Format cells…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Format amount" });
+  await dialog.getByRole("button", { name: "Add a rule" }).click();
+  // amount = row × 0.5: rows from 6 on are over 2.5.
+  await dialog.getByLabel("Rule 1: value").fill("2.5");
+  await dialog.getByRole("button", { name: "Done" }).click();
+  // Red at 28% over white (light theme tokens).
+  await expect.poll(() => countColor(page, [245, 194, 194])).toBeGreaterThan(500);
+  await page.mouse.click(box.x + 340, box.y + 16, { button: "right" });
+  await page.getByRole("menuitem", { name: "Format cells…" }).click();
+  await expect(page.getByLabel("Rule 1: value")).toHaveValue("2.5");
+  await page.getByRole("button", { name: "Clear formatting" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect.poll(() => countColor(page, [245, 194, 194])).toBe(0);
+});

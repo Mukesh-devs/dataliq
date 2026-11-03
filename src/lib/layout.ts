@@ -1,3 +1,4 @@
+import { hasFormat, type ColumnFormat } from "./cellFormat";
 /**
  * How a tab shows its columns: order, hidden and pinned columns, display
  * names and widths. Purely a display choice: filters, sorting and the data
@@ -14,6 +15,8 @@ export interface ColumnLayout {
   labels: Record<string, string>;
   /** Widths set by the user (resize or auto-fit), in px. */
   widths: Record<string, number>;
+  /** Conditional formatting by column (rules and colour scales). */
+  formats?: Record<string, ColumnFormat>;
 }
 
 export function defaultLayout(columns: string[]): ColumnLayout {
@@ -34,6 +37,7 @@ export function reconcile(layout: ColumnLayout | undefined, columns: string[]): 
     pinned: layout.pinned.filter((c) => known.has(c)),
     labels: keep(layout.labels),
     widths: keep(layout.widths),
+    ...(layout.formats && { formats: keep(layout.formats) }),
   };
 }
 
@@ -181,6 +185,18 @@ export function rename(layout: ColumnLayout, column: string, name: string): Colu
 
 export const MIN_WIDTH = 50;
 export const MAX_WIDTH = 500;
+
+/** Sets (or with none, clears) a column's conditional formatting. */
+export function setFormat(
+  layout: ColumnLayout,
+  column: string,
+  format: ColumnFormat | undefined,
+): ColumnLayout {
+  const formats = { ...layout.formats };
+  if (format && hasFormat(format)) formats[column] = format;
+  else delete formats[column];
+  return { ...layout, formats };
+}
 
 export function setWidth(layout: ColumnLayout, column: string, width: number): ColumnLayout {
   const w = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width)));

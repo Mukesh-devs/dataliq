@@ -1,6 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import {
   Group,
+  Paintbrush,
   ListOrdered,
   ArrowDown,
   ArrowUp,
@@ -43,6 +44,8 @@ interface ColumnMenuProps {
   onCountValues?: () => void;
   /** Opens Group by with this column. */
   onGroupBy?: () => void;
+  /** Opens conditional formatting for this column. */
+  onFormat?: () => void;
 }
 
 /** The column header menu (▼ or right-click): sort and filter. */
@@ -62,6 +65,7 @@ export function ColumnMenu({
   onClean,
   onCountValues,
   onGroupBy,
+  onFormat,
 }: ColumnMenuProps) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor]);
   const current = sort.find((k) => k.column === column);
@@ -127,7 +131,12 @@ export function ColumnMenu({
               Clean column…
             </Item>
           )}
-          {(onPin || onHide || onRename || onAutoFit) && <MenuSeparator />}
+          {(onPin || onHide || onRename || onAutoFit || onFormat) && <MenuSeparator />}
+          {onFormat && (
+            <Item icon={<Paintbrush />} onSelect={choose(onFormat)}>
+              Format cells…
+            </Item>
+          )}
           {onPin && (
             <Item icon={pinned ? <PinOff /> : <Pin />} onSelect={choose(() => onPin(!pinned))}>
               {pinned ? "Unpin column" : "Pin to the left"}

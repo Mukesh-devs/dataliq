@@ -48,6 +48,12 @@
   --diff-changed: rgb(245 158 11 / 0.2);
   --diff-added: rgb(22 163 74 / 0.14);
   --diff-removed: rgb(220 38 38 / 0.12);
+  /* Conditional formatting: each colour as "r g b"; fills take an alpha. */
+  --rule-red: 220 38 38;
+  --rule-amber: 217 119 6;
+  --rule-green: 22 163 74;
+  --rule-blue: 37 99 235;
+  --rule-purple: 147 51 234;
   --diff-changed-mark: #d97706;
   --diff-added-mark: #16a34a;
   --diff-removed-mark: #dc2626;
@@ -91,6 +97,11 @@
   --diff-changed: rgb(251 191 36 / 0.18);
   --diff-added: rgb(74 222 128 / 0.13);
   --diff-removed: rgb(248 113 113 / 0.15);
+  --rule-red: 248 113 113;
+  --rule-amber: 251 191 36;
+  --rule-green: 74 222 128;
+  --rule-blue: 96 165 250;
+  --rule-purple: 192 132 252;
   --diff-changed-mark: #fbbf24;
   --diff-added-mark: #4ade80;
   --diff-removed-mark: #f87171;

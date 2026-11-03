@@ -62,6 +62,7 @@ import {
 import { useSelection } from "../../stores/selection";
 import { useDataTools } from "../tools/useDataTools";
 import { FilterPresets } from "../filters/FilterPresets";
+import { FormatColumn } from "../filters/FormatColumn";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { NOT_LOADED, PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
@@ -94,6 +95,7 @@ import {
   reconcile,
   rename,
   setHidden,
+  setFormat,
   setPinned,
   showAll,
   visible,
@@ -222,6 +224,7 @@ export function FileView({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
   const [renaming, setRenaming] = useState<{ column: string; anchor: Anchor } | null>(null);
+  const [formatting, setFormatting] = useState<{ column: ColumnInfo; anchor: Anchor } | null>(null);
   const [profiled, setProfiled] = useState<string | null>(null);
   // The right panel; shared by all tabs (each tab keeps its own column).
   const profileOpen = useLayout((s) => s.profile);
@@ -1267,12 +1270,39 @@ export function FileView({
                 ? () => onLayoutChange(setHidden(layout, menu.column.name, true))
                 : undefined,
             onRename: () => setRenaming({ column: menu.column.name, anchor: menu.anchor }),
+            onFormat: () => setFormatting({ column: menu.column, anchor: menu.anchor }),
             onAutoFit: () => grid.current?.autoFit(menu.column.name),
           })}
           onProfile={baseId ? () => showProfile(menu.column.name) : undefined}
           onClean={canClean ? () => openClean(menu.column.name) : undefined}
           onCountValues={tools.ready ? () => tools.countValues(menu.column.name) : undefined}
           onGroupBy={tools.groupBy && (() => tools.groupBy!(menu.column.name))}
+        />
+      )}
+      {formatting && onLayoutChange && (
+        <FormatColumn
+          column={label(layout, formatting.column.name)}
+          kind={formatting.column.kind}
+          format={layout.formats?.[formatting.column.name]}
+          anchor={formatting.anchor}
+          onOpenChange={(o) => !o && setFormatting(null)}
+          onChange={(f) => onLayoutChange(setFormat(layout, formatting.column.name, f))}
+          loadRange={
+            baseId
+              ? async () => {
+                  const s = await selectionStats(
+                    baseId,
+                    statsSpec(view),
+                    [formatting.column.name],
+                    "all",
+                    false,
+                    `format:${tab.id}`,
+                  );
+                  const c = s.columns[0];
+                  return c && c.min !== null && c.max !== null ? { min: c.min, max: c.max } : null;
+                }
+              : undefined
+          }
         />
       )}
       {renaming && onLayoutChange && (

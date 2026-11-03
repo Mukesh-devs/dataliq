@@ -42,13 +42,16 @@ import {
   gridTheme,
   matchColor,
   nullColor,
+  fillColor,
   rowHeight,
+  ruleColors,
   tintColors,
   type CellTint,
 } from "./gridTheme";
 import { CHART_HEIGHT, paintHistogram } from "./headerChart";
 import { paintMatches } from "./highlight";
-import type { RowSource } from "./rowSource";
+import { NOT_LOADED, type RowSource } from "./rowSource";
+import { cellFill } from "../../lib/cellFormat";
 import { scrollToRow } from "./scrollToRow";
 
 const ICONS: Partial<Record<ColumnKind, GridColumnIcon>> = {
@@ -240,17 +243,30 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     void themeVersion;
     return tintColors();
   }, [themeVersion]);
+  const rules = useMemo(() => {
+    void themeVersion;
+    return ruleColors();
+  }, [themeVersion]);
+  const formats = layout.formats;
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
       const src = shown[col] ?? -1;
       const column = source.columns[src] ?? { kind: "other" as const, name: "" };
-      const cell = toGridCell(source.getValue(row, src), column, cellStyle);
+      const value = source.getValue(row, src);
+      const cell = toGridCell(value, column, cellStyle);
       const tint = cellTint?.(row, column.name);
-      return tint
-        ? { ...cell, themeOverride: { ...cell.themeOverride, bgCell: tints[tint] } }
-        : cell;
+      // A comparison's fills first, then conditional formatting.
+      const fill = tint
+        ? tints[tint]
+        : value === NOT_LOADED
+          ? undefined
+          : (() => {
+              const f = cellFill(formats?.[column.name], value, column);
+              return f && fillColor(rules[f.color], f.strength);
+            })();
+      return fill ? { ...cell, themeOverride: { ...cell.themeOverride, bgCell: fill } } : cell;
     },
-    [source, shown, cellStyle, cellTint, tints],
+    [source, shown, cellStyle, cellTint, tints, formats, rules],
   );
 
   // A new source (e.g. preview -> imported data) must load what is on screen
