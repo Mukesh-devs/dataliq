@@ -73,6 +73,41 @@ pub struct RequestKey {
     pub group: Option<String>,
 }
 
+/// What [`Engine::memory_usage`] reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryUsage {
+    pub used_bytes: u64,
+    /// None when DuckDB reports no limit.
+    pub limit_bytes: Option<u64>,
+    /// Data written to the temporary folder because it didn't fit.
+    pub spilled_bytes: u64,
+}
+
+/// A DuckDB size setting ("7.4 GiB", "512.0 MiB", "1000 bytes") in bytes.
+pub fn parse_size(text: &str) -> Option<u64> {
+    let t = text.trim();
+    let split = t
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(t.len());
+    let (num, unit) = t.split_at(split);
+    let n: f64 = num.parse().ok()?;
+    let unit = unit.trim().to_ascii_lowercase();
+    let mult: f64 = match unit.as_str() {
+        "" | "b" | "byte" | "bytes" => 1.0,
+        "kb" => 1e3,
+        "mb" => 1e6,
+        "gb" => 1e9,
+        "tb" => 1e12,
+        "kib" => 1024.0,
+        "mib" => 1024f64.powi(2),
+        "gib" => 1024f64.powi(3),
+        "tib" => 1024f64.powi(4),
+        _ => return None,
+    };
+    Some((n * mult).round() as u64)
+}
+
 /// Rows of a query result as Arrow data.
 pub struct QueryBatches {
     pub schema: SchemaRef,
@@ -350,6 +385,24 @@ impl Engine {
         Ok(true)
     }
 
+    /// DuckDB's memory in use, its limit and what it has spilled to disk.
+    pub fn memory_usage(&self) -> Result<MemoryUsage> {
+        let conn = self.connection()?;
+        let (used, spilled): (i64, i64) = conn.query_row(
+            "SELECT coalesce(sum(memory_usage_bytes), 0)::BIGINT, \
+             coalesce(sum(temporary_storage_bytes), 0)::BIGINT FROM duckdb_memory()",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        let limit: String =
+            conn.query_row("SELECT current_setting('memory_limit')", [], |r| r.get(0))?;
+        Ok(MemoryUsage {
+            used_bytes: used.max(0) as u64,
+            limit_bytes: parse_size(&limit),
+            spilled_bytes: spilled.max(0) as u64,
+        })
+    }
+
     /// New memory and thread limits from Settings, for every connection.
     pub fn set_limits(&self, memory_limit_bytes: u64, threads: Option<u32>) -> Result<()> {
         let mib = (memory_limit_bytes / (1024 * 1024)).max(1);
@@ -393,5 +446,20 @@ impl Drop for Engine {
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(path.with_extension("duckdb.wal"));
         }
+    }
+}
+
+#[cfg(test)]
+mod size_tests {
+    use super::parse_size;
+
+    #[test]
+    fn sizes_parse_in_both_unit_systems() {
+        assert_eq!(parse_size("7.5 GiB"), Some(8_053_063_680));
+        assert_eq!(parse_size("512.0 MiB"), Some(536_870_912));
+        assert_eq!(parse_size("1.5GB"), Some(1_500_000_000));
+        assert_eq!(parse_size("1000 bytes"), Some(1000));
+        assert_eq!(parse_size("-1"), None);
+        assert_eq!(parse_size("lots"), None);
     }
 }

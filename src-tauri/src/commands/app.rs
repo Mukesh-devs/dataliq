@@ -60,3 +60,10 @@ pub async fn sample_dataset(
         .await
         .map_err(|e| AppError::Internal(format!("sample: {e}")))?
 }
+
+/// DuckDB's memory in use, its limit and what it spilled to disk, for the
+/// status bar.
+#[tauri::command]
+pub fn engine_memory(engine: State<'_, Arc<Engine>>) -> Result<crate::engine::MemoryUsage> {
+    engine.memory_usage()
+}

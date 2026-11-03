@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NOTICE_MS, useNotice } from "../../stores/notice";
@@ -101,5 +102,34 @@ describe("StatusBar", () => {
     expect(screen.getByRole("group", { name: "Selection statistics" })).toHaveTextContent(
       "Adding up…",
     );
+  });
+
+  it("shows DuckDB's memory against its limit, and what spilled to disk", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "engine_memory")
+        return { usedBytes: 900 * 2 ** 20, limitBytes: 2 ** 30, spilledBytes: 3 * 2 ** 30 };
+      throw new Error(`unexpected ${cmd}`);
+    });
+    try {
+      render(<StatusBar message="" />);
+      const memory = await screen.findByRole("img", { name: /DuckDB memory/ });
+      expect(memory).toHaveTextContent(/900(\.0)? MB \/ 1(\.0)? GB ?· 3(\.0)? GB on disk/);
+      expect(memory).toHaveClass("text-warning");
+    } finally {
+      clearMocks();
+    }
+  });
+
+  it("hides the memory when the engine can't say", async () => {
+    mockIPC(() => {
+      throw new Error("no engine");
+    });
+    try {
+      render(<StatusBar message="" />);
+      await act(() => Promise.resolve());
+      expect(screen.queryByRole("img", { name: /DuckDB memory/ })).toBeNull();
+    } finally {
+      clearMocks();
+    }
   });
 });

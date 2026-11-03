@@ -380,3 +380,13 @@ fn memory_and_thread_limits_change_while_running() {
         std::thread::available_parallelism().unwrap().get()
     );
 }
+
+#[test]
+fn memory_usage_reports_the_limit() {
+    let fx = crate::filters::fx();
+    let m = fx.engine.memory_usage().unwrap();
+    // The fixture engine has a 1 GiB limit.
+    let limit = m.limit_bytes.unwrap();
+    assert!((1_000_000_000..=1_100_000_000).contains(&limit), "{limit}");
+    assert!(m.used_bytes < limit);
+}

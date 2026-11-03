@@ -327,3 +327,14 @@ export function baseName(path: string): string {
   if (isUrl(path)) return urlName(path);
   return path.split(/[\\/]/).pop() || path;
 }
+
+/** DuckDB's memory: in use, the limit (null when none) and spilled to disk. */
+export interface MemoryUsage {
+  usedBytes: number;
+  limitBytes: number | null;
+  spilledBytes: number;
+}
+
+export function engineMemory(): Promise<MemoryUsage> {
+  return call<MemoryUsage>("engine_memory");
+}

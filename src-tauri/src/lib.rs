@@ -139,6 +139,7 @@ pub fn run() {
             commands::app::take_startup_files,
             commands::app::set_native_menu,
             commands::app::sample_dataset,
+            commands::app::engine_memory,
             commands::update::update_status,
             commands::update::check_update,
             commands::update::install_update,
