@@ -8,6 +8,7 @@
 
 mod bench_small;
 mod charts;
+mod cli_run;
 mod compare;
 mod convert;
 mod copy_sql;

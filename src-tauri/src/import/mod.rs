@@ -428,6 +428,36 @@ pub fn open_direct(engine: &Engine, source: &Source) -> Result<Dataset> {
 
 /// Opens a Parquet file as a dataset without importing. The row count comes
 /// from the file metadata, so this is instant even for 50M rows.
+/// A dataset that reads the file through its reader on every query (no
+/// cache, no import): for one pass over a file, e.g. `dataliq run`.
+pub fn open_query(engine: &Engine, source: &Source) -> Result<Dataset> {
+    if source.detected.format == FileFormat::Parquet && !source.is_multi() {
+        return open_in_place(engine, source);
+    }
+    if source.is_excel() {
+        return Err(AppError::Query(
+            "Excel files are read in the app; save the sheet as CSV or Parquet first.".into(),
+        ));
+    }
+    let (sql, params) = source.reader()?;
+    let rows: i64 = engine
+        .connection()?
+        .query_row(
+            &format!("SELECT count(*) FROM {sql}"),
+            duckdb::params_from_iter(params.iter()),
+            |r| r.get(0),
+        )
+        .map_err(|e| friendly_error(&e.to_string()))?;
+    let ds = Dataset {
+        id: format!("q-{}", cache::cache_key(&source.stamp()?, &source.options)),
+        source: DatasetSource::Query { sql, params },
+        row_count: rows as u64,
+        cached: false,
+    };
+    engine.datasets.insert(ds.clone());
+    Ok(ds)
+}
+
 pub fn open_in_place(engine: &Engine, source: &Source) -> Result<Dataset> {
     let stamp = source.stamp()?;
     let key = format!("pq-{}", cache::cache_key(&stamp, &source.options));
