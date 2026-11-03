@@ -10,6 +10,7 @@ pub mod engine;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod mcp;
 pub mod quality;
 pub mod recipe;
 pub mod remote;

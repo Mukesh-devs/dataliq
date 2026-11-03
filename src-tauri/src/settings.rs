@@ -25,6 +25,12 @@ pub struct Settings {
     pub cache_dir: Option<PathBuf>,
     /// Files smaller than this (MiB) import without a progress bar.
     pub small_file_mb: u64,
+    /// AI assistants may read data through `dataliq mcp` (off by default).
+    pub mcp_enabled: bool,
+    /// The folders `dataliq mcp` may read.
+    pub mcp_folders: Vec<PathBuf>,
+    /// `dataliq mcp` may write query results into those folders.
+    pub mcp_allow_export: bool,
 }
 
 impl Default for Settings {
@@ -37,6 +43,9 @@ impl Default for Settings {
             cache_max_gb: 20,
             cache_dir: None,
             small_file_mb: 100,
+            mcp_enabled: false,
+            mcp_folders: Vec::new(),
+            mcp_allow_export: false,
         }
     }
 }
@@ -104,6 +113,17 @@ impl Settings {
         }
         if self.cache_max_gb == 0 {
             return bad("The cache needs at least 1 GB.");
+        }
+        for f in &self.mcp_folders {
+            if !f.is_dir() {
+                return Err(AppError::Query(format!(
+                    "The shared folder {} doesn't exist.",
+                    f.display()
+                )));
+            }
+            if f.parent().is_none() {
+                return bad("Share folders of data, not a whole drive.");
+            }
         }
         Ok(())
     }

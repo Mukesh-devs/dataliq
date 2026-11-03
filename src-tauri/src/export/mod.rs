@@ -362,6 +362,11 @@ fn count_files(dir: &Path) -> Result<u32> {
     Ok(n)
 }
 
+/// `COPY … TO` options for `format` with the default export options.
+pub fn copy_options_for(format: ExportFormat) -> Result<String> {
+    copy_options(format, &ExportOptions::default())
+}
+
 /// The temporary file next to `path` that becomes `path` when complete.
 fn partial_path(path: &Path) -> PathBuf {
     let mut name = path.file_name().unwrap_or_default().to_os_string();

@@ -22,6 +22,7 @@ mod folders;
 mod import_cache;
 mod json_parquet_sources;
 mod live_db;
+mod mcp;
 mod paging;
 mod perf_export;
 mod perf_import;

@@ -32,6 +32,10 @@ pub struct SettingsInfo {
     pub default_cache_dir: PathBuf,
     pub default_temp_dir: PathBuf,
     pub settings_file: PathBuf,
+    /// The program an MCP client starts (`<it> mcp`).
+    pub mcp_command: PathBuf,
+    /// Where `dataliq mcp` logs its calls.
+    pub mcp_log: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -60,6 +64,12 @@ pub fn settings_info(app: AppHandle, state: State<'_, SettingsState>) -> Result<
             .join("datasets"),
         default_temp_dir: Settings::default().effective_temp_dir(),
         settings_file: state.path.clone(),
+        mcp_command: std::env::current_exe()?,
+        mcp_log: app
+            .path()
+            .app_data_dir()
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+            .join(crate::mcp::LOG_FILE),
     })
 }
 

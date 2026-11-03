@@ -8,6 +8,10 @@ fn main() {
         attach_console();
         std::process::exit(dataliq_lib::cli::report::main(&args[2..]));
     }
+    // `dataliq mcp`: an MCP server on stdin/stdout for AI assistants.
+    if args.get(1).map(String::as_str) == Some("mcp") {
+        std::process::exit(dataliq_lib::mcp::main());
+    }
     dataliq_lib::run()
 }
 
