@@ -1,4 +1,11 @@
-import { BarChart, CustomChart, LineChart, ScatterChart } from "echarts/charts";
+import {
+  BarChart,
+  BoxplotChart,
+  CustomChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+} from "echarts/charts";
 import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
@@ -9,6 +16,8 @@ echarts.use([
   BarChart,
   LineChart,
   ScatterChart,
+  PieChart,
+  BoxplotChart,
   CustomChart,
   GridComponent,
   LegendComponent,

@@ -17,6 +17,7 @@ fn spec(kind: ChartKind, x: &str) -> ChartSpec {
         bucket: None,
         measures: vec![],
         y: None,
+        split_by: None,
         bins: None,
         limit: None,
         sample: None,
@@ -366,4 +367,137 @@ fn copied_chart_sql_gives_the_charts_numbers_in_plain_duckdb() {
     scatter.sample = Some(50);
     let rows = plain(&sql(&scatter), "CAST(count(*) AS VARCHAR)");
     assert_eq!(num(&rows[0][0]), Some(50.0));
+}
+
+#[test]
+fn bars_split_by_a_second_column() {
+    let fx = fx();
+    let mut c = spec(ChartKind::Bar, "city");
+    c.split_by = Some("active".into());
+    c.measures = vec![measure(Agg::Count, None)];
+    let d = chart(&fx, &ViewSpec::default(), &c);
+    // true, false and NULL: three series, no "Other".
+    let names: Vec<&str> = d.series.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(names.len(), 3, "{names:?}");
+    assert!(names.contains(&"true") && names.contains(&"false") && names.contains(&"(empty)"));
+    // Each group's series add up to its rows.
+    let all: Vec<&Person> = fx.people.iter().collect();
+    let groups = by_city(&all);
+    for (i, x) in d.x.iter().enumerate() {
+        let total: f64 = d.series.iter().filter_map(|s| s.values[i]).sum();
+        assert_eq!(total as u64, groups[&label(x)].0, "{x}");
+    }
+    // Split by the axis column itself is refused.
+    c.split_by = Some("city".into());
+    assert!(
+        fx.engine
+            .chart_data(
+                &fx.dataset.id,
+                &ViewSpec::default(),
+                &c,
+                &RequestKey::default()
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn many_split_values_end_in_other() {
+    let fx = fx();
+    let mut c = spec(ChartKind::Line, "active");
+    c.split_by = Some("name".into());
+    let d = chart(&fx, &ViewSpec::default(), &c);
+    let names: std::collections::HashSet<_> = fx.people.iter().map(|p| &p.name).collect();
+    assert!(names.len() > 8, "the fixture has {} names", names.len());
+    assert_eq!(d.series.len(), 8);
+    assert_eq!(d.series.last().unwrap().name, "Other");
+    // Every row is in exactly one series.
+    let rows: f64 = d
+        .series
+        .iter()
+        .flat_map(|s| s.values.iter().flatten())
+        .sum();
+    assert_eq!(rows as usize, fx.people.len());
+}
+
+#[test]
+fn pie_slices_with_the_rest_as_other() {
+    let fx = fx();
+    let mut c = spec(ChartKind::Pie, "city");
+    c.limit = Some(3);
+    c.measures = vec![measure(Agg::Sum, Some("amount")), measure(Agg::Count, None)];
+    let d = chart(&fx, &ViewSpec::default(), &c);
+    // One measure only, the three largest slices.
+    assert_eq!(d.series.len(), 1);
+    assert_eq!(d.x.len(), 3);
+    assert!(d.truncated);
+    let all: f64 = fx.people.iter().filter_map(|p| p.amount).sum();
+    let shown: f64 = d.series[0].values.iter().flatten().sum();
+    assert!(
+        close(shown + d.other.unwrap(), all),
+        "{shown} + {:?} vs {all}",
+        d.other
+    );
+    // An average has no meaningful "Other".
+    c.measures = vec![measure(Agg::Avg, Some("amount"))];
+    assert_eq!(chart(&fx, &ViewSpec::default(), &c).other, None);
+}
+
+#[test]
+fn box_plot_gives_the_spread_per_group() {
+    let fx = fx();
+    let mut c = spec(ChartKind::Box, "active");
+    c.y = Some("amount".into());
+    let d = chart(&fx, &ViewSpec::default(), &c);
+    assert_eq!(d.series.len(), 6);
+    for (i, x) in d.x.iter().enumerate() {
+        let want = label(x).map(|v| v == "true");
+        let mut vals: Vec<f64> = fx
+            .people
+            .iter()
+            .filter(|p| p.active == want)
+            .filter_map(|p| p.amount)
+            .collect();
+        vals.sort_by(f64::total_cmp);
+        let at = |s: usize| d.series[s].values[i].unwrap();
+        assert!(close(at(0), vals[0]), "min");
+        assert!(close(at(4), *vals.last().unwrap()), "max");
+        assert_eq!(at(5) as usize, vals.len(), "values");
+        assert!(at(1) <= at(2) && at(2) <= at(3), "quartiles in order");
+    }
+    // Only numbers have a spread.
+    c.y = Some("name".into());
+    assert!(
+        fx.engine
+            .chart_data(
+                &fx.dataset.id,
+                &ViewSpec::default(),
+                &c,
+                &RequestKey::default()
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn new_charts_copy_as_sql_that_runs() {
+    let fx = fx();
+    let mut charts = Vec::new();
+    let mut pie = spec(ChartKind::Pie, "city");
+    pie.measures = vec![measure(Agg::Sum, Some("amount"))];
+    charts.push(pie);
+    let mut b = spec(ChartKind::Box, "city");
+    b.y = Some("amount".into());
+    charts.push(b);
+    let mut split = spec(ChartKind::Bar, "city");
+    split.split_by = Some("active".into());
+    charts.push(split);
+    for c in charts {
+        let sql = fx
+            .engine
+            .chart_sql(&fx.dataset.id, &ViewSpec::default(), &c, &reader(&fx))
+            .unwrap();
+        let rows = plain(&sql, "CAST(COLUMNS(*) AS VARCHAR)");
+        assert!(!rows.is_empty(), "{sql}");
+    }
 }

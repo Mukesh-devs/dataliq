@@ -266,6 +266,7 @@ fn perf_charts_50m() {
         bucket: None,
         measures: vec![],
         y: None,
+        split_by: None,
         bins: None,
         limit: None,
         sample: None,

@@ -3,12 +3,21 @@
 //! checked against the dataset's schema; the view's values stay parameters.
 
 use super::{
-    Agg, ChartKind, ChartSpec, DEFAULT_CATEGORIES, MAX_CATEGORIES, MAX_POINTS, Measure, XKind,
+    Agg, ChartKind, ChartSpec, DEFAULT_BOXES, DEFAULT_CATEGORIES, DEFAULT_SLICES, MAX_CATEGORIES,
+    MAX_POINTS, Measure, XKind,
 };
 use crate::engine::sql::quote_ident;
 use crate::error::{AppError, Result};
 use crate::sources::ColumnMeta;
 use crate::view::ProfileKind;
+
+/// One series of a grouped chart: a measure over the rows `filter` keeps
+/// (all when none), e.g. one value of a "split by" column.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SeriesAgg {
+    pub measure: Measure,
+    pub filter: Option<String>,
+}
 
 /// A grouped chart's query: `x`, one column per measure, then the number of
 /// groups before the limit.
@@ -57,9 +66,15 @@ fn axis_value(col: &str, meta: &ColumnMeta) -> Option<(String, XKind)> {
     }
 }
 
-fn aggregate(m: &Measure, schema: &[ColumnMeta]) -> Result<String> {
+/// A measure as a DOUBLE aggregate, over the rows `filter` keeps.
+pub(crate) fn aggregate(
+    m: &Measure,
+    schema: &[ColumnMeta],
+    filter: Option<&str>,
+) -> Result<String> {
+    let only = filter.map_or_else(String::new, |f| format!(" FILTER (WHERE {f})"));
     if m.agg == Agg::Count {
-        return Ok("CAST(count(*) AS DOUBLE)".into());
+        return Ok(format!("CAST(count(*){only} AS DOUBLE)"));
     }
     let name = m
         .column
@@ -68,7 +83,7 @@ fn aggregate(m: &Measure, schema: &[ColumnMeta]) -> Result<String> {
     let meta = column(schema, name)?;
     let col = quote_ident(name);
     if m.agg == Agg::CountDistinct {
-        return Ok(format!("CAST(count(DISTINCT {col}) AS DOUBLE)"));
+        return Ok(format!("CAST(count(DISTINCT {col}){only} AS DOUBLE)"));
     }
     if ProfileKind::of(&meta.r#type) != ProfileKind::Number {
         return Err(AppError::Query(format!(
@@ -83,7 +98,7 @@ fn aggregate(m: &Measure, schema: &[ColumnMeta]) -> Result<String> {
         Agg::Max => "max",
         Agg::Count | Agg::CountDistinct => unreachable!(),
     };
-    Ok(format!("CAST({f}({col}) AS DOUBLE)"))
+    Ok(format!("CAST({f}({col}){only} AS DOUBLE)"))
 }
 
 /// Bar, horizontal bar and line: rows grouped by `x` (dates by `bucket`).
@@ -91,14 +106,25 @@ fn aggregate(m: &Measure, schema: &[ColumnMeta]) -> Result<String> {
 /// dates are in x order (up to [`MAX_POINTS`]).
 pub fn grouped_sql(
     chart: &ChartSpec,
-    measures: &[Measure],
+    series: &[SeriesAgg],
     view: &str,
     schema: &[ColumnMeta],
 ) -> Result<GroupedSql> {
     let meta = column(schema, &chart.x)?;
     let col = quote_ident(&chart.x);
     let kind = ProfileKind::of(&meta.r#type);
+    let pie = chart.kind == ChartKind::Pie;
     let (x, x_kind) = match (kind, chart.bucket) {
+        // A pie's slices are labels: dates by their bucket as text.
+        (ProfileKind::Temporal, Some(b)) if pie => (
+            format!(
+                "CAST(CAST(date_trunc('{}', {}) AS DATE) AS VARCHAR)",
+                b.unit(),
+                as_timestamp(&col, meta)
+            ),
+            XKind::Category,
+        ),
+        _ if pie => (format!("CAST({col} AS VARCHAR)"), XKind::Category),
         (ProfileKind::Temporal, Some(b)) => (
             format!(
                 "CAST(epoch_ms(date_trunc('{}', {})) AS DOUBLE)",
@@ -113,24 +139,40 @@ pub fn grouped_sql(
             _ => (format!("CAST({col} AS VARCHAR)"), XKind::Category),
         },
     };
-    let aggs = measures
+    let aggs = series
         .iter()
         .enumerate()
-        .map(|(i, m)| Ok(format!("{} AS m{i}", aggregate(m, schema)?)))
+        .map(|(i, s)| {
+            Ok(format!(
+                "{} AS m{i}",
+                aggregate(&s.measure, schema, s.filter.as_deref())?
+            ))
+        })
         .collect::<Result<Vec<_>>>()?;
+    // Split series: categories by their total over every series.
+    let size = if series.iter().any(|s| s.filter.is_some()) {
+        let parts: Vec<String> = (0..series.len())
+            .map(|i| format!("coalesce(m{i}, 0)"))
+            .collect();
+        format!("({})", parts.join(" + "))
+    } else {
+        "m0".to_string()
+    };
     let (order, limit) = if x_kind == XKind::Category {
-        // Numbers as bars read best in their order, text by size.
-        let order = if kind == ProfileKind::Number {
+        // Numbers as bars read best in their order, text (and slices) by size.
+        let order = if kind == ProfileKind::Number && !pie {
             "CAST(x AS DOUBLE) ASC NULLS LAST".to_string()
         } else {
-            "m0 DESC NULLS LAST, x ASC NULLS LAST".to_string()
+            format!("{size} DESC NULLS LAST, x ASC NULLS LAST")
+        };
+        let default = if pie {
+            DEFAULT_SLICES
+        } else {
+            DEFAULT_CATEGORIES
         };
         (
             order,
-            chart
-                .limit
-                .unwrap_or(DEFAULT_CATEGORIES)
-                .clamp(1, MAX_CATEGORIES),
+            chart.limit.unwrap_or(default).clamp(1, MAX_CATEGORIES),
         )
     } else {
         ("x ASC NULLS LAST".to_string(), MAX_POINTS)
@@ -143,6 +185,40 @@ pub fn grouped_sql(
             aggs.join(", ")
         ),
         x_kind,
+        limit,
+    })
+}
+
+/// Box plot: per group of `x` (the largest groups), the minimum, quartiles,
+/// median and maximum of the number column `y`, and how many values.
+pub fn box_sql(chart: &ChartSpec, view: &str, schema: &[ColumnMeta]) -> Result<GroupedSql> {
+    let y = chart
+        .y
+        .as_deref()
+        .ok_or_else(|| AppError::Query("Choose the number column to show the spread of.".into()))?;
+    let meta = column(schema, y)?;
+    if ProfileKind::of(&meta.r#type) != ProfileKind::Number {
+        return Err(AppError::Query(format!(
+            "A box plot shows the spread of numbers; \"{y}\" is {}.",
+            meta.r#type
+        )));
+    }
+    column(schema, &chart.x)?;
+    let (x, yc) = (quote_ident(&chart.x), quote_ident(y));
+    let v = format!("CAST({yc} AS DOUBLE)");
+    let limit = chart
+        .limit
+        .unwrap_or(DEFAULT_BOXES)
+        .clamp(1, MAX_CATEGORIES);
+    Ok(GroupedSql {
+        select: format!(
+            "SELECT *, count(*) OVER ()::BIGINT AS groups FROM (\
+             SELECT CAST({x} AS VARCHAR) AS x, min({v}) AS m0, quantile_cont({v}, 0.25) AS m1, \
+             median({v}) AS m2, quantile_cont({v}, 0.75) AS m3, max({v}) AS m4, \
+             CAST(count({v}) AS DOUBLE) AS m5 FROM ({view}) WHERE {yc} IS NOT NULL GROUP BY 1\
+             ) ORDER BY m5 DESC, x ASC NULLS LAST LIMIT {limit}"
+        ),
+        x_kind: XKind::Category,
         limit,
     })
 }
@@ -249,7 +325,24 @@ pub fn readable_sql(chart: &ChartSpec, view: &str, schema: &[ColumnMeta]) -> Res
                 "SELECT * FROM (\n  SELECT {col}, {yc} FROM ({view})\n  WHERE {col} IS NOT NULL AND {yc} IS NOT NULL\n) USING SAMPLE reservoir({n} ROWS) REPEATABLE (7);"
             ))
         }
-        ChartKind::Bar | ChartKind::HorizontalBar | ChartKind::Line => {
+        ChartKind::Box => {
+            let y = chart
+                .y
+                .as_deref()
+                .ok_or_else(|| AppError::Query("Choose a number column.".into()))?;
+            box_sql(chart, view, schema)?;
+            let yc = quote_ident(y);
+            let limit = chart
+                .limit
+                .unwrap_or(DEFAULT_BOXES)
+                .clamp(1, MAX_CATEGORIES);
+            Ok(format!(
+                "SELECT {col}, min({yc}) AS \"min\", quantile_cont({yc}, 0.25) AS q1, median({yc}) AS median,\n\
+                 quantile_cont({yc}, 0.75) AS q3, max({yc}) AS \"max\", count({yc}) AS \"values\"\n\
+                 FROM ({view})\nWHERE {yc} IS NOT NULL\nGROUP BY 1\nORDER BY \"values\" DESC, 1 ASC NULLS LAST\nLIMIT {limit};"
+            ))
+        }
+        ChartKind::Bar | ChartKind::HorizontalBar | ChartKind::Line | ChartKind::Pie => {
             let x = match (kind, chart.bucket) {
                 (ProfileKind::Temporal, Some(b)) => {
                     format!("date_trunc('{}', {})", b.unit(), as_timestamp(&col, meta))
@@ -267,7 +360,7 @@ pub fn readable_sql(chart: &ChartSpec, view: &str, schema: &[ColumnMeta]) -> Res
             let mut cols = vec![format!("{x} AS {col}")];
             for m in &measures {
                 // The same checks and maths as the chart, in the column's own type.
-                aggregate(m, schema)?;
+                aggregate(m, schema, None)?;
                 let expr = match (m.agg, m.column.as_deref().map(quote_ident)) {
                     (Agg::Count, _) => "count(*)".to_string(),
                     (Agg::CountDistinct, Some(c)) => format!("count(DISTINCT {c})"),
@@ -282,30 +375,47 @@ pub fn readable_sql(chart: &ChartSpec, view: &str, schema: &[ColumnMeta]) -> Res
                     quote_ident(&super::measure_name(m))
                 ));
             }
-            let category = !(chart.kind == ChartKind::Line && axis_value(&col, meta).is_some())
-                && kind != ProfileKind::Temporal;
+            let pie = chart.kind == ChartKind::Pie;
+            let category = pie
+                || (!(chart.kind == ChartKind::Line && axis_value(&col, meta).is_some())
+                    && kind != ProfileKind::Temporal);
+            let categories = chart
+                .limit
+                .unwrap_or(if pie {
+                    DEFAULT_SLICES
+                } else {
+                    DEFAULT_CATEGORIES
+                })
+                .clamp(1, MAX_CATEGORIES);
+            // Split by a column: one row per group and value (the first measure).
+            if let Some(split) = chart.split_by.as_deref().filter(|_| !pie) {
+                column(schema, split)?;
+                let measure = cols.get(1).cloned().unwrap_or_default();
+                return Ok(format!(
+                    "SELECT {}, {} AS {}, {measure}\nFROM ({view})\nGROUP BY 1, 2\nORDER BY 1 ASC NULLS LAST, 3 DESC NULLS LAST;",
+                    cols[0],
+                    quote_ident(split),
+                    quote_ident(split),
+                ));
+            }
             let (order, limit) = if !category {
                 ("1 ASC NULLS LAST".to_string(), MAX_POINTS)
-            } else if kind == ProfileKind::Number {
-                (
-                    "1 ASC NULLS LAST".to_string(),
-                    chart
-                        .limit
-                        .unwrap_or(DEFAULT_CATEGORIES)
-                        .clamp(1, MAX_CATEGORIES),
-                )
+            } else if kind == ProfileKind::Number && !pie {
+                ("1 ASC NULLS LAST".to_string(), categories)
             } else {
                 (
                     "2 DESC NULLS LAST, 1 ASC NULLS LAST".to_string(),
-                    chart
-                        .limit
-                        .unwrap_or(DEFAULT_CATEGORIES)
-                        .clamp(1, MAX_CATEGORIES),
+                    categories,
                 )
+            };
+            let measures = if pie {
+                &cols[..2.min(cols.len())]
+            } else {
+                &cols[..]
             };
             Ok(format!(
                 "SELECT {}\nFROM ({view})\nGROUP BY 1\nORDER BY {order}\nLIMIT {limit};",
-                cols.join(", ")
+                measures.join(", ")
             ))
         }
     }
@@ -342,6 +452,7 @@ mod tests {
             bucket: None,
             measures: vec![],
             y: None,
+            split_by: None,
             bins: None,
             limit: None,
             sample: None,
@@ -355,6 +466,17 @@ mod tests {
         }
     }
 
+    /// Measures as unfiltered series, as `grouped_sql` takes them.
+    fn all(measures: &[Measure]) -> Vec<SeriesAgg> {
+        measures
+            .iter()
+            .map(|m| SeriesAgg {
+                measure: m.clone(),
+                filter: None,
+            })
+            .collect()
+    }
+
     fn render(q: &GroupedSql) -> String {
         format!("{:?} limit {}\n{}", q.x_kind, q.limit, q.select)
     }
@@ -363,7 +485,7 @@ mod tests {
     fn bar_of_categories_keeps_the_largest() {
         let q = grouped_sql(
             &chart(ChartKind::Bar, "city"),
-            &[m(Agg::Count, None), m(Agg::Sum, Some("amount"))],
+            &all(&[m(Agg::Count, None), m(Agg::Sum, Some("amount"))]),
             VIEW,
             &schema(),
         )
@@ -375,7 +497,7 @@ mod tests {
     fn bars_of_numbers_are_categories_in_order() {
         let q = grouped_sql(
             &chart(ChartKind::HorizontalBar, "quantity"),
-            &[m(Agg::Avg, Some("amount"))],
+            &all(&[m(Agg::Avg, Some("amount"))]),
             VIEW,
             &schema(),
         )
@@ -387,11 +509,16 @@ mod tests {
     fn line_by_month_and_by_timestamp_with_time_zone() {
         let mut c = chart(ChartKind::Line, "joined");
         c.bucket = Some(Bucket::Month);
-        let month = grouped_sql(&c, &[m(Agg::Max, Some("amount"))], VIEW, &schema()).unwrap();
+        let month = grouped_sql(&c, &all(&[m(Agg::Max, Some("amount"))]), VIEW, &schema()).unwrap();
         c.x = "seen".into();
         c.bucket = Some(Bucket::Week);
-        let week =
-            grouped_sql(&c, &[m(Agg::CountDistinct, Some("city"))], VIEW, &schema()).unwrap();
+        let week = grouped_sql(
+            &c,
+            &all(&[m(Agg::CountDistinct, Some("city"))]),
+            VIEW,
+            &schema(),
+        )
+        .unwrap();
         insta::assert_snapshot!(format!("{}\n\n{}", render(&month), render(&week)));
     }
 
@@ -425,13 +552,14 @@ mod tests {
     fn bad_columns_are_errors_in_words() {
         let e = grouped_sql(
             &chart(ChartKind::Bar, "city"),
-            &[m(Agg::Sum, Some("city"))],
+            &all(&[m(Agg::Sum, Some("city"))]),
             VIEW,
             &schema(),
         )
         .unwrap_err();
         assert!(e.to_string().contains("need a number column"), "{e}");
-        let e = grouped_sql(&chart(ChartKind::Bar, "nope"), &[], VIEW, &schema()).unwrap_err();
+        let e =
+            grouped_sql(&chart(ChartKind::Bar, "nope"), &all(&[]), VIEW, &schema()).unwrap_err();
         assert!(e.to_string().contains("no column named \"nope\""), "{e}");
         let e = scatter_sql("city", "amount", 10, VIEW, &schema()).unwrap_err();
         assert!(e.to_string().contains("number or date"), "{e}");
@@ -443,7 +571,7 @@ mod tests {
         });
         let q = grouped_sql(
             &chart(ChartKind::Bar, "a\"b"),
-            &[m(Agg::Count, None)],
+            &all(&[m(Agg::Count, None)]),
             VIEW,
             &s,
         )

@@ -64,6 +64,10 @@
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
+  --series-5: #8f5bd9;
+  --series-6: #d6458f;
+  --series-7: #1497b8;
+  --series-8: #7a8a1f;
   /* SQL editor syntax colours. */
   --syntax-keyword: #6d28d9;
   --syntax-string: #047454;
@@ -110,6 +114,10 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  --series-5: #a07ee8;
+  --series-6: #e0679f;
+  --series-7: #2fb3d1;
+  --series-8: #9aab3a;
   --syntax-keyword: #c4b5fd;
   --syntax-string: #6ee7b7;
   --syntax-number: #fcd34d;

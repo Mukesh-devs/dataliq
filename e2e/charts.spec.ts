@@ -52,11 +52,37 @@ function charts(chart: Record<string, unknown>) {
       elapsedMs: 6,
     };
   }
+  if (kind === "box") {
+    return {
+      kind,
+      xKind: "category",
+      x: ["Paris", "Berlin"],
+      series: [
+        { name: "Min amount", values: [1, 2] },
+        { name: "Q1 amount", values: [10, 12] },
+        { name: "Median amount", values: [20, 25] },
+        { name: "Q3 amount", values: [40, 35] },
+        { name: "Max amount", values: [90, 70] },
+        { name: "Values", values: [300, 200] },
+      ],
+      bins: [],
+      total: 2,
+      truncated: false,
+      elapsedMs: 5,
+    };
+  }
+  const split = chart.splitBy
+    ? [
+        { name: "true", values: [300, 250, 100] },
+        { name: "Other", values: [200, 150, 200] },
+      ]
+    : null;
   return {
     kind,
     xKind: "category",
     x: ["Paris", "Berlin", "Tokyo"],
-    series: [{ name: "Count", values: [500, 400, 300] }],
+    series: split ?? [{ name: "Count", values: [500, 400, 300] }],
+    other: kind === "pie" ? 250 : null,
     bins: [],
     total: 12,
     truncated: true,
@@ -231,4 +257,39 @@ test("export the chart as PNG and SVG, copy its SQL", async ({ page, context }) 
   // The bars and their labels are in it.
   expect(svg).toContain("Paris");
   expect(svg.match(/<path/g)?.length ?? 0).toBeGreaterThan(3);
+});
+
+test("pie with Other, a box plot, and bars split and stacked", async ({ page }) => {
+  await open(page);
+  await page
+    .getByRole("radiogroup", { name: "Show" })
+    .getByRole("radio", { name: "Chart" })
+    .click();
+  await panel(page).getByRole("radio", { name: "Pie" }).click();
+  await panel(page).getByLabel("Column").selectOption("name");
+  await panel(page).getByRole("checkbox", { name: "Ring" }).check();
+  await expect
+    .poll(async () => (await invokes(page, "chart_data")).at(-1)?.chart)
+    .toMatchObject({ kind: "pie", x: "name", donut: true, measures: [{ agg: "count" }] });
+  await expect(page.getByRole("img", { name: "Pie of name" })).toBeVisible();
+  // No second measure on a pie.
+  await expect(panel(page).getByRole("button", { name: "Add measure" })).toHaveCount(0);
+  await panel(page).getByRole("button", { name: "Show the chart's values as a table" }).click();
+  await expect(panel(page).getByRole("table")).toContainText("Other250");
+  await panel(page).getByRole("button", { name: "Show the chart" }).click();
+
+  await panel(page).getByRole("radio", { name: "Box plot" }).click();
+  await expect
+    .poll(async () => (await invokes(page, "chart_data")).at(-1)?.chart)
+    .toMatchObject({ kind: "box", y: "id" });
+  await panel(page).getByLabel("Number column").selectOption("amount");
+  await expect(page.getByRole("img", { name: "Box plot of name" })).toBeVisible();
+
+  await panel(page).getByRole("radio", { name: "Bar", exact: true }).click();
+  await panel(page).getByLabel("Split by").selectOption("id");
+  await panel(page).getByRole("checkbox", { name: "Stacked" }).check();
+  await expect
+    .poll(async () => (await invokes(page, "chart_data")).at(-1)?.chart)
+    .toMatchObject({ kind: "bar", x: "name", splitBy: "id", stacked: true });
+  await expect(panel(page).getByRole("button", { name: "Add measure" })).toHaveCount(0);
 });
