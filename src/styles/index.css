@@ -71,3 +71,31 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* An indeterminate progress bar: a stripe sliding across (still when motion is reduced). */
+.dl-indeterminate {
+  background: var(--accent-soft);
+}
+.dl-indeterminate::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  background: var(--accent);
+  animation: dl-indeterminate 1.2s ease-in-out infinite;
+}
+@keyframes dl-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-indeterminate::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}

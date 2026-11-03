@@ -1,7 +1,8 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ipcBytes } from "../test/ipc";
-import { MAX_RESULT_ROWS, useSql } from "./sql";
+import { MAX_RESULT_ROWS, planText, useSql } from "./sql";
+import { decodeIpc } from "../lib/arrow";
 
 interface Call {
   cmd: string;
@@ -31,7 +32,14 @@ function backend(answer: (sql: string) => unknown) {
 
 describe("sql store", () => {
   beforeEach(() =>
-    useSql.setState({ running: null, result: undefined, error: undefined, text: "" }),
+    useSql.setState({
+      running: null,
+      result: undefined,
+      error: undefined,
+      plan: undefined,
+      text: "",
+      editor: null,
+    }),
   );
   afterEach(() => clearMocks());
 
@@ -191,5 +199,40 @@ describe("sql store", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("explains the editor's last query, with timings when asked", async () => {
+    const calls = backend((sql) =>
+      ipcBytes({ explain_key: ["physical_plan"], explain_value: [`plan of ${sql}`] }),
+    );
+    useSql.setState({
+      editor: { runnable: () => ({ script: "SET x = 1; SELECT 1", base: 0 }) } as never,
+    });
+    await useSql.getState().explain(true);
+    expect(calls.find((c) => c.cmd === "run_query")?.args).toMatchObject({
+      sql: "EXPLAIN ANALYZE SELECT 1",
+      options: { session: true, group: "sql" },
+    });
+    expect(useSql.getState().plan).toMatchObject({
+      text: "plan of EXPLAIN ANALYZE SELECT 1",
+      analyze: true,
+    });
+    // The next run clears the plan.
+    await useSql.getState().run("SELECT 2");
+    expect(useSql.getState().plan).toBeUndefined();
+  });
+
+  it("explains only queries", async () => {
+    backend(() => ipcBytes({ n: [1] }));
+    useSql.setState({
+      editor: { runnable: () => ({ script: "DROP TABLE t", base: 0 }) } as never,
+    });
+    await useSql.getState().explain(false);
+    expect(useSql.getState().error?.message).toMatch(/plan of a query/);
+  });
+
+  it("joins every plan section", () => {
+    const t = decodeIpc(ipcBytes({ explain_key: ["a", "b"], explain_value: ["one  ", "two"] }));
+    expect(planText(t)).toBe("one\n\ntwo");
   });
 });

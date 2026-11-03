@@ -1,5 +1,9 @@
+import * as Popover from "@radix-ui/react-popover";
 import {
+  ChevronDown,
   CircleAlert,
+  Copy,
+  ListTree,
   Download,
   LoaderCircle,
   Pencil,
@@ -24,6 +28,7 @@ import { RenameTable } from "./RenameTable";
 import { DataGrid } from "../grid/DataGrid";
 import { PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { Button, IconButton } from "../ui/Button";
+import { MenuItem } from "../ui/Menu";
 import { SqlEditor } from "./SqlEditor";
 
 /** Bottom panel: SQL editor over the open files' tables, and the result. */
@@ -33,8 +38,11 @@ export function SqlPanel() {
     setText,
     tables,
     running,
+    startedAt,
     result,
     error,
+    plan,
+    explain,
     cancel,
     height,
     setHeight,
@@ -102,8 +110,9 @@ export function SqlPanel() {
   };
 
   const rowCount = result?.dataset?.rowCount ?? result?.table.numRows ?? 0;
+  const elapsed = useElapsed(running ? startedAt : null);
   const status = running
-    ? "Running…"
+    ? `Running… ${formatDuration(elapsed)}`
     : error
       ? "The query failed"
       : result
@@ -162,6 +171,7 @@ export function SqlPanel() {
             <Download className="size-3" aria-hidden /> Export
           </Button>
         )}
+        <ExplainButton disabled={!!running} onExplain={(analyze) => void explain(analyze)} />
         <Button size="sm" variant="ghost" onClick={formatNow} title="Format SQL">
           <WandSparkles className="size-3" aria-hidden /> Format
         </Button>
@@ -175,6 +185,14 @@ export function SqlPanel() {
           <X className="size-3.5" aria-hidden />
         </IconButton>
       </div>
+      {running && (
+        <div
+          role="progressbar"
+          aria-label="Query running"
+          aria-valuetext={`Running for ${formatDuration(elapsed)}`}
+          className="dl-indeterminate absolute inset-x-0 top-9 z-10 h-0.5 overflow-hidden"
+        />
+      )}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 w-[45%] min-w-64 flex-col border-r border-border">
           {tables.length > 0 && (
@@ -200,6 +218,8 @@ export function SqlPanel() {
               <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />
               <pre className="whitespace-pre-wrap font-mono text-fg-muted">{error.message}</pre>
             </div>
+          ) : plan ? (
+            <PlanView plan={plan} />
           ) : source ? (
             <DataGrid source={source} />
           ) : (
@@ -281,6 +301,99 @@ function TableStrip({
           </RenameTable>
         );
       })}
+    </div>
+  );
+}
+
+/** Milliseconds since `start` (a `performance.now()` time), ticking while set. */
+function useElapsed(start: number | null): number {
+  const [now, setNow] = useState(() => performance.now());
+  useEffect(() => {
+    if (start === null) return;
+    const timer = setInterval(() => setNow(performance.now()), 100);
+    return () => clearInterval(timer);
+  }, [start]);
+  return start === null ? 0 : Math.max(0, now - start);
+}
+
+/** Explain ▾: the query plan, or the plan with each step's time (runs the query). */
+function ExplainButton({
+  disabled,
+  onExplain,
+}: {
+  disabled: boolean;
+  onExplain: (analyze: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const choose = (analyze: boolean) => () => {
+    setOpen(false);
+    onExplain(analyze);
+  };
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={disabled}
+          title="How DuckDB runs the query"
+          aria-haspopup="menu"
+        >
+          <ListTree className="size-3" aria-hidden /> Explain
+          <ChevronDown className="size-3" aria-hidden />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          role="menu"
+          aria-label="Explain"
+          className="z-50 min-w-64 rounded-[var(--radius-lg)] border border-border bg-bg p-1 text-[13px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
+        >
+          <MenuItem icon={<ListTree />} onSelect={choose(false)} autoFocus>
+            Explain the plan
+          </MenuItem>
+          <MenuItem icon={<Play />} onSelect={choose(true)}>
+            Explain with timings (runs the query)
+          </MenuItem>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** A query plan as DuckDB draws it, with a Copy button. */
+function PlanView({ plan }: { plan: { text: string; analyze: boolean; elapsedMs: number } }) {
+  const notice = useNotice((s) => s.show);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-1 text-[12px] text-fg-muted">
+        <span className="flex-1">
+          {plan.analyze ? "Query plan with timings" : "Query plan"} ·{" "}
+          {formatDuration(plan.elapsedMs)}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            void navigator.clipboard.writeText(plan.text).then(
+              () => notice("Copied the query plan"),
+              (e: unknown) =>
+                notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`),
+            )
+          }
+        >
+          <Copy className="size-3" aria-hidden /> Copy
+        </Button>
+      </div>
+      <pre
+        aria-label="Query plan"
+        tabIndex={0}
+        className="min-h-0 flex-1 overflow-auto p-3 font-mono text-[11px] leading-snug text-fg"
+      >
+        {plan.text}
+      </pre>
     </div>
   );
 }
