@@ -4,7 +4,7 @@ import { formatCount } from "./format";
 import { call } from "./ipc";
 import type { ViewSpec } from "./view";
 
-export type ChartKind = "bar" | "horizontalBar" | "line" | "histogram" | "scatter";
+export type ChartKind = "bar" | "horizontalBar" | "line" | "histogram" | "scatter" | "pie" | "box";
 export type Agg = "count" | "sum" | "avg" | "min" | "max" | "countDistinct";
 export type Bucket = "day" | "week" | "month" | "year";
 
@@ -18,7 +18,14 @@ export interface ChartSpec {
   x: string;
   bucket?: Bucket;
   measures?: Measure[];
+  /** Scatter: the y axis; box plot: the number column. */
   y?: string;
+  /** Bar and line: a series per value of this column (the first measure). */
+  splitBy?: string;
+  /** Bars: series stacked rather than side by side. */
+  stacked?: boolean;
+  /** Pie: a ring. */
+  donut?: boolean;
   bins?: number;
   limit?: number;
   sample?: number;
@@ -38,6 +45,8 @@ export interface ChartData {
   bins: Bin[];
   total: number;
   truncated: boolean;
+  /** Pie of a count or sum: the slices not shown, together. */
+  other?: number | null;
   elapsedMs: number;
 }
 
@@ -50,7 +59,15 @@ export const CHART_KINDS: { kind: ChartKind; label: string }[] = [
   { kind: "line", label: "Line" },
   { kind: "histogram", label: "Histogram" },
   { kind: "scatter", label: "Scatter" },
+  { kind: "pie", label: "Pie" },
+  { kind: "box", label: "Box plot" },
 ];
+
+/** Kinds grouped by a column with measures (bars, lines and pies). */
+export const isGrouped = (k: ChartKind) =>
+  k === "bar" || k === "horizontalBar" || k === "line" || k === "pie";
+/** Kinds that can split into a series per value of a second column. */
+export const canSplit = (k: ChartKind) => k === "bar" || k === "horizontalBar" || k === "line";
 
 export const AGGS: { agg: Agg; label: string }[] = [
   { agg: "count", label: "Count" },
@@ -118,10 +135,11 @@ export const isAxisKind = (k: ColumnKind) => isNumberKind(k) || isTimeKind(k);
 /** What the chart's options allow for `kind`, given the columns. */
 export function allowed(kind: ChartKind, columns: ColumnInfo[]) {
   const axis = columns.filter((c) => isAxisKind(c.kind));
+  const numbers = columns.filter((c) => isNumberKind(c.kind));
   return {
     x: kind === "histogram" || kind === "scatter" ? axis : columns,
-    y: kind === "scatter" ? axis : [],
-    measureColumns: columns.filter((c) => isNumberKind(c.kind)),
+    y: kind === "scatter" ? axis : kind === "box" ? numbers : [],
+    measureColumns: numbers,
   };
 }
 
@@ -151,13 +169,25 @@ export function fitChart(chart: ChartSpec, columns: ColumnInfo[]): ChartSpec {
   if (chart.kind === "scatter") {
     next.y = has(ok.y, chart.y) ? chart.y : (ok.y.find((c) => c.name !== x) ?? ok.y[0])?.name;
   }
+  if (chart.kind === "box") {
+    next.y = has(ok.y, chart.y) ? chart.y : (ok.y.find((c) => c.name !== x) ?? ok.y[0])?.name;
+  }
   const xCol = columns.find((c) => c.name === x);
-  if (!xCol || !isTimeKind(xCol.kind)) delete next.bucket;
-  if (chart.kind === "bar" || chart.kind === "horizontalBar" || chart.kind === "line") {
+  if (!xCol || !isTimeKind(xCol.kind) || chart.kind === "box") delete next.bucket;
+  // A split needs another existing column; it keeps one measure.
+  const split =
+    canSplit(chart.kind) && chart.splitBy && chart.splitBy !== x && has(columns, chart.splitBy);
+  if (!split) delete next.splitBy;
+  if (chart.kind !== "bar" && chart.kind !== "horizontalBar") delete next.stacked;
+  if (chart.kind !== "pie") delete next.donut;
+  if (isGrouped(chart.kind)) {
     const measures = (chart.measures ?? []).filter(
       (m) => m.agg === "count" || m.agg === "countDistinct" || has(ok.measureColumns, m.column),
     );
-    next.measures = measures.length > 0 ? measures.slice(0, MAX_MEASURES) : [{ agg: "count" }];
+    const most = chart.kind === "pie" || split ? 1 : MAX_MEASURES;
+    next.measures = measures.length > 0 ? measures.slice(0, most) : [{ agg: "count" }];
+  } else {
+    delete next.measures;
   }
   return next;
 }
@@ -206,6 +236,10 @@ export function chartColors(root: HTMLElement = document.documentElement): Chart
       v("--series-2", "#eb6834"),
       v("--series-3", "#1baf7a"),
       v("--series-4", "#eda100"),
+      v("--series-5", "#8f5bd9"),
+      v("--series-6", "#d6458f"),
+      v("--series-7", "#1497b8"),
+      v("--series-8", "#7a8a1f"),
     ],
     fg: v("--fg", "#18181b"),
     muted: v("--fg-muted", "#52525b"),
@@ -255,12 +289,14 @@ export function chartTable(data: ChartData, bucket?: Bucket): { head: string[]; 
       rows: data.bins.map((b) => [formatX(data, b.lo), formatX(data, b.hi), formatCount(b.count)]),
     };
   }
+  const rows = data.x.map((x, i) => [
+    formatX(data, x, bucket),
+    ...data.series.map((s) => formatNumber(s.values[i] ?? null)),
+  ]);
+  if (data.kind === "pie" && data.other) rows.push(["Other", formatNumber(data.other)]);
   return {
     head: [data.kind === "scatter" ? "x" : "Group", ...data.series.map((s) => s.name)],
-    rows: data.x.map((x, i) => [
-      formatX(data, x, bucket),
-      ...data.series.map((s) => formatNumber(s.values[i] ?? null)),
-    ]),
+    rows,
   };
 }
 
@@ -387,6 +423,80 @@ export function chartOption(
     };
   }
 
+  if (data.kind === "pie") {
+    const values = data.series[0]?.values ?? [];
+    const slices = data.x.map((x, i) => ({
+      name: x == null ? "null" : formatX(data, x, chart.bucket),
+      value: values[i] ?? 0,
+      itemStyle: { color: c.series[i % c.series.length] },
+    }));
+    if (data.other)
+      slices.push({ name: "Other", value: data.other, itemStyle: { color: c.subtle } });
+    return {
+      ...base,
+      legend: { type: "scroll", orient: "vertical", right: 0, top: "middle", textStyle: text },
+      tooltip: {
+        ...tooltip,
+        trigger: "item",
+        formatter: (p: { name: string; value: number; percent: number }) =>
+          `${p.name}<br/><b>${formatNumber(p.value)}</b> (${p.percent.toFixed(1)}%)`,
+      },
+      series: [
+        {
+          type: "pie",
+          name: data.series[0]?.name,
+          radius: chart.donut ? ["45%", "72%"] : [0, "72%"],
+          center: ["40%", "50%"],
+          avoidLabelOverlap: true,
+          itemStyle: { borderColor: c.bg, borderWidth: 2, borderRadius: 3 },
+          label: { ...text, color: c.fg, formatter: "{b}" },
+          labelLine: { lineStyle: { color: c.border } },
+          data: slices,
+        },
+      ],
+    };
+  }
+
+  if (data.kind === "box") {
+    const at = (s: number, i: number) => data.series[s]?.values[i] ?? null;
+    return {
+      ...base,
+      grid: { ...(base.grid as object), top: 24 },
+      tooltip: {
+        ...tooltip,
+        trigger: "item",
+        formatter: (p: { dataIndex: number }) => {
+          const i = p.dataIndex;
+          const rows = ["Max", "Q3", "Median", "Q1", "Min"].map(
+            (n, k) => `${n}: <b>${formatNumber(at(4 - k, i))}</b>`,
+          );
+          return [
+            `<span style="color:${c.muted}">${formatX(data, data.x[i] ?? null)} · ${formatCount(at(5, i) ?? 0)} values</span>`,
+            ...rows,
+          ].join("<br/>");
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: data.x.map((v) => (v == null ? "null" : String(v))),
+        axisLabel: { ...text, hideOverlap: true },
+        axisLine,
+        axisTick: { show: false },
+      },
+      yAxis: valueAxis(labels.y, false, true),
+      series: [
+        {
+          type: "boxplot",
+          name: labels.y,
+          boxWidth: [6, 32],
+          itemStyle: { color: c.surface, borderColor: c.series[0], borderWidth: 1.5 },
+          emphasis: { itemStyle: { borderColor: c.series[1], borderWidth: 2 } },
+          data: data.x.map((_, i) => [at(0, i), at(1, i), at(2, i), at(3, i), at(4, i)]),
+        },
+      ],
+    };
+  }
+
   const horizontal = data.kind === "horizontalBar";
   const line = data.kind === "line";
   const category = data.xKind === "category";
@@ -399,7 +509,8 @@ export function chartOption(
     inverse: horizontal,
   };
   const xAxis = category ? categoryAxis : valueAxis(undefined, data.xKind === "time");
-  const series = data.series.map((s) => ({
+  const stacked = !!chart.stacked && !line;
+  const series = data.series.map((s, i) => ({
     name: s.name,
     type: line ? "line" : "bar",
     barMaxWidth: 24,
@@ -409,8 +520,16 @@ export function chartOption(
     lineStyle: { width: 2 },
     itemStyle: line
       ? { borderColor: c.bg, borderWidth: 2 }
-      : { borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0] },
+      : {
+          // A stack is rounded once, at its end.
+          borderRadius:
+            stacked && i < data.series.length - 1 ? 0 : horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
+          // A split's "Other" is grey.
+          ...(chart.splitBy && s.name === "Other" && { color: c.subtle }),
+        },
     emphasis: { focus: "series" },
+    // Stacked bars share one stack; a split's "Other" is grey.
+    ...(stacked && { stack: "total" }),
     data: category ? s.values : data.x.map((x, i) => [x, s.values[i] ?? null]),
   }));
   return {

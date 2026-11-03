@@ -7,7 +7,7 @@ use dataliq_lib::cache::{Cache, CacheConfig};
 use dataliq_lib::engine::{Dataset, Param, RequestKey};
 use dataliq_lib::import::{self, ImportTarget, Imports};
 use dataliq_lib::recipe::{
-    Case, NewType, RecipeFile, RecipeOutcome, RecipeStep, Step, load_recipe, save_recipe,
+    Case, DateUnit, NewType, RecipeFile, RecipeOutcome, RecipeStep, Step, load_recipe, save_recipe,
 };
 use dataliq_lib::sources::{OpenOptions, Source};
 use dataliq_lib::view::{Filter, FilterOp};
@@ -603,4 +603,58 @@ fn the_script_explains_each_step() {
     };
     assert_eq!(count(&script), count(&plain));
     assert_eq!(count(&script), fx.people.len() as i64);
+}
+
+#[test]
+fn dates_round_to_months_and_times_shift() {
+    let fx = fx();
+    // joined (a date) as a timestamp at midnight, shifted to India time,
+    // then rounded to its hour; the month into a new column.
+    let out = apply(
+        &fx,
+        &[
+            on(Step::ChangeType {
+                column: "joined".into(),
+                to: NewType::Timestamp,
+                format: None,
+            }),
+            on(Step::ShiftTime {
+                column: "joined".into(),
+                minutes: 330,
+            }),
+            on(Step::RoundDate {
+                column: "joined".into(),
+                unit: DateUnit::Month,
+                into: Some("month".into()),
+            }),
+            on(Step::RoundDate {
+                column: "joined".into(),
+                unit: DateUnit::Hour,
+                into: None,
+            }),
+        ],
+    );
+    assert!(
+        out.steps.iter().all(|s| s.error.is_none()),
+        "{:?}",
+        out.steps
+    );
+    let rows = rows(&fx, &out);
+    let (j, m) = (col(&out, "joined"), col(&out, "month"));
+    let mut checked = 0;
+    for (row, p) in rows.iter().zip(&fx.people) {
+        let Some(day) = &p.joined else {
+            assert_eq!(row[j], None);
+            continue;
+        };
+        assert_eq!(row[j].as_deref(), Some(format!("{day} 05:00:00").as_str()));
+        assert_eq!(
+            row[m].as_deref(),
+            Some(format!("{}-01", &day[..7]).as_str())
+        );
+        checked += 1;
+    }
+    assert!(checked > 100);
+    let month = out.columns.iter().find(|c| c.name == "month").unwrap();
+    assert_eq!(month.r#type, "DATE");
 }

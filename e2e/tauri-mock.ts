@@ -449,6 +449,8 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 ((c: string[], s: unknown) => Promise<unknown[]>) | undefined;
               return histograms ? histograms(args.columns as string[], args.spec) : [];
             }
+            case "engine_memory":
+              return { usedBytes: 180 * 2 ** 20, limitBytes: 8 * 2 ** 30, spilledBytes: 0 };
             case "selection_stats": {
               const stats = w.__selectionStats as
                 ((a: Record<string, unknown>) => Promise<unknown>) | undefined;

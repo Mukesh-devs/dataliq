@@ -380,3 +380,37 @@ fn memory_and_thread_limits_change_while_running() {
         std::thread::available_parallelism().unwrap().get()
     );
 }
+
+#[test]
+fn memory_usage_reports_the_limit() {
+    let fx = crate::filters::fx();
+    let m = fx.engine.memory_usage().unwrap();
+    // The fixture engine has a 1 GiB limit.
+    let limit = m.limit_bytes.unwrap();
+    assert!((1_000_000_000..=1_100_000_000).contains(&limit), "{limit}");
+    assert!(m.used_bytes < limit);
+}
+
+#[test]
+fn explain_answers_with_a_plan_column() {
+    let fx = crate::filters::fx();
+    fx.engine.register_table(&fx.dataset.id, "people").unwrap();
+    let key = dataliq_lib::engine::RequestKey::default();
+    for sql in [
+        "EXPLAIN SELECT count(*) FROM people",
+        "EXPLAIN ANALYZE SELECT count(*) FROM people",
+    ] {
+        let out = fx.engine.query_session(sql, &[], 1000, &key).unwrap();
+        let names: Vec<String> = out
+            .schema
+            .fields()
+            .iter()
+            .map(|f| f.name().clone())
+            .collect();
+        assert!(
+            names.contains(&"explain_value".to_string()),
+            "{sql}: {names:?}"
+        );
+        assert!(out.rows >= 1);
+    }
+}

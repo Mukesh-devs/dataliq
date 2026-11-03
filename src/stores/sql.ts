@@ -59,6 +59,23 @@ export interface SqlError {
   offset: number | null;
 }
 
+export interface SqlPlan {
+  text: string;
+  analyze: boolean;
+  elapsedMs: number;
+}
+
+/** The plan text from an `EXPLAIN` result (its `explain_value` cells). */
+export function planText(table: Table): string {
+  const col = table.getChild("explain_value") ?? table.getChildAt(table.numCols - 1);
+  const parts: string[] = [];
+  for (let i = 0; i < table.numRows; i++) {
+    const v: unknown = col?.get(i);
+    if (v !== null && v !== undefined) parts.push(String(v).trimEnd());
+  }
+  return parts.join("\n\n");
+}
+
 interface SqlState {
   open: boolean;
   /** Panel height in px. */
@@ -67,8 +84,17 @@ interface SqlState {
   text: string;
   tables: SqlTable[];
   running: string | null;
+  /** When the running statement started (`performance.now()`), for the timer. */
+  startedAt: number | null;
   result?: SqlResult;
   error?: SqlError;
+  /** A query plan from Explain, shown instead of the result until the next run. */
+  plan?: SqlPlan;
+  /**
+   * Shows the plan of the editor's last query (the selection, else all of
+   * it); `analyze` runs it and adds each step's time and rows.
+   */
+  explain: (analyze: boolean) => Promise<void>;
   setOpen: (open: boolean) => void;
   setHeight: (height: number) => void;
   setText: (text: string) => void;
@@ -130,6 +156,7 @@ export const useSql = create<SqlState>()(
         text: "",
         tables: [],
         running: null,
+        startedAt: null,
         editor: null,
         library: null,
         setLibrary: (library) => set({ library }),
@@ -163,8 +190,8 @@ export const useSql = create<SqlState>()(
           if (statements.length === 0) return;
           const requestId = `sql-${nextRun++}`;
           const isCurrent = () => get().running === requestId;
-          set({ running: requestId, error: undefined });
           const started = performance.now();
+          set({ running: requestId, startedAt: started, error: undefined, plan: undefined });
           let table: Table | undefined;
           let dataset: DatasetInfo | undefined;
           for (const [i, st] of statements.entries()) {
@@ -237,6 +264,53 @@ export const useSql = create<SqlState>()(
           if (!id) return;
           void cancelQuery(id).catch(() => {});
           set({ running: null, error: { message: "The query was cancelled.", offset: null } });
+        },
+        explain: async (analyze) => {
+          const r = get().editor?.runnable();
+          const statements = r ? splitStatements(r.script) : [];
+          const last = statements[statements.length - 1];
+          if (!last) return;
+          if (!returnsRows(last.text)) {
+            set({
+              error: {
+                message: "Explain shows the plan of a query (SELECT, FROM, WITH, …).",
+                offset: null,
+              },
+            });
+            return;
+          }
+          const requestId = `sql-${nextRun++}`;
+          const started = performance.now();
+          set({ running: requestId, startedAt: started, error: undefined, plan: undefined });
+          try {
+            const body = last.text.replace(/^\s*EXPLAIN\s+(ANALYZE\s+)?/i, "");
+            const table = await runQuery(`EXPLAIN ${analyze ? "ANALYZE " : ""}${body}`, {
+              maxRows: 1000,
+              requestId,
+              group: "sql",
+              session: true,
+            });
+            if (get().running !== requestId) return;
+            set({
+              running: null,
+              plan: {
+                text: planText(table),
+                analyze,
+                elapsedMs: Math.round(performance.now() - started),
+              },
+            });
+          } catch (e) {
+            if (get().running !== requestId) return;
+            const kind = (e as { kind?: string }).kind;
+            const message = e instanceof Error ? e.message : String(e);
+            set({
+              running: null,
+              error: {
+                message: kind === "cancelled" ? "The query was cancelled." : errorText(message),
+                offset: null,
+              },
+            });
+          }
         },
       };
     },

@@ -18,11 +18,14 @@ import type { ColumnInfo } from "../../lib/arrow";
 import { formatCount } from "../../lib/format";
 import { modKey } from "../../lib/platform";
 import {
+  DATE_UNITS,
   STEP_NAMES,
   TYPE_NAMES,
   describeStep,
   isEnabled,
+  parseShift,
   type Case,
+  type DateUnit,
   type NewType,
   type RecipeStep,
   type Step,
@@ -298,6 +301,15 @@ const ROW_TESTS: [RowTest, string][] = [
   ["gt", "is greater than"],
 ];
 const NUMERIC = new Set(["integer", "number"]);
+const TEMPORAL = new Set(["date", "timestamp"]);
+/** Common shifts between UTC and local times. */
+const SHIFTS: [string, string][] = [
+  ["+5:30", "UTC → India (+5:30)"],
+  ["-5:30", "India → UTC (-5:30)"],
+  ["+4:00", "UTC → Gulf (+4:00)"],
+  ["+1:00", "One hour later"],
+  ["-1:00", "One hour earlier"],
+];
 
 /** Builds one step from its fields. */
 function StepForm({
@@ -320,6 +332,7 @@ function StepForm({
   const [keep, setKeep] = useState(false);
   const [test, setTest] = useState<RowTest>("empty");
   const [dedupeAll, setDedupeAll] = useState(true);
+  const [unit, setUnit] = useState<DateUnit>("month");
   const info = columns.find((c) => c.name === col);
   const names = other
     .split(",")
@@ -366,6 +379,16 @@ function StepForm({
         return text.trim() && other.trim()
           ? { op, name: text.trim(), expression: other.trim() }
           : null;
+      case "roundDate":
+        return TEMPORAL.has(info!.kind)
+          ? { op, column: col, unit, into: text.trim() || undefined }
+          : null;
+      case "shiftTime": {
+        const minutes = parseShift(text);
+        return minutes !== null && minutes !== 0 && info!.kind === "timestamp"
+          ? { op, column: col, minutes }
+          : null;
+      }
     }
   };
   const step = build();
@@ -564,6 +587,57 @@ function StepForm({
               onChange={(e) => setOther(e.target.value)}
             />
           </Field>
+        </>
+      )}
+      {op === "roundDate" && (
+        <>
+          {info && !TEMPORAL.has(info.kind) && (
+            <p className="text-[11px] text-fg-subtle">Pick a date or time column.</p>
+          )}
+          <Field label="Round down to the start of the">
+            <select
+              className={control}
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as DateUnit)}
+            >
+              {DATE_UNITS.filter((u) => u !== "hour" || info?.kind === "timestamp").map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="As a new column (empty: in place)">
+            <input
+              className={control}
+              placeholder={`${col} ${unit}`}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </Field>
+        </>
+      )}
+      {op === "shiftTime" && (
+        <>
+          {info && info.kind !== "timestamp" && (
+            <p className="text-[11px] text-fg-subtle">Pick a date-and-time column.</p>
+          )}
+          <Field label="By (hours:minutes, e.g. +5:30)">
+            <input
+              className={`${control} font-mono`}
+              list="dataliq-shifts"
+              placeholder="+5:30"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </Field>
+          <datalist id="dataliq-shifts">
+            {SHIFTS.map(([v, name]) => (
+              <option key={v} value={v}>
+                {name}
+              </option>
+            ))}
+          </datalist>
         </>
       )}
       <div>

@@ -8,7 +8,9 @@
 
 mod bench_small;
 mod charts;
+mod cli_run;
 mod compare;
+mod convert;
 mod copy_sql;
 mod csv_sources;
 mod databases;
@@ -19,6 +21,8 @@ mod filters;
 mod folders;
 mod import_cache;
 mod json_parquet_sources;
+mod live_db;
+mod mcp;
 mod paging;
 mod perf_export;
 mod perf_import;

@@ -38,7 +38,8 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 ###  Open anything
 
 - CSV, TSV, JSON, NDJSON, Parquet and Excel files, also compressed (`.gz`, `.zst`).
-- SQLite and DuckDB databases (read-only).
+- SQLite and DuckDB databases (read-only), and live **MySQL / PostgreSQL** servers
+  (read-only, password in the system keychain).
 - A whole folder or a pattern such as `logs/*.csv.gz` as one table.
 - Files on the web or in S3 with **Open URL**.
 - Delimiters, headers and column types are detected for you, and you can change them.
@@ -50,11 +51,15 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 - Hide, reorder, pin and rename columns; show or hide them all at once, or find them by name.
 - Select cells to see their count, sum, average, min and max in the status bar.
 - Column profiles: nulls, distinct values, min, max, mean and a histogram.
+- **Format cells** with highlight rules and colour scales; save filters as presets.
 
 ###  Analyze
 
-- **SQL panel**: query and join every open file as a table.
-- **Charts**: bar, line, histogram and scatter, export as PNG or SVG.
+- **SQL panel**: query and join every open file as a table; Explain shows the plan.
+- **Data tools** without SQL: group by / pivot, value counts, samples, append and join
+  tabs, a summary of every column — each result opens as a tab.
+- **Charts**: bar (grouped or stacked), line, pie, histogram, scatter and box plot, export
+  as PNG or SVG.
 - **Compare** two files and see the added, removed and changed rows.
 - **Data quality** warnings for empty columns, mixed types, outliers and duplicates.
 
@@ -63,8 +68,18 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 - **Clean** without touching the original file: rename, change types, trim, find and
   replace, fill empty cells, remove duplicates. Undo any step.
 - Save your steps as a recipe and reuse it on the next file.
-- **Export** to CSV, TSV, Parquet, JSON or Excel.
-- Copy a selection as CSV, JSON, Markdown or SQL.
+- **Export** to CSV, TSV, Parquet, JSON or Excel, as one file or a folder split by a
+  column, a number of rows or a size.
+- **Convert** a whole folder of files to another format.
+- Copy a selection as CSV, Excel, JSON, Markdown or SQL.
+
+###  Automate
+
+- **Reports from the command line**: `dataliq run monthly.json --in calls.csv.gz --out
+  report.xlsx` applies a saved recipe with no window.
+- **AI assistants** (MCP): `dataliq mcp` lets Claude Desktop, Claude Code or any MCP client
+  list, describe and query the folders you share — read-only, sandboxed and logged. Turn it
+  on in Settings › AI assistants.
 
 ###  Everyday comforts
 
@@ -75,8 +90,9 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 
 ###  Private by design
 
-Nothing leaves your computer. The only network requests are the URLs you open and, if you
-keep it on, a daily check for a new version.
+Nothing leaves your computer. The only network requests are the URLs and databases you
+open, DuckDB extensions downloaded the first time one is needed, and, if you keep it on, a
+daily check for a new version.
 
 ## Installation
 

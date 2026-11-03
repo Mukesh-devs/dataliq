@@ -2,13 +2,17 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   Check,
   ChartColumn,
+  ClipboardList,
   LoaderCircle,
+  MemoryStick,
   Monitor,
   Moon,
   SlidersHorizontal,
   Sun,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { engineMemory, type MemoryUsage } from "../../lib/files";
+import { formatBytes } from "../../lib/format";
 import { STAT_LABELS, STAT_ORDER, statItems } from "../../lib/selectionStats";
 import { useNotice } from "../../stores/notice";
 import { useSelection } from "../../stores/selection";
@@ -48,6 +52,7 @@ export function StatusBar({ message, action }: StatusBarProps) {
       )}
       <span className="flex-1" />
       <SelectionStatsStrip />
+      <MemoryIndicator />
       <IconButton
         label={headerCharts ? "Hide column histograms" : "Show column histograms"}
         aria-pressed={headerCharts}
@@ -79,7 +84,7 @@ function SelectionStatsStrip() {
   if (!summary && !pending && !error) return null;
   const copy = (label: string, text: string, value: string) =>
     void navigator.clipboard.writeText(value).then(
-      () => notice(`Copied ${label} ${text}`),
+      () => notice(`Copied ${label}${text ? ` ${text}` : ""}`),
       (e: unknown) => notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`),
     );
   return (
@@ -114,6 +119,17 @@ function SelectionStatsStrip() {
           <span className="tabular truncate text-fg">{it.text}</span>
         </button>
       ))}
+      {items.length > 0 && (
+        <IconButton
+          label="Copy the statistics"
+          className="size-5 shrink-0"
+          onClick={() =>
+            copy("the statistics", "", items.map((it) => `${it.label}\t${it.copy}`).join("\n"))
+          }
+        >
+          <ClipboardList className="size-3.5" aria-hidden />
+        </IconButton>
+      )}
       <IconButton
         label="Choose selection statistics"
         className="size-5 shrink-0"
@@ -187,5 +203,60 @@ function StatsMenu({ at, onClose }: { at: { x: number; y: number }; onClose: () 
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  );
+}
+
+/** How often the memory indicator asks (only while the window is visible). */
+export const MEMORY_POLL_MS = 3000;
+/** Share of the limit from which the indicator stands out. */
+const MEMORY_HIGH = 0.8;
+
+/**
+ * DuckDB's memory in use against its limit, and what a big query spilled to
+ * the temporary folder. Hidden when the engine can't say.
+ */
+function MemoryIndicator() {
+  const [memory, setMemory] = useState<MemoryUsage | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
+      engineMemory().then(
+        (m) => alive && setMemory(m),
+        () => alive && setMemory(null),
+      );
+    };
+    poll();
+    const timer = setInterval(poll, MEMORY_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+  if (!memory) return null;
+  const { usedBytes, limitBytes, spilledBytes } = memory;
+  const high = limitBytes !== null && usedBytes >= limitBytes * MEMORY_HIGH;
+  const detail =
+    `DuckDB memory: ${formatBytes(usedBytes)} in use` +
+    (limitBytes !== null ? ` of ${formatBytes(limitBytes)} (Settings › Memory limit)` : "") +
+    (spilledBytes > 0 ? `; ${formatBytes(spilledBytes)} spilled to the temporary folder` : "");
+  return (
+    <span
+      role="img"
+      aria-label={detail}
+      title={detail}
+      className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${high ? "font-medium text-warning" : ""}`}
+    >
+      <MemoryStick className="size-3.5" aria-hidden />
+      <span className="tabular">
+        {formatBytes(usedBytes)}
+        {limitBytes !== null && (
+          <span className="text-fg-subtle"> / {formatBytes(limitBytes)}</span>
+        )}
+      </span>
+      {spilledBytes > 0 && (
+        <span className="tabular text-fg-subtle">· {formatBytes(spilledBytes)} on disk</span>
+      )}
+    </span>
   );
 }

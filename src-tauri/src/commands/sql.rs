@@ -23,17 +23,19 @@ pub fn unregister_table(engine: State<'_, Arc<Engine>>, name: String) -> Result<
 }
 
 /// Runs a query in the SQL panel's session and returns its rows as a
-/// pageable dataset (close it with `close_dataset`).
+/// pageable dataset (close it with `close_dataset`). A newer query of the
+/// same `group` (the SQL panel's by default) cancels an older one.
 #[tauri::command]
 pub async fn sql_result(
     engine: State<'_, Arc<Engine>>,
     sql: String,
     request_id: Option<String>,
+    group: Option<String>,
 ) -> Result<Dataset> {
     let engine = Arc::clone(&engine);
     let key = RequestKey {
         id: request_id,
-        group: Some("sql".into()),
+        group: Some(group.unwrap_or_else(|| "sql".into())),
     };
     tauri::async_runtime::spawn_blocking(move || engine.sql_result(&sql, &key))
         .await

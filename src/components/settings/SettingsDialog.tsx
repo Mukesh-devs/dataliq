@@ -17,6 +17,7 @@ import { useExport, type ExportDefaults } from "../../stores/export";
 import { useNotice } from "../../stores/notice";
 import { useSettings, type Density, type ThemePreference } from "../../stores/settings";
 import { Button } from "../ui/Button";
+import { McpSettings } from "./McpSettings";
 
 const inputClass =
   "h-7 min-w-0 rounded-[var(--radius)] border border-border bg-bg px-2 text-[13px] text-fg outline-none focus:border-accent disabled:opacity-50";
@@ -366,6 +367,10 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
             />
             Header row with the column names
           </label>
+        </Section>
+
+        <Section title="AI assistants">
+          <McpSettings value={draft.app} onChange={(changes) => setApp(changes)} info={info} />
         </Section>
 
         <Section title="Updates">

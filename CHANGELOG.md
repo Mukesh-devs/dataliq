@@ -6,6 +6,44 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-03
+
+Big-data tools without SQL, live MySQL and PostgreSQL databases, an MCP server for AI
+assistants, conditional formatting, more charts and reports from the command line.
+
+### Added
+
+- Data tools (Data menu, palette, column menu), each opening its result as a new tab:
+  Group by / pivot with count, distinct, sum, average, min, max, median, 95th percentile and
+  standard deviation; Count values; Open a sample (random rows, a random share or the first
+  rows); Append tabs (columns matched by name); Join with another tab (matching, all left,
+  all, left with or without a match); Summarize every column.
+- Export to a folder of files: one per value of a column (Hive layout), or files of N rows or
+  about N MB.
+- File › Convert files…: a folder of CSV, CSV.gz, TSV, JSON, NDJSON or Parquet files to
+  another format, with progress and Cancel.
+- File › Connect to a database…: MySQL / MariaDB and PostgreSQL, read-only, queried in the
+  SQL panel (`SELECT * FROM cdr.calls`) or opened as tabs; saved connections keep the
+  password in the system keychain.
+- SQL panel: Explain (the query plan, or with timings) and a running timer.
+- The status bar shows DuckDB's memory against its limit, and what spilled to disk.
+- Format cells… (column menu): highlight rules and colour scales, saved with the layout.
+- Charts: pie and ring, box plots, bars and lines split by a second column, stacked bars.
+- Saved filter presets, reusable on any file with the same columns.
+- Cleaning steps: round dates (hour to year) and shift times (e.g. +5:30).
+- Copy selection as › Excel keeps leading zeros and long numbers; a button copies the
+  selection's statistics.
+- `dataliq run [recipe] --in FILE --out FILE`: a recipe applied and the result written, with
+  no window, for scheduled reports.
+- `dataliq mcp`: an MCP server so AI assistants (Claude Desktop, Claude Code, …) can list,
+  describe and query files in folders you share, read-only and sandboxed; Settings › AI
+  assistants turns it on and shows the configuration to copy.
+
+### Fixed
+
+- "Open a sample…" and Help › Open the sample dataset no longer share a command.
+- Conditional fills keep cell text at WCAG AA contrast in both themes.
+
 ## [1.1.0] - 2026-11-03
 
 Spreadsheet-style statistics of the selected cells in the status bar, and quicker column
@@ -245,7 +283,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.5.0...v0.6.0

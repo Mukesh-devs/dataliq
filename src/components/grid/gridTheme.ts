@@ -1,4 +1,5 @@
 import type { Theme } from "@glideapps/glide-data-grid";
+import type { RuleColor } from "../../lib/cellFormat";
 
 function cssVar(style: CSSStyleDeclaration, name: string, fallback: string): string {
   return style.getPropertyValue(name).trim() || fallback;
@@ -81,4 +82,29 @@ export function tintColors(root: HTMLElement = document.documentElement): Record
     added: cssVar(s, "--diff-added", "rgba(22,163,74,0.14)"),
     removed: cssVar(s, "--diff-removed", "rgba(220,38,38,0.12)"),
   };
+}
+
+/** Conditional formatting colours as "r g b" triples (from the tokens). */
+export function ruleColors(
+  root: HTMLElement = document.documentElement,
+): Record<RuleColor, string> {
+  const s = getComputedStyle(root);
+  return {
+    red: cssVar(s, "--rule-red", "220 38 38"),
+    amber: cssVar(s, "--rule-amber", "217 119 6"),
+    green: cssVar(s, "--rule-green", "22 163 74"),
+    blue: cssVar(s, "--rule-blue", "37 99 235"),
+    purple: cssVar(s, "--rule-purple", "147 51 234"),
+  };
+}
+
+/** Alpha of a rule's fill, and the range of a colour scale's (light to strong). */
+export const RULE_ALPHA = 0.28;
+export const SCALE_ALPHA: [number, number] = [0.04, 0.45];
+
+/** A cell fill as CSS: a rule's colour, or a scale's at its strength. */
+export function fillColor(rgb: string, strength?: number): string {
+  const [lo, hi] = SCALE_ALPHA;
+  const alpha = strength === undefined ? RULE_ALPHA : lo + (hi - lo) * strength;
+  return `rgb(${rgb} / ${alpha.toFixed(3)})`;
 }

@@ -44,6 +44,10 @@ import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
 import { useSqlTables } from "./useSqlTables";
+import { ConvertDialog } from "../components/tools/ConvertDialog";
+import { useConvert } from "../stores/convert";
+import { ConnectDialog } from "../components/tools/ConnectDialog";
+import { useConnect } from "../stores/connect";
 
 // Loaded on first use, so the start screen doesn't parse the grid, SQL
 // editor and chart libraries (about 1.5 MB of JavaScript).
@@ -521,6 +525,20 @@ export function App() {
         run: () => void clearCache(),
       },
       {
+        id: "connect-database",
+        title: "Connect to a database…",
+        group: "File",
+        keywords: "mysql mariadb postgres postgresql server sql live remote cdr",
+        run: () => useConnect.getState().show(),
+      },
+      {
+        id: "convert-files",
+        title: "Convert files…",
+        group: "File",
+        keywords: "batch folder csv parquet gzip json format change transform",
+        run: () => useConvert.getState().show(),
+      },
+      {
         id: "settings",
         title: "Settings…",
         group: "App",
@@ -725,6 +743,8 @@ export function App() {
             />
           )}
           <ExportDialog />
+          <ConvertDialog />
+          <ConnectDialog />
           {sqlOpen && (
             <Suspense fallback={null}>
               <SqlPanel />

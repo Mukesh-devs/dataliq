@@ -235,3 +235,111 @@ describe("chartOption", () => {
     expect(s.tooltip.formatter({ value: [2, 4] })).toBe("Amount: <b>2</b><br/>Quantity: <b>4</b>");
   });
 });
+
+describe("pies, box plots and split series", () => {
+  const data = (over: Partial<ChartData>): ChartData => ({
+    kind: "bar",
+    xKind: "category",
+    x: ["Paris", "Oslo"],
+    series: [{ name: "Count", values: [5, 3] }],
+    bins: [],
+    total: 2,
+    truncated: false,
+    elapsedMs: 1,
+    ...over,
+  });
+
+  it("keeps a pie to one measure and a split to one series measure", () => {
+    const pie = fitChart(
+      {
+        kind: "pie",
+        x: "city",
+        measures: [{ agg: "count" }, { agg: "sum", column: "amount" }],
+        splitBy: "qty",
+        stacked: true,
+      },
+      columns,
+    );
+    expect(pie.measures).toEqual([{ agg: "count" }]);
+    expect(pie.splitBy).toBeUndefined();
+    expect(pie.stacked).toBeUndefined();
+    const bar = fitChart(
+      {
+        kind: "bar",
+        x: "city",
+        splitBy: "qty",
+        measures: [{ agg: "count" }, { agg: "sum", column: "amount" }],
+      },
+      columns,
+    );
+    expect(bar.measures).toHaveLength(1);
+    expect(bar.splitBy).toBe("qty");
+    // Not by the axis column itself, nor a column that is gone.
+    expect(fitChart({ kind: "bar", x: "city", splitBy: "city" }, columns).splitBy).toBeUndefined();
+    expect(fitChart({ kind: "line", x: "city", splitBy: "gone" }, columns).splitBy).toBeUndefined();
+  });
+
+  it("gives a box plot a number column", () => {
+    const box = fitChart({ kind: "box", x: "city", measures: [{ agg: "count" }] }, columns);
+    expect(box.y).toBe("amount");
+    expect(box.measures).toBeUndefined();
+    expect(fitChart({ ...box, y: "city" }, columns).y).toBe("amount");
+  });
+
+  it("draws slices with the rest as a grey Other, as a ring when asked", () => {
+    const o = chartOption(
+      data({ kind: "pie", truncated: true, other: 12 }),
+      { kind: "pie", x: "city", donut: true },
+      colors,
+    ) as any;
+    const s = o.series[0];
+    expect(s.type).toBe("pie");
+    expect(s.radius).toEqual(["45%", "72%"]);
+    expect(s.data.map((d: any) => [d.name, d.value])).toEqual([
+      ["Paris", 5],
+      ["Oslo", 3],
+      ["Other", 12],
+    ]);
+    expect(s.data[2].itemStyle.color).toBe(colors.subtle);
+    expect(chartTable(data({ kind: "pie", other: 12 })).rows.at(-1)).toEqual(["Other", "12"]);
+  });
+
+  it("draws a box per group from the five numbers", () => {
+    const five = [1, 2, 3, 4, 5, 10].map((v, i) => ({ name: `s${i}`, values: [v, v * 2] }));
+    const o = chartOption(
+      data({ kind: "box", series: five }),
+      { kind: "box", x: "city", y: "amount" },
+      colors,
+      {
+        x: "city",
+        y: "amount",
+      },
+    ) as any;
+    expect(o.series[0].type).toBe("boxplot");
+    expect(o.series[0].data).toEqual([
+      [1, 2, 3, 4, 5],
+      [2, 4, 6, 8, 10],
+    ]);
+    expect(o.xAxis.data).toEqual(["Paris", "Oslo"]);
+  });
+
+  it("stacks bars and greys a split's Other", () => {
+    const split = data({
+      series: [
+        { name: "true", values: [1, 2] },
+        { name: "Other", values: [3, 4] },
+      ],
+    });
+    const o = chartOption(
+      split,
+      { kind: "bar", x: "city", splitBy: "active", stacked: true },
+      colors,
+    ) as any;
+    expect(o.series.map((s: any) => s.stack)).toEqual(["total", "total"]);
+    expect(o.series[1].itemStyle.color).toBe(colors.subtle);
+    // Only the top of the stack is rounded.
+    expect(o.series.map((s: any) => s.itemStyle.borderRadius)).toEqual([0, [4, 4, 0, 0]]);
+    const lines = chartOption(split, { kind: "line", x: "city", splitBy: "active" }, colors) as any;
+    expect(lines.series[0].stack).toBeUndefined();
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRows, sqlLiteral, tableName, type CopyColumn } from "./copyAs";
+import { excelCell, formatRows, sqlLiteral, tableName, type CopyColumn } from "./copyAs";
 
 const DAY = 86_400_000;
 const columns: CopyColumn[] = [
@@ -115,5 +115,37 @@ describe("tableName", () => {
     expect(tableName("events.ndjson.zst")).toBe("events");
     expect(tableName("data.parquet")).toBe("data");
     expect(tableName(".csv")).toBe("data");
+  });
+});
+
+describe("copy for Excel", () => {
+  const col = (kind: "text" | "integer" | "number" | "boolean" | "date") => ({
+    name: "c",
+    label: "c",
+    format: { kind },
+  });
+  it("keeps leading zeros, long numbers and date-like text as text", () => {
+    const t = col("text");
+    expect(excelCell("00912345", t)).toBe('="00912345"');
+    expect(excelCell("+919876543210", t)).toBe('="+919876543210"');
+    expect(excelCell("1234567890123456789", t)).toBe('="1234567890123456789"');
+    expect(excelCell("1-2", t)).toBe('="1-2"');
+    expect(excelCell("9876543210", t)).toBe("9876543210");
+    expect(excelCell("Paris, FR", t)).toBe("Paris, FR");
+    expect(excelCell("=SUM(A1)", t)).toBe("'=SUM(A1)");
+    expect(excelCell("-not a number", t)).toBe("'-not a number");
+    expect(excelCell("two\nlines", t)).toBe('"two\nlines"');
+    expect(excelCell(null, t)).toBe("");
+  });
+
+  it("writes numbers plainly unless too long for Excel", () => {
+    expect(excelCell(12.5, col("number"))).toBe("12.5");
+    expect(excelCell(919876543210123456n, col("integer"))).toBe('="919876543210123456"');
+    expect(excelCell(true, col("boolean"))).toBe("TRUE");
+  });
+
+  it("copies rows with Windows line ends", () => {
+    const cols = [{ name: "id", label: "ID", format: { kind: "text" as const } }];
+    expect(formatRows("excel", cols, [["007"], ["8"]])).toBe('ID\r\n="007"\r\n8');
   });
 });

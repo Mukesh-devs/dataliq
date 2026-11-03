@@ -3,6 +3,7 @@
 pub mod app;
 pub mod chart;
 pub mod compare;
+pub mod connect;
 pub mod export;
 pub mod files;
 pub mod import;

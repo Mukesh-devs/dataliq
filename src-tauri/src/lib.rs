@@ -5,10 +5,12 @@ pub mod chart;
 pub mod cli;
 pub mod commands;
 pub mod compare;
+pub mod connect;
 pub mod engine;
 pub mod error;
 pub mod export;
 pub mod import;
+pub mod mcp;
 pub mod quality;
 pub mod recipe;
 pub mod remote;
@@ -114,6 +116,7 @@ pub fn run() {
                 paths.app_data_dir()?,
             )));
             app.manage(Arc::new(export::Exports::default()));
+            app.manage(Arc::new(connect::Connections::new(paths.app_data_dir()?)));
             app.manage(commands::settings::SettingsState {
                 path: settings_path,
                 current: parking_lot::RwLock::new(settings.clone()),
@@ -139,6 +142,7 @@ pub fn run() {
             commands::app::take_startup_files,
             commands::app::set_native_menu,
             commands::app::sample_dataset,
+            commands::app::engine_memory,
             commands::update::update_status,
             commands::update::check_update,
             commands::update::install_update,
@@ -159,6 +163,13 @@ pub fn run() {
             commands::sql::delete_saved_query,
             commands::export::export_view,
             commands::export::cancel_export,
+            commands::export::list_data_files,
+            commands::connect::list_connections,
+            commands::connect::connect_database,
+            commands::connect::live_tables,
+            commands::connect::disconnect_database,
+            commands::connect::forget_connection,
+            commands::export::convert_files,
             commands::chart::chart_data,
             commands::chart::chart_sql,
             commands::chart::save_chart_image,

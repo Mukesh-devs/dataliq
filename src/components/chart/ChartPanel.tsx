@@ -8,6 +8,8 @@ import {
   ChartColumnBig,
   ChartLine,
   ChartScatter,
+  ChartPie,
+  ChartCandlestick,
   CircleAlert,
   LoaderCircle,
   Plus,
@@ -27,6 +29,7 @@ import {
   CHART_KINDS,
   MAX_MEASURES,
   allowed,
+  canSplit,
   chartColors,
   chartData,
   chartFileName,
@@ -35,6 +38,7 @@ import {
   chartOption,
   chartTable,
   fitChart,
+  isGrouped,
   isTimeKind,
   pickChartPath,
   saveChartImage,
@@ -55,6 +59,8 @@ const KIND_ICONS: Record<ChartKind, typeof ChartBar> = {
   line: ChartLine,
   histogram: ChartColumnBig,
   scatter: ChartScatter,
+  pie: ChartPie,
+  box: ChartCandlestick,
 };
 
 const selectClass =
@@ -216,7 +222,9 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
   const set = (changes: Partial<ChartSpec>) =>
     onChange(fitChart({ ...chart, ...changes }, columns));
   const xCol = columns.find((c) => c.name === chart.x);
-  const grouped = chart.kind === "bar" || chart.kind === "horizontalBar" || chart.kind === "line";
+  const grouped = isGrouped(chart.kind);
+  const split = canSplit(chart.kind) && !!chart.splitBy;
+  const maxMeasures = chart.kind === "pie" || split ? 1 : MAX_MEASURES;
   const measures = chart.measures ?? [{ agg: "count" as Agg }];
   const setMeasure = (i: number, agg: Agg, column?: string) => {
     const next = measures.map((m, j) =>
@@ -295,6 +303,54 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
                 </option>
               ))}
             </select>
+          </label>
+        )}
+        {chart.kind === "box" && (
+          <label className="flex items-center gap-1 text-fg-muted">
+            Spread of
+            <select
+              aria-label="Number column"
+              className={selectClass}
+              value={chart.y ?? ""}
+              onChange={(e) => set({ y: e.target.value })}
+            >
+              {columnOptions(ok.y)}
+            </select>
+          </label>
+        )}
+        {canSplit(chart.kind) && (
+          <label className="flex items-center gap-1 text-fg-muted">
+            Split by
+            <select
+              aria-label="Split by"
+              className={selectClass}
+              value={chart.splitBy ?? ""}
+              onChange={(e) => set({ splitBy: e.target.value || undefined })}
+            >
+              <option value="">—</option>
+              {columnOptions(columns.filter((c) => c.name !== chart.x))}
+            </select>
+          </label>
+        )}
+        {(chart.kind === "bar" || chart.kind === "horizontalBar") &&
+          (split || measures.length > 1) && (
+            <label className="flex items-center gap-1 text-fg-muted">
+              <input
+                type="checkbox"
+                checked={!!chart.stacked}
+                onChange={(e) => set({ stacked: e.target.checked || undefined })}
+              />
+              Stacked
+            </label>
+          )}
+        {chart.kind === "pie" && (
+          <label className="flex items-center gap-1 text-fg-muted">
+            <input
+              type="checkbox"
+              checked={!!chart.donut}
+              onChange={(e) => set({ donut: e.target.checked || undefined })}
+            />
+            Ring
           </label>
         )}
         {chart.kind === "scatter" && (
@@ -389,7 +445,7 @@ export const ChartPanel = forwardRef<ChartPanelHandle, ChartPanelProps>(function
                 )}
               </span>
             ))}
-            {measures.length < MAX_MEASURES && (
+            {measures.length < maxMeasures && (
               <IconButton
                 label="Add measure"
                 className="size-6"

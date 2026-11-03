@@ -18,6 +18,8 @@ interface FilterBarProps {
   onSortChange?: (sort: SortKey[]) => void;
   /** Shown at the right end of the bar (the search box). */
   end?: ReactNode;
+  /** Shown after the "Filter" button (saved filters). */
+  start?: ReactNode;
 }
 
 /** Toolbar with one removable chip per filter and a button to add one. */
@@ -31,6 +33,7 @@ export function FilterBar({
   sort = [],
   onSortChange,
   end,
+  start,
 }: FilterBarProps) {
   const kinds = useMemo(() => new Map(columns.map((c) => [c.name, c.kind])), [columns]);
   return (
@@ -40,6 +43,7 @@ export function FilterBar({
       className="flex min-h-9 shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1"
     >
       <AddFilter columns={columns} onPick={onAdd} />
+      {start}
       {filters.map((f, i) => {
         const label = describeFilter(f, kinds.get(f.column));
         return (

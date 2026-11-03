@@ -82,6 +82,36 @@ describe("RecipePanel", () => {
     expect(onChange).toHaveBeenLastCalledWith([{ op: "removeDuplicates", columns: ["name"] }]);
   });
 
+  it("rounds dates and shifts times", async () => {
+    const { onChange, user } = setup({
+      columns: [col("day", "date"), col("started", "timestamp"), col("name", "text")],
+      column: "started",
+    });
+    const f = within(form());
+    await user.selectOptions(f.getByLabelText("Step"), "roundDate");
+    // Hours only for a date-and-time column.
+    expect(f.getByRole("option", { name: "hour" })).toBeInTheDocument();
+    await user.selectOptions(f.getByLabelText("Round down to the start of the"), "week");
+    await user.type(f.getByLabelText("As a new column (empty: in place)"), "week");
+    await user.click(f.getByRole("button", { name: "Add step" }));
+    expect(onChange).toHaveBeenLastCalledWith([
+      { op: "roundDate", column: "started", unit: "week", into: "week" },
+    ]);
+    await user.selectOptions(f.getByLabelText("Column"), "day");
+    expect(f.queryByRole("option", { name: "hour" })).toBeNull();
+
+    await user.selectOptions(f.getByLabelText("Step"), "shiftTime");
+    await user.selectOptions(f.getByLabelText("Column"), "started");
+    await user.type(f.getByLabelText("By (hours:minutes, e.g. +5:30)"), "+5:30");
+    await user.click(f.getByRole("button", { name: "Add step" }));
+    expect(onChange).toHaveBeenLastCalledWith([
+      { op: "shiftTime", column: "started", minutes: 330 },
+    ]);
+    // Not for a text column.
+    await user.selectOptions(f.getByLabelText("Column"), "name");
+    expect(f.getByRole("button", { name: "Add step" })).toBeDisabled();
+  });
+
   it("turns steps off, moves and removes them, and shows what happened", async () => {
     const steps: RecipeStep[] = [
       { op: "trim", column: "name" },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultExportName, rangeRows, toRanges } from "./exporting";
+import { convertedName, defaultExportName, rangeRows, splitOptions, toRanges } from "./exporting";
 
 describe("exporting helpers", () => {
   it("merges selected rows into ranges", () => {
@@ -18,5 +18,30 @@ describe("exporting helpers", () => {
     expect(defaultExportName("Q1 report.xlsx", "csvGz")).toBe("Q1 report-export.csv.gz");
     expect(defaultExportName("a/b:c", "json")).toBe("a_b_c-export.json");
     expect(defaultExportName("", "xlsx")).toBe("export-export.xlsx");
+  });
+});
+
+describe("split exports", () => {
+  it("turns the dialog's choice into options", () => {
+    expect(splitOptions("none", "", "", "")).toEqual({ options: {} });
+    expect(splitOptions("column", "region", "", "")).toEqual({
+      options: { partitionBy: ["region"] },
+    });
+    expect(splitOptions("column", "", "", "")).toEqual({ problem: "Pick a column" });
+    expect(splitOptions("rows", "", "1,000,000", "")).toEqual({
+      options: { rowsPerFile: 1_000_000 },
+    });
+    expect(splitOptions("rows", "", "1.5", "")).toHaveProperty("problem");
+    expect(splitOptions("size", "", "", "2.5")).toEqual({ options: { maxFileBytes: 2_500_000 } });
+    expect(splitOptions("size", "", "", "0")).toHaveProperty("problem");
+  });
+});
+
+describe("converting files", () => {
+  it("names the new files as the backend does", () => {
+    expect(convertedName("/d/sales.csv.gz", "parquet")).toBe("sales.parquet");
+    expect(convertedName("C:\\d\\logs.2024.ndjson.zst", "csv")).toBe("logs.2024.csv");
+    expect(convertedName("/d/v1.2.parquet", "csvGz")).toBe("v1.2.csv.gz");
+    expect(convertedName("/d/noext", "json")).toBe("noext.json");
   });
 });

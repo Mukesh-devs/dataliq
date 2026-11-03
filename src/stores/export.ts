@@ -109,7 +109,12 @@ export const useExport = create<ExportState>()(
             out.rowsLeftOut > 0
               ? ` (${formatCount(out.rowsLeftOut)} rows past the sheet limit left out)`
               : "";
-          notice(`Exported ${rows}${sheets} to ${name} in ${formatDuration(out.elapsedMs)}${left}`);
+          // A split export names the folder it wrote.
+          const into =
+            out.files > 0
+              ? ` in ${formatCount(out.files)} file${out.files === 1 ? "" : "s"} to the folder ${baseName(out.path)}`
+              : ` to ${name}`;
+          notice(`Exported ${rows}${sheets}${into} in ${formatDuration(out.elapsedMs)}${left}`);
         } catch (e) {
           if ((e as { kind?: string }).kind === "cancelled") notice("Export cancelled");
           else notice(`Couldn't export: ${e instanceof Error ? e.message : String(e)}`);

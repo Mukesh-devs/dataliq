@@ -220,7 +220,13 @@ interface TabsState {
    * Opens a SQL result in a new tab (filters, sort, profiles, export as for
    * a file). The tab owns the dataset from then on. Returns the tab id.
    */
-  openResult: (result: { dataset: DatasetInfo; preview: Table; sql: string }) => string;
+  openResult: (result: {
+    dataset: DatasetInfo;
+    preview: Table;
+    sql: string;
+    /** "Result N" by default. */
+    title?: string;
+  }) => string;
   /**
    * Opens a comparison's differing rows in a new tab (filters, export, …
    * as for a file). The tab owns the dataset from then on. Returns the tab id.
@@ -643,9 +649,9 @@ export const useTabs = create<TabsState>()((set, get) => {
       patch(id, recipeOpen ? { recipeOpen, qualityOpen: false } : { recipeOpen }),
     setQualityOpen: (id, qualityOpen) =>
       patch(id, qualityOpen ? { qualityOpen, recipeOpen: false } : { qualityOpen }),
-    openResult: ({ dataset, preview, sql }) => {
+    openResult: ({ dataset, preview, sql, title: name }) => {
       const id = `tab-${nextId++}`;
-      const title = `Result ${nextResult++}`;
+      const title = name ?? `Result ${nextResult++}`;
       const info: SourceInfo = {
         path: "",
         fileName: title,

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { RULE_ALPHA, SCALE_ALPHA } from "../components/grid/gridTheme";
 
 /**
  * WCAG 2.2 AA contrast of the theme tokens: text 4.5:1 against every
@@ -97,4 +98,17 @@ describe.each([
     for (const bg of BACKGROUNDS)
       expect(contrast(t["focus-ring"]!, t[bg]!), `ring on --${bg}`).toBeGreaterThanOrEqual(3);
   });
+
+  // Conditional formatting fills cells with a rule colour (28%) or a scale
+  // (up to 45%); cell text stays readable on the strongest of them. (A
+  // filled NULL cell draws its marker in --fg, not --null.)
+  it.each(["red", "amber", "green", "blue", "purple"])(
+    "cell text is readable on a %s highlight",
+    (color) => {
+      for (const alpha of [RULE_ALPHA, SCALE_ALPHA[1]]) {
+        const fill = over(`rgb(${t[`rule-${color}`]} / ${alpha})`, t.bg!);
+        expect(contrast(t.fg!, fill), `--fg on ${color} ${alpha}`).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
 });
