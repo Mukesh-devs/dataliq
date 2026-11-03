@@ -7,7 +7,9 @@ import {
   defaultExportName,
   pickExportPath,
   rangeRows,
+  splitOptions,
   type ExportFormat,
+  type SplitMode,
 } from "../../lib/exporting";
 import { formatCount, plural } from "../../lib/format";
 import { optionsFor, useExport, type ExportDefaults, type ExportTarget } from "../../stores/export";
@@ -77,6 +79,13 @@ function ExportForm({ target }: { target: ExportTarget }) {
   const rows = scope === "selection" && selection ? rangeRows(selection.rows) : target.rowCount;
   const overSheet = d.format === "xlsx" && rows > XLSX_SHEET_ROWS;
   const sheets = Math.ceil(rows / XLSX_SHEET_ROWS);
+  // A folder of files: per value of a column, per N rows or per N MB.
+  const [splitMode, setSplitMode] = useState<SplitMode>("none");
+  const [splitColumn, setSplitColumn] = useState("");
+  const [rowsPerFile, setRowsPerFile] = useState("1000000");
+  const [fileMb, setFileMb] = useState("100");
+  const canSplit = d.format !== "xlsx";
+  const split = splitOptions(canSplit ? splitMode : "none", splitColumn, rowsPerFile, fileMb);
 
   const run = async () => {
     const path = await pickExportPath(defaultExportName(target.title, d.format), d.format).catch(
@@ -94,7 +103,11 @@ function ExportForm({ target }: { target: ExportTarget }) {
       labels: target.labels,
       path,
       format: d.format,
-      options: { ...optionsFor(d), rows: sel ? sel.rows : undefined },
+      options: {
+        ...optionsFor(d),
+        rows: sel ? sel.rows : undefined,
+        ...("options" in split ? split.options : {}),
+      },
       totalRows: rows,
     });
   };
@@ -223,6 +236,91 @@ function ExportForm({ target }: { target: ExportTarget }) {
           Compressed with zstd; column types are kept exactly.
         </p>
       )}
+      {canSplit && (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="mb-1 text-fg-muted">Files</legend>
+          <label className="flex items-center gap-2 text-fg">
+            <input
+              type="radio"
+              name="split"
+              checked={splitMode === "none"}
+              onChange={() => setSplitMode("none")}
+            />
+            One file
+          </label>
+          <label className="flex items-center gap-2 text-fg">
+            <input
+              type="radio"
+              name="split"
+              checked={splitMode === "column"}
+              onChange={() => setSplitMode("column")}
+            />
+            <span className="shrink-0">A folder per value of</span>
+            <select
+              aria-label="Split by column"
+              className={`${inputClass} h-6`}
+              value={splitColumn}
+              onFocus={() => setSplitMode("column")}
+              onChange={(e) => {
+                setSplitColumn(e.target.value);
+                setSplitMode("column");
+              }}
+            >
+              <option value="">Choose a column</option>
+              {columns.map((c) => (
+                <option key={c} value={c}>
+                  {target.labels[c] ?? c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-fg">
+            <input
+              type="radio"
+              name="split"
+              checked={splitMode === "rows"}
+              onChange={() => setSplitMode("rows")}
+            />
+            <span className="shrink-0">Files of</span>
+            <input
+              aria-label="Rows per file"
+              inputMode="numeric"
+              className={`${inputClass} h-6 w-28 font-mono`}
+              value={rowsPerFile}
+              onFocus={() => setSplitMode("rows")}
+              onChange={(e) => setRowsPerFile(e.target.value)}
+            />
+            <span className="shrink-0">rows</span>
+          </label>
+          <label className="flex items-center gap-2 text-fg">
+            <input
+              type="radio"
+              name="split"
+              checked={splitMode === "size"}
+              onChange={() => setSplitMode("size")}
+            />
+            <span className="shrink-0">Files of about</span>
+            <input
+              aria-label="Megabytes per file"
+              inputMode="decimal"
+              className={`${inputClass} h-6 w-20 font-mono`}
+              value={fileMb}
+              onFocus={() => setSplitMode("size")}
+              onChange={(e) => setFileMb(e.target.value)}
+            />
+            <span className="shrink-0">MB</span>
+          </label>
+          {splitMode !== "none" && (
+            <span className="text-[11px] text-fg-subtle">
+              {"problem" in split
+                ? split.problem
+                : splitMode === "column"
+                  ? "Writes a folder named after the file, with a subfolder per value (Hive layout)."
+                  : "Writes a folder named after the file: name_0001, name_0002, … in the view’s order."}
+            </span>
+          )}
+        </fieldset>
+      )}
       {overSheet && (
         <div
           role="alert"
@@ -262,7 +360,7 @@ function ExportForm({ target }: { target: ExportTarget }) {
           size="sm"
           variant="primary"
           type="submit"
-          disabled={busy || columns.length === 0 || rows === 0}
+          disabled={busy || columns.length === 0 || rows === 0 || "problem" in split}
         >
           Export {plural(rows, "row")}…
         </Button>

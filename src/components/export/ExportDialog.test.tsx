@@ -11,7 +11,9 @@ interface Call {
   args: Record<string, unknown>;
 }
 
-function backend(opts: { path?: string | null; fail?: string } = {}) {
+function backend(
+  opts: { path?: string | null; fail?: string; outcome?: Record<string, unknown> } = {},
+) {
   const calls: Call[] = [];
   mockIPC((cmd, a) => {
     const args = a as Record<string, unknown>;
@@ -21,7 +23,16 @@ function backend(opts: { path?: string | null; fail?: string } = {}) {
     if (cmd === "export_view") {
       if (opts.fail === "cancelled") throw { kind: "cancelled", message: "Cancelled" };
       if (opts.fail) throw { kind: "query", message: opts.fail };
-      return { path: "/out/x.csv", rows: 2, sheets: 0, rowsLeftOut: 0, elapsedMs: 12 };
+      return (
+        opts.outcome ?? {
+          path: "/out/x.csv",
+          rows: 2,
+          sheets: 0,
+          rowsLeftOut: 0,
+          files: 0,
+          elapsedMs: 12,
+        }
+      );
     }
     throw new Error(`unexpected ${cmd}`);
   });
@@ -77,6 +88,46 @@ describe("ExportDialog", () => {
     expect(useExport.getState().job).toBeNull();
     // The options are remembered.
     expect(useExport.getState().defaults).toMatchObject({ delimiter: ";", quoteAll: true });
+  });
+
+  it("splits into a folder of files by rows, size or a column's values", async () => {
+    const calls = backend({
+      outcome: { path: "/out/x", rows: 1500, sheets: 0, rowsLeftOut: 0, files: 3, elapsedMs: 9 },
+    });
+    render(<ExportDialog />);
+    useExport.getState().show(target());
+    const user = userEvent.setup();
+    await screen.findByRole("dialog", { name: "Export" });
+    const exportButton = screen.getByRole("button", { name: /Export 1,500 rows/ });
+    // A column split needs its column.
+    await user.click(screen.getByRole("radio", { name: /A folder per value of/ }));
+    expect(screen.getByText("Pick a column")).toBeInTheDocument();
+    expect(exportButton).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText("Split by column"), "a");
+    expect(screen.getByText(/subfolder per value \(Hive layout\)/)).toBeInTheDocument();
+    // Files of 500 rows instead.
+    const perFile = screen.getByLabelText("Rows per file");
+    await user.clear(perFile);
+    await user.type(perFile, "500");
+    // Typing in its box picks the option.
+    expect(screen.getByRole("radio", { name: /^Files of .*rows$/ })).toBeChecked();
+    await user.click(exportButton);
+    await waitFor(() =>
+      expect(useNotice.getState().text).toMatch(/Exported 1,500 rows in 3 files to the folder x/),
+    );
+    expect(exportCall(calls).request.options).toMatchObject({ rowsPerFile: 500 });
+    expect(exportCall(calls).request.options.partitionBy).toBeUndefined();
+  });
+
+  it("offers no file splitting for Excel (it splits into sheets)", async () => {
+    backend();
+    render(<ExportDialog />);
+    useExport.getState().show(target());
+    const user = userEvent.setup();
+    await screen.findByRole("dialog", { name: "Export" });
+    expect(screen.getByRole("group", { name: "Files" })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Excel" }));
+    expect(screen.queryByRole("group", { name: "Files" })).toBeNull();
   });
 
   it("exports only the selection; cancelling the save dialog does nothing", async () => {

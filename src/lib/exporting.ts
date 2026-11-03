@@ -35,6 +35,43 @@ export interface ExportOptions {
   splitSheets?: boolean;
   /** Only these view positions, as `[start, end)` ranges. */
   rows?: [number, number][];
+  /** A folder with a subfolder per value of these columns (not Excel). */
+  partitionBy?: string[];
+  /** A folder of files of at most this many rows (not Excel). */
+  rowsPerFile?: number;
+  /** A folder of files of about this many bytes (not Excel). */
+  maxFileBytes?: number;
+}
+
+/** How an export is split into files. */
+export type SplitMode = "none" | "column" | "rows" | "size";
+
+/** The split options, or why they can't be used. */
+export function splitOptions(
+  mode: SplitMode,
+  column: string,
+  rows: string,
+  megabytes: string,
+): { options: Partial<ExportOptions> } | { problem: string } {
+  const n = (s: string) => Number(s.replace(/[,_\s]/g, ""));
+  switch (mode) {
+    case "none":
+      return { options: {} };
+    case "column":
+      return column ? { options: { partitionBy: [column] } } : { problem: "Pick a column" };
+    case "rows": {
+      const r = n(rows);
+      return Number.isInteger(r) && r >= 1
+        ? { options: { rowsPerFile: r } }
+        : { problem: "Rows per file: a whole number" };
+    }
+    case "size": {
+      const mb = n(megabytes);
+      return Number.isFinite(mb) && mb > 0
+        ? { options: { maxFileBytes: Math.round(mb * 1_000_000) } }
+        : { problem: "File size: a number of MB" };
+    }
+  }
 }
 
 export interface ExportRequest {
@@ -55,6 +92,8 @@ export interface ExportOutcome {
   rows: number;
   sheets: number;
   rowsLeftOut: number;
+  /** Files written into the folder `path` (split exports); 0 for one file. */
+  files: number;
   elapsedMs: number;
 }
 

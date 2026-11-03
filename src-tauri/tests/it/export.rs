@@ -388,3 +388,163 @@ fn selected_rows_are_the_rows_the_grid_shows() {
         assert_eq!(got, want, "{spec:?}");
     }
 }
+
+/// Every file of a split export in name order, read back and concatenated.
+fn read_split(engine: &Engine, tmp: &Path, files: &[PathBuf]) -> Vec<Row> {
+    files
+        .iter()
+        .enumerate()
+        .flat_map(|(i, f)| {
+            let ds = reopen(engine, &tmp.join(format!("re{i}")), f);
+            read_back(engine, &ds).1
+        })
+        .collect()
+}
+
+fn listed(dir: &Path) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    files.sort();
+    files
+}
+
+#[test]
+fn split_by_rows_numbers_files_in_view_order() {
+    let fx = fx();
+    let want = expected(&fx.people);
+    let exports = Exports::default();
+    for format in [ExportFormat::Csv, ExportFormat::Parquet] {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(format!("sales.{}", format.extension()));
+        let options = ExportOptions {
+            rows_per_file: Some(100),
+            ..Default::default()
+        };
+        let req = request(&fx, path, format, options);
+        let out = export::export(&fx.engine, &exports, &req, "job", &|_| {}).unwrap();
+        let folder = tmp.path().join("sales");
+        assert_eq!(out.path, folder);
+        assert_eq!(out.rows, want.len() as u64);
+        let files = listed(&folder);
+        assert_eq!(out.files as usize, files.len());
+        assert_eq!(files.len(), want.len().div_ceil(100), "{format:?}");
+        assert_eq!(
+            files[0].file_name().unwrap().to_string_lossy(),
+            format!("sales_0001.{}", format.extension())
+        );
+        assert!(!tmp.path().join("sales.partial").exists());
+        // Every file but the last holds 100 rows; together, the view in order,
+        // without the internal file-number column.
+        let ds = reopen(&fx.engine, &tmp.path().join("re"), &files[0]);
+        let (names, _) = read_back(&fx.engine, &ds);
+        assert_eq!(names, ["joined", "Full name", "id", "amount", "active"]);
+        assert_eq!(ds.row_count, 100);
+        assert_eq!(
+            read_split(&fx.engine, tmp.path(), &files),
+            want,
+            "{format:?}"
+        );
+    }
+}
+
+#[test]
+fn split_by_column_writes_hive_folders() {
+    let fx = fx();
+    let exports = Exports::default();
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("by_active.parquet");
+    let options = ExportOptions {
+        partition_by: Some(vec!["active".into()]),
+        ..Default::default()
+    };
+    let out = export::export(
+        &fx.engine,
+        &exports,
+        &request(&fx, path, ExportFormat::Parquet, options),
+        "job",
+        &|_| {},
+    )
+    .unwrap();
+    let folder = tmp.path().join("by_active");
+    let dirs: Vec<String> = listed(&folder)
+        .iter()
+        .map(|d| d.file_name().unwrap().to_string_lossy().to_string())
+        .collect();
+    assert_eq!(
+        dirs,
+        [
+            "active=__HIVE_DEFAULT_PARTITION__",
+            "active=false",
+            "active=true"
+        ]
+    );
+    assert_eq!(out.files, 3);
+    // Read back as one table with the partition column, as DuckDB does.
+    let conn = fx.engine.connection().unwrap();
+    let n: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT count(*) FROM read_parquet('{}/*/*.parquet', hive_partitioning = true) WHERE active",
+                folder.display()
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let want = expected(&fx.people)
+        .iter()
+        .filter(|r| r.4 == Some(true))
+        .count();
+    assert_eq!(n as usize, want);
+}
+
+#[test]
+fn split_by_size_and_refusals() {
+    let fx = fx();
+    let exports = Exports::default();
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("small.csv");
+    let options = ExportOptions {
+        max_file_bytes: Some(4_000),
+        ..Default::default()
+    };
+    let req = request(&fx, path.clone(), ExportFormat::Csv, options.clone());
+    let out = export::export(&fx.engine, &exports, &req, "job", &|_| {}).unwrap();
+    let files = listed(&tmp.path().join("small"));
+    // DuckDB checks the size once per batch of rows: a file this small
+    // stays whole (big exports split; see docs/DECISIONS.md D56).
+    assert_eq!(
+        files[0].file_name().unwrap().to_string_lossy(),
+        "small_0001.csv"
+    );
+    assert_eq!(out.files as usize, files.len());
+    assert_eq!(
+        read_split(&fx.engine, tmp.path(), &files),
+        expected(&fx.people)
+    );
+    // The folder now exists: a second export says so and changes nothing.
+    let again = export::export(&fx.engine, &exports, &req, "job", &|_| {});
+    assert!(matches!(again, Err(AppError::Query(m)) if m.contains("already exists")));
+    // Excel splits into sheets, not files; rows and size don't mix.
+    let xlsx = request(&fx, tmp.path().join("x.xlsx"), ExportFormat::Xlsx, options);
+    assert!(export::export(&fx.engine, &exports, &xlsx, "job", &|_| {}).is_err());
+    let both = ExportOptions {
+        rows_per_file: Some(10),
+        max_file_bytes: Some(10),
+        ..Default::default()
+    };
+    let req = request(&fx, tmp.path().join("both.csv"), ExportFormat::Csv, both);
+    assert!(export::export(&fx.engine, &exports, &req, "job", &|_| {}).is_err());
+    assert!(!tmp.path().join("both").exists());
+    // A partition column that isn't exported.
+    let bad = ExportOptions {
+        partition_by: Some(vec!["city".into()]),
+        ..Default::default()
+    };
+    let req = request(&fx, tmp.path().join("bad.csv"), ExportFormat::Csv, bad);
+    let err = export::export(&fx.engine, &exports, &req, "job", &|_| {}).unwrap_err();
+    assert!(err.to_string().contains("city"), "{err}");
+    assert!(!tmp.path().join("bad").exists() && !tmp.path().join("bad.partial").exists());
+}
