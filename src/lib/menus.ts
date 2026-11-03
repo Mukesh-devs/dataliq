@@ -34,6 +34,7 @@ export const MENUS: MenuSpec[] = [
       { command: "open-folder", label: "Open folder as one table…" },
       { command: "open-pattern", label: "Open files matching a pattern…" },
       { command: "open-url", label: "Open URL…" },
+      { command: "connect-database", label: "Connect to a database…" },
       { submenu: "Open recent", items: [{ recent: true }] },
       sep,
       { command: "open-workspace", label: "Open workspace…" },

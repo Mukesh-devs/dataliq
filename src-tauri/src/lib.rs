@@ -5,6 +5,7 @@ pub mod chart;
 pub mod cli;
 pub mod commands;
 pub mod compare;
+pub mod connect;
 pub mod engine;
 pub mod error;
 pub mod export;
@@ -114,6 +115,7 @@ pub fn run() {
                 paths.app_data_dir()?,
             )));
             app.manage(Arc::new(export::Exports::default()));
+            app.manage(Arc::new(connect::Connections::new(paths.app_data_dir()?)));
             app.manage(commands::settings::SettingsState {
                 path: settings_path,
                 current: parking_lot::RwLock::new(settings.clone()),
@@ -161,6 +163,11 @@ pub fn run() {
             commands::export::export_view,
             commands::export::cancel_export,
             commands::export::list_data_files,
+            commands::connect::list_connections,
+            commands::connect::connect_database,
+            commands::connect::live_tables,
+            commands::connect::disconnect_database,
+            commands::connect::forget_connection,
             commands::export::convert_files,
             commands::chart::chart_data,
             commands::chart::chart_sql,
