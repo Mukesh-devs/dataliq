@@ -41,6 +41,19 @@ pub enum Case {
     Title,
 }
 
+/// What "Round dates" rounds down to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DateUnit {
+    Hour,
+    Day,
+    /// Weeks start on Monday (ISO).
+    Week,
+    Month,
+    Quarter,
+    Year,
+}
+
 /// One cleaning step.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
@@ -101,6 +114,20 @@ pub enum Step {
     Calculate {
         name: String,
         expression: String,
+    },
+    /// Dates and times rounded down to the start of their hour, day, week,
+    /// month, quarter or year (dates from a day up), in place or as a new
+    /// column `into`, e.g. to group by month.
+    RoundDate {
+        column: String,
+        unit: DateUnit,
+        #[serde(default)]
+        into: Option<String>,
+    },
+    /// Times moved by `minutes` (e.g. UTC to India time: +330).
+    ShiftTime {
+        column: String,
+        minutes: i64,
     },
 }
 

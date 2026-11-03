@@ -6,7 +6,9 @@ import {
   describeGaps,
   describeStep,
   fitView,
+  formatShift,
   hasEffect,
+  parseShift,
   readableScript,
   recipeFileName,
   type StepOutcome,
@@ -131,5 +133,26 @@ describe("recipe files", () => {
       reader: "read_csv('p.csv')",
       labels: ["Trim spaces in “name”", "Trim spaces in “city”"],
     });
+  });
+});
+
+describe("date steps", () => {
+  it("reads and writes time shifts", () => {
+    expect(parseShift("+5:30")).toBe(330);
+    expect(parseShift("-5:30")).toBe(-330);
+    expect(parseShift("5.5h")).toBe(330);
+    expect(parseShift("90")).toBe(90);
+    expect(parseShift("soon")).toBeNull();
+    expect(formatShift(330)).toBe("+5:30");
+    expect(formatShift(-45)).toBe("-0:45");
+  });
+
+  it("describes them", () => {
+    expect(describeStep({ op: "roundDate", column: "started", unit: "month", into: "month" })).toBe(
+      "Round “started” to the month as “month”",
+    );
+    expect(describeStep({ op: "shiftTime", column: "started", minutes: -330 })).toBe(
+      "Shift “started” by -5:30",
+    );
   });
 });

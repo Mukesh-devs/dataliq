@@ -25,7 +25,32 @@ export type Step =
   | { op: "fillEmpty"; column: string; value: string }
   | { op: "removeDuplicates"; columns?: string[] }
   | { op: "removeRows"; filter: Filter }
-  | { op: "calculate"; name: string; expression: string };
+  | { op: "calculate"; name: string; expression: string }
+  | { op: "roundDate"; column: string; unit: DateUnit; into?: string }
+  | { op: "shiftTime"; column: string; minutes: number };
+
+/** What "Round dates" rounds down to (weeks start on Monday). */
+export type DateUnit = "hour" | "day" | "week" | "month" | "quarter" | "year";
+
+export const DATE_UNITS: DateUnit[] = ["hour", "day", "week", "month", "quarter", "year"];
+
+/** "+5:30", "-1:00", "+0:45": a shift in minutes as hours and minutes. */
+export function formatShift(minutes: number): string {
+  const sign = minutes < 0 ? "-" : "+";
+  const m = Math.abs(Math.round(minutes));
+  return `${sign}${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/** "+5:30", "-2", "330" (minutes), "5.5" (hours) → minutes; null when unreadable. */
+export function parseShift(text: string): number | null {
+  const t = text.trim().replace(/^\+/, "");
+  const hm = /^(-?)(\d{1,4}):([0-5]\d)$/.exec(t);
+  if (hm) return (hm[1] ? -1 : 1) * (Number(hm[2]) * 60 + Number(hm[3]));
+  const h = /^-?\d+(\.\d+)?\s*h$/i.exec(t);
+  if (h) return Math.round(parseFloat(t) * 60);
+  if (/^-?\d+$/.test(t)) return Number(t);
+  return null;
+}
 
 export type StepOp = Step["op"];
 
@@ -180,6 +205,8 @@ export const STEP_NAMES: Record<StepOp, string> = {
   removeDuplicates: "Remove duplicate rows",
   removeRows: "Remove rows",
   calculate: "Calculated column",
+  roundDate: "Round dates",
+  shiftTime: "Shift times",
 };
 
 export const TYPE_NAMES: Record<NewType, string> = {
@@ -224,6 +251,10 @@ export function describeStep(s: Step): string {
       return `Remove rows where ${describeFilter(s.filter)}`;
     case "calculate":
       return `New column ${q(s.name)} = ${s.expression}`;
+    case "roundDate":
+      return `Round ${q(s.column)} to the ${s.unit}${s.into ? ` as ${q(s.into)}` : ""}`;
+    case "shiftTime":
+      return `Shift ${q(s.column)} by ${formatShift(s.minutes)}`;
   }
 }
 

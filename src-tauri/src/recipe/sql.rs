@@ -3,7 +3,7 @@
 //! current schema; user values are inlined as safely quoted literals, so a
 //! recipe is one standalone query (it can be copied as a script).
 
-use super::{Case, NewType, Step};
+use super::{Case, DateUnit, NewType, Step};
 use crate::engine::Param;
 use crate::engine::sql::{inline_params, literal, quote_ident};
 use crate::error::{AppError, Result};
@@ -333,6 +333,72 @@ pub fn step_sql(step: &Step, prev: &str, schema: &[ColumnMeta]) -> Result<String
             )?;
             inline_params(&built.select, &built.params)
         }
+        Step::RoundDate {
+            column: name,
+            unit,
+            into,
+        } => {
+            let meta = column(schema, name)?;
+            let t = meta.r#type.to_ascii_uppercase();
+            if ProfileKind::of(&meta.r#type) != ProfileKind::Temporal || t.contains("TIME ZONE") {
+                return Err(AppError::Query(format!(
+                    "Rounding works on date and time columns; \"{name}\" is {}.",
+                    meta.r#type
+                )));
+            }
+            let is_date = t == "DATE";
+            if is_date && *unit == DateUnit::Hour {
+                return Err(AppError::Query(format!(
+                    "\"{name}\" holds dates without a time: round to a day or longer."
+                )));
+            }
+            let part = match unit {
+                DateUnit::Hour => "hour",
+                DateUnit::Day => "day",
+                DateUnit::Week => "week",
+                DateUnit::Month => "month",
+                DateUnit::Quarter => "quarter",
+                DateUnit::Year => "year",
+            };
+            let q = quote_ident(name);
+            // A day or longer is a date; hours keep the time.
+            let expr = if *unit == DateUnit::Hour {
+                format!("date_trunc('hour', {q})")
+            } else {
+                format!("CAST(date_trunc('{part}', {q}) AS DATE)")
+            };
+            match into.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
+                Some(new) => {
+                    check_new_name(schema, new, None)?;
+                    format!("SELECT *, {expr} AS {} {from}", quote_ident(new))
+                }
+                None => format!(
+                    "SELECT {} {from}",
+                    project(schema, |c| (&c.name == name).then(|| expr.clone()))
+                ),
+            }
+        }
+        Step::ShiftTime {
+            column: name,
+            minutes,
+        } => {
+            let meta = column(schema, name)?;
+            let t = meta.r#type.to_ascii_uppercase();
+            if !(t.starts_with("TIMESTAMP") || t == "TIME") || t.contains("TIME ZONE") {
+                return Err(AppError::Query(format!(
+                    "Shifting works on time columns; \"{name}\" is {}.",
+                    meta.r#type
+                )));
+            }
+            if minutes.unsigned_abs() > 60 * 24 * 366 {
+                return Err(AppError::Query("Shift by at most a year.".into()));
+            }
+            let expr = format!("({} + INTERVAL ({minutes}) MINUTE)", quote_ident(name));
+            format!(
+                "SELECT {} {from}",
+                project(schema, |c| (&c.name == name).then(|| expr.clone()))
+            )
+        }
         Step::Calculate { name, expression } => {
             check_new_name(schema, name, None)?;
             if expression.trim().is_empty() {
@@ -373,6 +439,76 @@ mod tests {
     }
 
     const PREV: &str = "t";
+
+    fn dated() -> Vec<ColumnMeta> {
+        [
+            ("day", "DATE"),
+            ("at", "TIMESTAMP"),
+            ("tz", "TIMESTAMP WITH TIME ZONE"),
+            ("n", "BIGINT"),
+        ]
+        .iter()
+        .map(|(n, t)| ColumnMeta {
+            name: n.to_string(),
+            r#type: t.to_string(),
+        })
+        .collect()
+    }
+
+    #[test]
+    fn rounding_and_shifting_dates() {
+        let s = |step: Step| step_sql(&step, PREV, &dated());
+        assert_eq!(
+            s(Step::RoundDate {
+                column: "at".into(),
+                unit: DateUnit::Month,
+                into: Some(" month ".into()),
+            })
+            .unwrap(),
+            "SELECT *, CAST(date_trunc('month', \"at\") AS DATE) AS \"month\" FROM t"
+        );
+        assert_eq!(
+            s(Step::RoundDate {
+                column: "at".into(),
+                unit: DateUnit::Hour,
+                into: None,
+            })
+            .unwrap(),
+            "SELECT \"day\", date_trunc('hour', \"at\") AS \"at\", \"tz\", \"n\" FROM t"
+        );
+        let hour_of_date = Step::RoundDate {
+            column: "day".into(),
+            unit: DateUnit::Hour,
+            into: None,
+        };
+        assert!(
+            s(hour_of_date)
+                .unwrap_err()
+                .to_string()
+                .contains("without a time")
+        );
+        for column in ["n", "tz"] {
+            let step = Step::RoundDate {
+                column: column.into(),
+                unit: DateUnit::Day,
+                into: None,
+            };
+            assert!(s(step).is_err(), "{column}");
+        }
+        assert_eq!(
+            s(Step::ShiftTime {
+                column: "at".into(),
+                minutes: 330,
+            })
+            .unwrap(),
+            "SELECT \"day\", (\"at\" + INTERVAL (330) MINUTE) AS \"at\", \"tz\", \"n\" FROM t"
+        );
+        let date_shift = Step::ShiftTime {
+            column: "day".into(),
+            minutes: 60,
+        };
+        assert!(s(date_shift).is_err());
+    }
 
     fn sql(step: Step) -> String {
         step_sql(&step, PREV, &schema()).unwrap()
