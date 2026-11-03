@@ -169,6 +169,6 @@ export function returnsRows(statement: string): boolean {
 }
 
 /** Runs a query in the panel's session; its rows become a pageable dataset. */
-export function sqlResult(sql: string, requestId: string): Promise<DatasetInfo> {
-  return call("sql_result", { sql, requestId });
+export function sqlResult(sql: string, requestId: string, group?: string): Promise<DatasetInfo> {
+  return call("sql_result", { sql, requestId, ...(group && { group }) });
 }

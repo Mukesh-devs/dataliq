@@ -1,5 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import {
+  Group,
+  ListOrdered,
   ArrowDown,
   ArrowUp,
   ChartColumn,
@@ -37,6 +39,10 @@ interface ColumnMenuProps {
   onProfile?: () => void;
   /** Opens the cleaning steps with this column picked. */
   onClean?: () => void;
+  /** Opens each value's count as a new tab. */
+  onCountValues?: () => void;
+  /** Opens Group by with this column. */
+  onGroupBy?: () => void;
 }
 
 /** The column header menu (▼ or right-click): sort and filter. */
@@ -54,6 +60,8 @@ export function ColumnMenu({
   onAutoFit,
   onProfile,
   onClean,
+  onCountValues,
+  onGroupBy,
 }: ColumnMenuProps) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor]);
   const current = sort.find((k) => k.column === column);
@@ -102,6 +110,16 @@ export function ColumnMenu({
           {onProfile && (
             <Item icon={<ChartColumn />} onSelect={choose(onProfile)}>
               Column profile
+            </Item>
+          )}
+          {onCountValues && (
+            <Item icon={<ListOrdered />} onSelect={choose(onCountValues)}>
+              Count values
+            </Item>
+          )}
+          {onGroupBy && (
+            <Item icon={<Group />} onSelect={choose(onGroupBy)}>
+              Group by this column…
             </Item>
           )}
           {onClean && (

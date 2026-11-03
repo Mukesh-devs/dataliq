@@ -60,6 +60,7 @@ import {
   type SelectionStats,
 } from "../../lib/selectionStats";
 import { useSelection } from "../../stores/selection";
+import { useDataTools } from "../tools/useDataTools";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { NOT_LOADED, PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
@@ -992,6 +993,8 @@ export function FileView({
     setQualityOpen,
   ]);
   useRegisterCommands("file", commands);
+  const tools = useDataTools(tab, viewRows);
+  useRegisterCommands("tools", tools.commands);
 
   const showSettings =
     isCsv(tab) || (tab.status === "error" && /\.(csv|tsv|txt|tab)/i.test(tab.path));
@@ -1258,6 +1261,8 @@ export function FileView({
           })}
           onProfile={baseId ? () => showProfile(menu.column.name) : undefined}
           onClean={canClean ? () => openClean(menu.column.name) : undefined}
+          onCountValues={tools.ready ? () => tools.countValues(menu.column.name) : undefined}
+          onGroupBy={tools.groupBy && (() => tools.groupBy!(menu.column.name))}
         />
       )}
       {renaming && onLayoutChange && (
@@ -1350,6 +1355,7 @@ export function FileView({
                 {...cellActions(cellMenu.column, cellMenu.row)}
               />
             )}
+            {tools.dialogs}
             {summaryOpen && (
               <SelectionSummary
                 load={loadSummary}

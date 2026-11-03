@@ -202,3 +202,74 @@ fn results_see_session_temp_tables_and_report_errors_in_the_users_lines() {
         other => panic!("expected a query error, got {other:?}"),
     }
 }
+
+/// The data tools' queries (Group by / pivot, value counts, samples,
+/// append, join, summary), in the form the UI builds them, over people.csv.
+#[test]
+fn data_tool_queries_run_as_results() {
+    let fx = fx();
+    fx.engine.register_table(&fx.dataset.id, "people").unwrap();
+    let tools = RequestKey {
+        id: None,
+        group: Some("tools".into()),
+    };
+    let run = |sql: &str| {
+        fx.engine
+            .sql_result(sql, &tools)
+            .unwrap_or_else(|e| panic!("{sql}\n{e}"))
+    };
+    let cities: std::collections::HashSet<Option<&str>> =
+        fx.people.iter().map(|p| p.city.as_deref()).collect();
+    // Group by with a percentile and a distinct count.
+    let ds = run(
+        "SELECT \"city\", count(*) AS \"rows\", quantile_cont(\"amount\", 0.95) AS \"p95_amount\", \
+         count(DISTINCT \"name\") AS \"distinct_name\"\nFROM \"people\"\nGROUP BY \"city\"\nORDER BY \"city\"",
+    );
+    assert_eq!(ds.row_count, cities.len() as u64);
+    // Pivot: one row per active value, one column per city value.
+    let ds = run(
+        "SELECT * FROM (\n  PIVOT (\nSELECT * FROM \"people\" WHERE \"amount\" > 100\n) ON \"active\" USING sum(\"amount\") AS \"sum_amount\" GROUP BY \"city\"\n)\nORDER BY \"city\"",
+    );
+    assert_eq!(ds.row_count, cities.len() as u64);
+    // Value counts add up to every row.
+    let ds = run(
+        "SELECT \"city\", count(*) AS \"count\",\n  round(100.0 * count(*) / sum(count(*)) OVER (), 2) AS \"percent\"\n\
+         FROM \"people\"\nGROUP BY \"city\"\nORDER BY \"count\" DESC, \"city\" NULLS FIRST",
+    );
+    let total: i64 = rows(&fx.engine, &ds)
+        .iter()
+        .map(|b| {
+            let c = b.column(1).as_primitive::<Int64Type>();
+            (0..b.num_rows()).map(|i| c.value(i)).sum::<i64>()
+        })
+        .sum();
+    assert_eq!(total, 1000);
+    // Samples.
+    assert_eq!(
+        run("SELECT * FROM \"people\"\nUSING SAMPLE reservoir(25 ROWS) REPEATABLE (42)").row_count,
+        25
+    );
+    let share = run("SELECT * FROM \"people\"\nUSING SAMPLE 50 PERCENT (bernoulli, 42)").row_count;
+    assert!((300..700).contains(&share), "{share}");
+    // Append by name with a source column, and an anti join.
+    assert_eq!(
+        run("SELECT 'a' AS \"source\", * FROM \"people\"\nUNION ALL BY NAME\nSELECT 'b' AS \"source\", * FROM \"people\"")
+            .row_count,
+        2000
+    );
+    assert_eq!(
+        run("SELECT l.*\nFROM \"people\" AS l\nANTI JOIN \"people\" AS r ON l.\"id\" = r.\"id\"")
+            .row_count,
+        0
+    );
+    assert_eq!(
+        run("SELECT l.\"id\", r.\"name\" AS \"name_right\"\nFROM \"people\" AS l\nLEFT JOIN \"people\" AS r ON l.\"id\" = r.\"id\"")
+            .row_count,
+        1000
+    );
+    // Summary: one row per column.
+    assert_eq!(
+        run("SELECT * FROM (SUMMARIZE SELECT * FROM \"people\")").row_count,
+        6
+    );
+}
