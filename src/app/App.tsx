@@ -696,6 +696,7 @@ export function App() {
           <Sidebar
             tabs={tabs}
             active={active}
+            onSelect={setActive}
             onLayoutChange={active ? (l) => setLayout(active.id, l) : undefined}
           />
         )}

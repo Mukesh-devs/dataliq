@@ -6,6 +6,7 @@
 
 mod open;
 mod profile;
+mod selection;
 mod sql;
 
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,7 @@ pub use profile::{
     APPROX_TOP_DISTINCT, BINS, Bin, ColumnHistogram, ColumnProfile, EXACT_DISTINCT_ROWS,
     ProfileKind, TOP_VALUES,
 };
+pub use selection::{MAX_SELECTION_RANGES, SelectionColumnStats, SelectionStats};
 pub use sql::{BuiltView, ORDER_TABLE, Relation, RowOrder, build, build_at, standalone_sql};
 
 pub(crate) use profile::numeric_expr;

@@ -2,15 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   defaultLayout,
   fitWidth,
+  invertHidden,
   label,
+  matchColumns,
   move,
   pinnedCount,
   reconcile,
   rename,
   setHidden,
+  setManyHidden,
   setPinned,
   setWidth,
   showAll,
+  showOnly,
   visible,
 } from "./layout";
 
@@ -103,5 +107,46 @@ describe("column layout", () => {
     expect(fitWidth("id", ["a long value here"], measure, opts)).toBe(17 * 8 + 16);
     expect(fitWidth("x", [], measure, { padding: 0, headerExtra: 0 })).toBe(50);
     expect(fitWidth("x", ["y".repeat(200)], measure, opts)).toBe(500);
+  });
+});
+
+describe("showing and hiding many columns", () => {
+  it("selects and unselects all, keeping the first column shown", () => {
+    const none = setManyHidden(base(), true);
+    expect(visible(none)).toEqual(["a"]);
+    expect(none.hidden).toEqual(["b", "c", "d", "e"]);
+    expect(visible(setManyHidden(none, false))).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("keeps the pinned columns when everything is unselected", () => {
+    const l = setPinned(setPinned(base(), "d", true), "b", true);
+    expect(visible(setManyHidden(l, true))).toEqual(["d", "b"]);
+  });
+
+  it("only touches the given columns", () => {
+    const l = setManyHidden(base(), true, ["b", "c", "zz"]);
+    expect(visible(l)).toEqual(["a", "d", "e"]);
+    expect(visible(setManyHidden(l, false, ["c"]))).toEqual(["a", "c", "d", "e"]);
+  });
+
+  it("inverts which columns are shown", () => {
+    const l = setManyHidden(base(), true, ["a", "b"]);
+    expect(visible(invertHidden(l))).toEqual(["a", "b"]);
+    expect(visible(invertHidden(l, ["b", "c"]))).toEqual(["b", "d", "e"]);
+    // Inverting all shown columns would hide everything: the first stays.
+    expect(visible(invertHidden(base()))).toEqual(["a"]);
+  });
+
+  it("shows only some columns", () => {
+    expect(visible(showOnly(base(), ["e", "b"]))).toEqual(["b", "e"]);
+    expect(visible(showOnly(base(), []))).toEqual(["a"]);
+  });
+
+  it("matches columns by name or display name", () => {
+    const l = rename(defaultLayout(["call_id", "duration", "dial_type"]), "duration", "Minutes");
+    expect(matchColumns(l, "")).toEqual(["call_id", "duration", "dial_type"]);
+    expect(matchColumns(l, " DI ")).toEqual(["dial_type"]);
+    expect(matchColumns(l, "min")).toEqual(["duration"]);
+    expect(matchColumns(l, "zzz")).toEqual([]);
   });
 });

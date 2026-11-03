@@ -132,17 +132,17 @@ pub(crate) fn numeric_expr(col: &str, kind: ProfileKind, duckdb_type: &str) -> O
     }
 }
 
-fn f64_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<f64> {
+pub(crate) fn f64_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<f64> {
     let a = batch.column(col).as_primitive::<Float64Type>();
     (!a.is_null(0)).then(|| a.value(0))
 }
 
-fn i64_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<i64> {
+pub(crate) fn i64_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<i64> {
     let a = batch.column(col).as_primitive::<Int64Type>();
     (!a.is_null(0)).then(|| a.value(0))
 }
 
-fn text_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<String> {
+pub(crate) fn text_at(batch: &arrow::record_batch::RecordBatch, col: usize) -> Option<String> {
     let a = batch.column(col).as_string::<i32>();
     (!a.is_null(0)).then(|| a.value(0).to_string())
 }

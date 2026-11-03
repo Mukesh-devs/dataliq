@@ -49,7 +49,17 @@ import { QualityPanel } from "../quality/QualityPanel";
 import { dataQuality, duplicatesSql, type QualityReport } from "../../lib/quality";
 import { CompareDialog, type CompareSide } from "../compare/CompareDialog";
 import type { CellTint } from "../grid/gridTheme";
-import { DataGrid, type DataGridHandle } from "../grid/DataGrid";
+import { DataGrid, type DataGridHandle, type SelectedRanges } from "../grid/DataGrid";
+import { SelectionSummary } from "../grid/SelectionSummary";
+import {
+  LOCAL_MAX_ROWS,
+  computeStats,
+  normalizeRows,
+  rowCount as selectionRowCount,
+  selectionStats,
+  type SelectionStats,
+} from "../../lib/selectionStats";
+import { useSelection } from "../../stores/selection";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { NOT_LOADED, PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
@@ -519,6 +529,91 @@ export function FileView({
     [source, layout, notice, tab.title],
   );
 
+  // Count, sum, average, min and max of the selection, for the status bar.
+  // Small selections are added up here from the loaded rows, big ones by
+  // DuckDB over the view (the same rows the grid shows, in its order).
+  const [gridSelection, setGridSelection] = useState<SelectedRanges | null>(null);
+  const viewRunning = tab.viewState?.status === "running";
+  const addUp = useCallback(
+    /** `group`: a newer request of the same group cancels an older one. */
+    async (sel: SelectedRanges, distinct: boolean, group: string): Promise<SelectionStats> => {
+      if (!source) throw new Error("No rows to add up.");
+      const index = new Map(source.columns.map((c, i) => [c.name, i]));
+      const cols = sel.columns.filter((n) => index.has(n));
+      const rows = normalizeRows(sel.rows, source.rowCount);
+      const n = selectionRowCount(rows, source.rowCount);
+      if (n > LOCAL_MAX_ROWS && baseId) {
+        return selectionStats(
+          baseId,
+          { ...view, columns: undefined },
+          cols,
+          rows,
+          distinct,
+          `${group}:${tab.id}`,
+        );
+      }
+      const list: number[] = [];
+      for (const [a, b] of rows === "all" ? [[0, source.rowCount] as const] : rows) {
+        for (let r = a; r < Math.min(b, source.rowCount); r++) list.push(r);
+      }
+      const values = await readRows(
+        source,
+        list,
+        cols.map((c) => index.get(c)!),
+      );
+      return computeStats(
+        cols.map((c) => source.columns[index.get(c)!]!),
+        values,
+        distinct,
+      );
+    },
+    [source, baseId, view, tab.id],
+  );
+  const wantDistinct = useSelection((s) => s.shown.includes("distinct"));
+  useEffect(() => {
+    const store = useSelection.getState();
+    const sel = gridSelection;
+    const n =
+      sel && source
+        ? selectionRowCount(normalizeRows(sel.rows, source.rowCount), source.rowCount)
+        : 0;
+    // A single cell has nothing to add up; a view being replaced has stale rows.
+    if (!sel || !source || viewRunning || n * sel.columns.length < 2) {
+      store.clear();
+      return;
+    }
+    let alive = true;
+    const big = n > LOCAL_MAX_ROWS;
+    // Big selections wait for the drag to settle.
+    const timer = setTimeout(
+      () => {
+        if (big) store.setPending();
+        addUp(sel, wantDistinct && sel.columns.length === 1, "selection").then(
+          (stats) => alive && useSelection.getState().setResult(stats),
+          (e: unknown) => {
+            if (!alive || (e as { kind?: string }).kind === "cancelled") return;
+            useSelection.getState().setError(e instanceof Error ? e.message : String(e));
+          },
+        );
+      },
+      big ? 150 : 0,
+    );
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [gridSelection, source, viewRunning, addUp, wantDistinct]);
+  // The status bar belongs to the active tab.
+  useEffect(() => () => useSelection.getState().clear(), []);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const loadSummary = useCallback(
+    () =>
+      gridSelection
+        ? addUp(gridSelection, true, "summary")
+        : Promise.reject(new Error("Select some cells first.")),
+    [gridSelection, addUp],
+  );
+
   /** Copies the view (shown columns, names, filters, search, sort) as runnable SQL. */
   const readerSql = base.readerSql;
   const copyViewSql = useCallback(async () => {
@@ -618,6 +713,7 @@ export function FileView({
       filterNotEquals: notEquals ? () => setFilters([...filters, notEquals]) : undefined,
       sort: onViewChange ? (descending) => setSort([{ column, descending }]) : undefined,
       profile: baseId ? () => showProfile(column) : undefined,
+      summarize: () => setSummaryOpen(true),
       reload: onReload,
     };
   };
@@ -1236,6 +1332,7 @@ export function FileView({
               highlight={tab.viewState?.dataset ? view.search : undefined}
               histograms={chartsWanted ? charts : undefined}
               cellTint={cellTint}
+              onSelectionChange={setGridSelection}
               onCellMenu={(column, row, p) =>
                 setCellMenu({
                   column,
@@ -1251,6 +1348,20 @@ export function FileView({
                 valueText={cellText(cellMenu.column, cellMenu.row) ?? "null"}
                 onOpenChange={(o) => !o && setCellMenu(null)}
                 {...cellActions(cellMenu.column, cellMenu.row)}
+              />
+            )}
+            {summaryOpen && (
+              <SelectionSummary
+                load={loadSummary}
+                onClose={() => setSummaryOpen(false)}
+                labelOf={labelOf}
+                onCopy={(text, what) =>
+                  void navigator.clipboard.writeText(text).then(
+                    () => notice(`Copied ${what}`),
+                    (e: unknown) =>
+                      notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`),
+                  )
+                }
               />
             )}
             <GoToRow

@@ -64,6 +64,66 @@ export function showAll(layout: ColumnLayout): ColumnLayout {
   return { ...layout, hidden: [] };
 }
 
+/**
+ * The hidden set, never hiding every column: when nothing would be left,
+ * the pinned columns stay shown, or else the first column in display order.
+ */
+function withHidden(layout: ColumnLayout, hidden: Set<string>): ColumnLayout {
+  if (layout.order.every((c) => hidden.has(c))) {
+    const keep = layout.pinned.length > 0 ? layout.pinned : layout.order.slice(0, 1);
+    for (const c of keep) hidden.delete(c);
+  }
+  // Hidden columns in display order, so the result doesn't depend on clicks.
+  return { ...layout, hidden: layout.order.filter((c) => hidden.has(c)) };
+}
+
+/**
+ * Shows or hides `columns` together (all columns by default), e.g. "select
+ * all" / "unselect all" in the sidebar. At least one column stays shown.
+ */
+export function setManyHidden(
+  layout: ColumnLayout,
+  hidden: boolean,
+  columns: readonly string[] = layout.order,
+): ColumnLayout {
+  const next = new Set(layout.hidden);
+  for (const c of columns) {
+    if (!layout.order.includes(c)) continue;
+    if (hidden) next.add(c);
+    else next.delete(c);
+  }
+  return withHidden(layout, next);
+}
+
+/** Hides the shown columns of `columns` and shows the hidden ones. */
+export function invertHidden(
+  layout: ColumnLayout,
+  columns: readonly string[] = layout.order,
+): ColumnLayout {
+  const next = new Set(layout.hidden);
+  for (const c of columns) {
+    if (!layout.order.includes(c)) continue;
+    if (next.has(c)) next.delete(c);
+    else next.add(c);
+  }
+  return withHidden(layout, next);
+}
+
+/** Shows only `columns` (e.g. the filtered ones); others are hidden. */
+export function showOnly(layout: ColumnLayout, columns: readonly string[]): ColumnLayout {
+  const keep = new Set(columns);
+  return withHidden(layout, new Set(layout.order.filter((c) => !keep.has(c))));
+}
+
+/** Columns whose name or display name contains `query` (case-insensitive). */
+export function matchColumns(layout: ColumnLayout, query: string): string[] {
+  const q = query.trim().toLowerCase();
+  if (q === "") return layout.order;
+  return layout.order.filter(
+    (c) => c.toLowerCase().includes(q) || label(layout, c).toLowerCase().includes(q),
+  );
+}
+
 /** Keeps `order` as pinned columns (in pin order) followed by the rest. */
 function withPinned(layout: ColumnLayout, pinned: string[]): ColumnLayout {
   const rest = layout.order.filter((c) => !pinned.includes(c));

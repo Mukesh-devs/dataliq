@@ -31,6 +31,8 @@ export interface MockOptions {
   profile?: (column: string, spec: unknown) => unknown;
   /** Result of `column_histograms` (none by default); runs in Node. */
   histograms?: (columns: string[], spec: unknown) => unknown[];
+  /** Result of `selection_stats` (big selections); runs in Node. */
+  selectionStats?: (args: Record<string, unknown>) => unknown;
   /**
    * Simulated background imports by path: progress events to emit (one per
    * `stepMs`) and the final row count. Paths not listed never finish.
@@ -105,6 +107,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
     const histograms = options.histograms;
     await page.exposeFunction("__histograms", (columns: string[], spec: unknown) =>
       histograms(columns, spec),
+    );
+  }
+  if (options.selectionStats) {
+    const selectionStats = options.selectionStats;
+    await page.exposeFunction("__selectionStats", (args: Record<string, unknown>) =>
+      selectionStats(args),
     );
   }
   if (options.charts) {
@@ -440,6 +448,12 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
               const histograms = w.__histograms as
                 ((c: string[], s: unknown) => Promise<unknown[]>) | undefined;
               return histograms ? histograms(args.columns as string[], args.spec) : [];
+            }
+            case "selection_stats": {
+              const stats = w.__selectionStats as
+                ((a: Record<string, unknown>) => Promise<unknown>) | undefined;
+              if (!stats) throw { kind: "internal", message: "unmocked command selection_stats" };
+              return stats(args);
             }
             case "preview_file":
               if (!file) throw { kind: "query", message: `File not found: ${String(args.path)}` };

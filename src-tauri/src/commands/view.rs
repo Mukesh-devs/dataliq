@@ -6,7 +6,9 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::engine::{Engine, RequestKey};
 use crate::error::{AppError, Result};
-use crate::view::{ColumnHistogram, ColumnProfile, OpenedView, ValueList, ViewSpec};
+use crate::view::{
+    ColumnHistogram, ColumnProfile, OpenedView, SelectionStats, ValueList, ViewSpec,
+};
 
 /// Sent as `view-ready` when a view has been written out in full (all its
 /// pages are fast; a sorted view's middle rows are available).
@@ -139,6 +141,40 @@ pub async fn column_histograms(
     })
     .await
     .map_err(|e| AppError::Internal(format!("histogram task failed: {e}")))?
+}
+
+/// Count, sum, average, min and max of the grid's selection: `columns` over
+/// the view's positions in `rows` (`[start, end)` ranges), or over every row
+/// of the view when `rows` is absent.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn selection_stats(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    spec: ViewSpec,
+    columns: Vec<String>,
+    rows: Option<Vec<[u64; 2]>>,
+    distinct: Option<bool>,
+    request_id: Option<String>,
+    group: Option<String>,
+) -> Result<SelectionStats> {
+    let engine = Arc::clone(&engine);
+    let key = RequestKey {
+        id: request_id,
+        group,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        engine.selection_stats(
+            &dataset_id,
+            &spec,
+            &columns,
+            rows.as_deref(),
+            distinct.unwrap_or(false),
+            &key,
+        )
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("selection stats task failed: {e}")))?
 }
 
 /// The view as SQL that runs on its own in DuckDB ("Copy as SQL"): over

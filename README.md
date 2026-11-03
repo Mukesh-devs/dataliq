@@ -47,7 +47,8 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 
 - A fast grid that scrolls smoothly through millions of rows.
 - Filter, sort and search any column.
-- Hide, reorder, pin and rename columns.
+- Hide, reorder, pin and rename columns; show or hide them all at once, or find them by name.
+- Select cells to see their count, sum, average, min and max in the status bar.
 - Column profiles: nulls, distinct values, min, max, mean and a histogram.
 
 ###  Analyze
