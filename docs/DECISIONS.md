@@ -834,3 +834,82 @@ unless the selection is one date or text column, when they are its range.
 Distinct is off by default (it is the slow statistic, an estimate over 10M
 rows as in D30) and shown for one column only; the per-column summary in the
 cell menu always counts it.
+
+## D56 — Data tools are SQL over the tabs' tables, opened as result tabs
+
+Group by / pivot, value counts, samples, append, join and the column summary
+build one DuckDB query over the tab's SQL panel table (the view's filters,
+search and sort applied through "view as SQL" when asked) and run it with
+`sql_result`, so the result is a pageable dataset like any SQL result and
+opens as a tab that can itself be filtered, charted, exported or used by
+another tool. The SQL builders are pure functions in `src/lib/tools.ts`,
+unit-tested and run against the bundled DuckDB in `tests/it/sql_results.rs`.
+Tool queries use their own request group ("tools"), so they never cancel
+the SQL panel's query.
+
+## D57 — Split exports write a folder named after the chosen file
+
+Exports split by a column use DuckDB's `PARTITION_BY` and keep the Hive
+layout (`region=EU/data_0.parquet`, NULL as `__HIVE_DEFAULT_PARTITION__`)
+so the folder reads back as one table. Splits by rows partition on
+`row_number() // n` and by size use `FILE_SIZE_BYTES`; both are then renamed
+to `name_0001.ext`, … in row order (DuckDB checks the size once per batch of
+rows, so small exports stay one file). The folder is written as
+`name.partial` and renamed when complete, and an existing folder is never
+replaced. Excel keeps splitting into sheets.
+
+## D58 — Live databases are attached read-only through temporary secrets
+
+MySQL / MariaDB and PostgreSQL use DuckDB's mysql and postgres extensions,
+installed on first use like httpfs. The login goes into a temporary secret
+(values as escaped literals) and `ATTACH '' AS name (TYPE …, SECRET …,
+READ_ONLY)` uses it, so credentials never appear in a connection string.
+Saved connections keep everything but the password in
+`db-connections.json`; the password is in the system keychain. The table
+list leaves out the servers' catalogs (information_schema, mysql, sys,
+pg_catalog). `tests/it/live_db.rs` runs against real servers when
+`DATALIQ_TEST_POSTGRES` / `DATALIQ_TEST_MYSQL` are set (ignored otherwise);
+both passed against PostgreSQL 16 and MariaDB.
+
+## D59 — The SQL panel shows elapsed time, not a percentage
+
+A percentage needs `duckdb_query_progress` on the connection that runs the
+statement, and the SQL panel's session is a `duckdb` crate connection that
+doesn't expose its handle (temp tables and settings live on it, so moving
+it to the raw C API would be a large change). The panel counts the seconds
+and shows an indeterminate bar instead; imports, exports and conversions,
+which run on raw connections, keep their percentages. Explain runs
+`EXPLAIN` / `EXPLAIN ANALYZE` on the session and shows the plan as text.
+
+## D60 — The MCP server is the app's own binary, sandboxed and read-only
+
+`dataliq mcp` serves the Model Context Protocol on stdio from the installed
+program, so there is nothing else to install and clients are configured
+with one path (Settings › AI assistants shows it). It is off by default and
+re-reads the settings on every call. It runs its own DuckDB with
+`allowed_directories` set to the shared folders, `enable_external_access =
+false`, extension autoloading off and `lock_configuration = true`; paths
+are resolved before the folder check, so `..` can't escape. Queries must be
+one SELECT according to DuckDB's own parser (`json_serialize_sql`).
+Exports are a separate tool, shown only when allowed, writing new files
+inside the shared folders. Each call is appended to `mcp-log.jsonl`. The
+protocol is small (initialize, ping, tools/list, tools/call) and handled
+directly with serde_json rather than through an SDK.
+
+## D61 — Conditional formatting is part of the column layout
+
+Rules and colour scales are display choices like widths and names, so they
+live in `ColumnLayout.formats`: saved in workspaces, dropped with their
+column, and drawn by the grid from the raw values. Colours are theme tokens
+(`--rule-*`, as "r g b") at 28% for rules and up to 45% for scales; the
+contrast tests check cell text on every one in both themes, and a filled
+NULL cell draws its marker in the text colour.
+
+## D62 — `dataliq run` reports from the command line
+
+The same binary takes `run [recipe] --in FILE --out FILE`, handled in
+`main` before Tauri starts so no window or display is needed. The file is
+read in place (`import::open_query`), the recipe applied as in the app and
+the result written by the app's export. It never replaces an existing file
+without `--overwrite` and exits 0 / 1 / 2. Release builds on Windows have
+no console, so it attaches to the parent's.
