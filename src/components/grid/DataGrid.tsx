@@ -264,9 +264,12 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
               const f = cellFill(formats?.[column.name], value, column);
               return f && fillColor(rules[f.color], f.strength);
             })();
-      return fill ? { ...cell, themeOverride: { ...cell.themeOverride, bgCell: fill } } : cell;
+      if (!fill) return cell;
+      // On a fill, the faint "null" marker would be hard to read: plain text colour.
+      const textDark = value === null && !tint ? { textDark: theme.textDark } : {};
+      return { ...cell, themeOverride: { ...cell.themeOverride, bgCell: fill, ...textDark } };
     },
-    [source, shown, cellStyle, cellTint, tints, formats, rules],
+    [source, shown, cellStyle, cellTint, tints, formats, rules, theme],
   );
 
   // A new source (e.g. preview -> imported data) must load what is on screen

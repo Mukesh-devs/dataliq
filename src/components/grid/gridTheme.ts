@@ -100,7 +100,7 @@ export function ruleColors(
 
 /** Alpha of a rule's fill, and the range of a colour scale's (light to strong). */
 export const RULE_ALPHA = 0.28;
-export const SCALE_ALPHA: [number, number] = [0.04, 0.5];
+export const SCALE_ALPHA: [number, number] = [0.04, 0.45];
 
 /** A cell fill as CSS: a rule's colour, or a scale's at its strength. */
 export function fillColor(rgb: string, strength?: number): string {
