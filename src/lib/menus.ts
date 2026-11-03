@@ -108,7 +108,7 @@ export const MENUS: MenuSpec[] = [
       sep,
       { command: "group-by", label: "Group by / pivot…" },
       { command: "summarize-columns", label: "Summarize every column" },
-      { command: "open-sample", label: "Open a sample…" },
+      { command: "sample-rows", label: "Open a sample…" },
       { command: "append-tabs", label: "Append tabs…" },
       { command: "join-tabs", label: "Join with another tab…" },
       sep,

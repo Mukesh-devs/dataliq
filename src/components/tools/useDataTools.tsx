@@ -106,7 +106,7 @@ export function useDataTools(tab: Tab, rowCount: number | undefined) {
         run: summarize,
       },
       {
-        id: "open-sample",
+        id: "sample-rows",
         title: "Open a sample…",
         group: "Data",
         keywords: "random subset reservoir percent first rows",
