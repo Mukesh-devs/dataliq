@@ -41,6 +41,7 @@ export const MENUS: MenuSpec[] = [
       { command: "save-workspace-as", label: "Save workspace as…" },
       sep,
       { command: "export", label: "Export view…" },
+      { command: "convert-files", label: "Convert files…" },
       { command: "reload-file", label: "Reload file (keep filters)" },
       sep,
       { command: "settings", label: "Settings…" },

@@ -160,3 +160,69 @@ export function toRanges(indices: Iterable<number>): [number, number][] {
 export function rangeRows(ranges: [number, number][]): number {
   return ranges.reduce((n, [a, b]) => n + (b - a), 0);
 }
+
+/** A data file of a folder that can be converted. */
+export interface DataFile {
+  path: string;
+  sizeBytes: number;
+  format: string;
+}
+
+export interface ConvertRequest {
+  files: string[];
+  /** Not Excel. */
+  format: ExportFormat;
+  outDir: string;
+  overwrite: boolean;
+}
+
+export interface ConvertedFile {
+  source: string;
+  /** Null when it failed or was skipped (see `error`). */
+  output: string | null;
+  rows: number;
+  sourceBytes: number;
+  outputBytes: number;
+  error: string | null;
+}
+
+export interface ConvertOutcome {
+  files: ConvertedFile[];
+  elapsedMs: number;
+}
+
+export interface ConvertProgress {
+  jobId: string;
+  done: number;
+  total: number;
+  file: string;
+  percent: number;
+}
+
+export function listDataFiles(folder: string): Promise<DataFile[]> {
+  return call<DataFile[]>("list_data_files", { folder });
+}
+
+/** Converts files one by one; cancel with `cancelExport(jobId)`. */
+export function convertFiles(request: ConvertRequest, jobId: string): Promise<ConvertOutcome> {
+  return call<ConvertOutcome>("convert_files", { request, jobId });
+}
+
+export async function onConvertProgress(
+  handler: (p: ConvertProgress) => void,
+): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<ConvertProgress>("convert-progress", (e) => handler(e.payload));
+}
+
+/** Formats files can be converted to (Excel is exported from a tab). */
+export const CONVERT_FORMATS = EXPORT_FORMATS.filter((f) => f.format !== "xlsx");
+
+/** The new file's name: `sales.csv.gz` → `sales.parquet` (as the backend names it). */
+export function convertedName(path: string, format: ExportFormat): string {
+  const name = path.split(/[\\/]/).pop() ?? path;
+  const stem = name
+    .replace(/\.(gz|gzip|zst|zstd)$/i, "")
+    .replace(/\.(csv|txt|dat|tsv|tab|json|ndjson|jsonl|parquet|pq)$/i, "");
+  return `${stem || name}.${formatInfo(format).extension}`;
+}

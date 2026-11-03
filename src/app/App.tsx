@@ -44,6 +44,8 @@ import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
 import { useSqlTables } from "./useSqlTables";
+import { ConvertDialog } from "../components/tools/ConvertDialog";
+import { useConvert } from "../stores/convert";
 
 // Loaded on first use, so the start screen doesn't parse the grid, SQL
 // editor and chart libraries (about 1.5 MB of JavaScript).
@@ -521,6 +523,13 @@ export function App() {
         run: () => void clearCache(),
       },
       {
+        id: "convert-files",
+        title: "Convert files…",
+        group: "File",
+        keywords: "batch folder csv parquet gzip json format change transform",
+        run: () => useConvert.getState().show(),
+      },
+      {
         id: "settings",
         title: "Settings…",
         group: "App",
@@ -725,6 +734,7 @@ export function App() {
             />
           )}
           <ExportDialog />
+          <ConvertDialog />
           {sqlOpen && (
             <Suspense fallback={null}>
               <SqlPanel />

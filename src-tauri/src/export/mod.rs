@@ -3,6 +3,7 @@
 //! Files are written next to the target as `.partial` and renamed when
 //! complete, so a cancelled or failed export never leaves half a file.
 
+pub mod convert;
 mod xlsx;
 
 use std::collections::{HashMap, HashSet};

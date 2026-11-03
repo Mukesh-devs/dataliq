@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultExportName, rangeRows, splitOptions, toRanges } from "./exporting";
+import { convertedName, defaultExportName, rangeRows, splitOptions, toRanges } from "./exporting";
 
 describe("exporting helpers", () => {
   it("merges selected rows into ranges", () => {
@@ -34,5 +34,14 @@ describe("split exports", () => {
     expect(splitOptions("rows", "", "1.5", "")).toHaveProperty("problem");
     expect(splitOptions("size", "", "", "2.5")).toEqual({ options: { maxFileBytes: 2_500_000 } });
     expect(splitOptions("size", "", "", "0")).toHaveProperty("problem");
+  });
+});
+
+describe("converting files", () => {
+  it("names the new files as the backend does", () => {
+    expect(convertedName("/d/sales.csv.gz", "parquet")).toBe("sales.parquet");
+    expect(convertedName("C:\\d\\logs.2024.ndjson.zst", "csv")).toBe("logs.2024.csv");
+    expect(convertedName("/d/v1.2.parquet", "csvGz")).toBe("v1.2.csv.gz");
+    expect(convertedName("/d/noext", "json")).toBe("noext.json");
   });
 });

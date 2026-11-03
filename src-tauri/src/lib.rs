@@ -160,6 +160,8 @@ pub fn run() {
             commands::sql::delete_saved_query,
             commands::export::export_view,
             commands::export::cancel_export,
+            commands::export::list_data_files,
+            commands::export::convert_files,
             commands::chart::chart_data,
             commands::chart::chart_sql,
             commands::chart::save_chart_image,
