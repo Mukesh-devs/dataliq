@@ -132,6 +132,8 @@ interface DataGridProps {
   histograms?: ReadonlyMap<string, Bin[]>;
   /** A fill for some cells (a comparison's changed cells, added and removed rows). */
   cellTint?: (row: number, column: string) => CellTint | undefined;
+  /** The selection (as in `selection()`) each time it changes; null when empty. */
+  onSelectionChange?: (selection: SelectedRanges | null) => void;
 }
 
 /** Width of Glide's header menu button (`menuButtonSize` in its source). */
@@ -164,6 +166,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     histograms,
     onCellMenu,
     cellTint,
+    onSelectionChange,
   },
   ref,
 ) {
@@ -378,6 +381,25 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     [source, getCellContent],
   );
 
+  /** A selection as column names and row ranges (selected rows take every shown column). */
+  const rangesOf = useCallback(
+    (sel: GridSelection): SelectedRanges | null => {
+      const names = (cols: number[]) =>
+        cols.map((c) => nameAt(c)).filter((n): n is string => n !== undefined);
+      if (sel.rows.length > 0) {
+        return { columns: names(shown.map((_, c) => c)), rows: toRanges(sel.rows) };
+      }
+      if (sel.columns.length > 0) {
+        return { columns: names(sel.columns.toArray()), rows: [[0, source.rowCount]] };
+      }
+      const range = sel.current?.range;
+      if (!range) return null;
+      const cols = Array.from({ length: range.width }, (_, i) => range.x + i);
+      return { columns: names(cols), rows: [[range.y, range.y + range.height]] };
+    },
+    [shown, nameAt, source],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -422,19 +444,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         return { columns: names(cols), rows };
       },
       selection(): SelectedRanges | null {
-        const names = (cols: number[]) =>
-          cols.map((c) => nameAt(c)).filter((n): n is string => n !== undefined);
-        const all = shown.map((_, c) => c);
-        if (selection.rows.length > 0) {
-          return { columns: names(all), rows: toRanges(selection.rows) };
-        }
-        if (selection.columns.length > 0) {
-          return { columns: names(selection.columns.toArray()), rows: [[0, source.rowCount]] };
-        }
-        const range = selection.current?.range;
-        if (!range) return null;
-        const cols = Array.from({ length: range.width }, (_, i) => range.x + i);
-        return { columns: names(cols), rows: [[range.y, range.y + range.height]] };
+        return rangesOf(selection);
       },
       autoFit(column: string) {
         const src = source.columns.findIndex((c) => c.name === column);
@@ -481,8 +491,13 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
       selection,
       shown,
       nameAt,
+      rangesOf,
     ],
   );
+
+  useEffect(() => {
+    onSelectionChange?.(rangesOf(selection));
+  }, [selection, rangesOf, onSelectionChange]);
 
   const digits = String(source.rowCount).length;
 

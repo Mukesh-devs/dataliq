@@ -22,19 +22,24 @@ const invokes = (page: Page, cmd: string) =>
     cmd,
   );
 
-async function open(page: Page, views: (spec: unknown) => number | Promise<number> = () => 500) {
+async function open(
+  page: Page,
+  views: (spec: unknown) => number | Promise<number> = () => 500,
+  extra: Partial<Parameters<typeof mockTauri>[1]> = {},
+) {
   await mockTauri(page, {
     dialogPaths: ["/data/comma.csv"],
     datasets: { "/data/comma.csv": 1000 },
     fetchRows: buildPage,
     views,
+    ...extra,
   });
   await page.goto("/");
   await page
     .getByRole("main")
     .getByRole("button", { name: /Open file/ })
     .click();
-  await expect(page.getByRole("status")).toContainText("1,000 rows");
+  await expect(page.getByRole("status")).toContainText(" rows ·");
   return (await page.getByTestId("data-grid").boundingBox())!;
 }
 
@@ -144,4 +149,64 @@ test("cancel a running query from the status bar", async ({ page }) => {
   expect(await invokes(page, "cancel_query")).toEqual([{ requestId: view!.requestId }]);
   // The sort is dropped: no sort chip left.
   await expect(page.getByRole("toolbar", { name: "Filters" })).not.toContainText("name");
+});
+
+test("the status bar adds up the selected cells", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const box = await open(page);
+  // amount (0, 0.5, 1, 1.5) of the first four rows: x 302–412.
+  const rowY = (r: number) => 46 + 28 * r + 14;
+  await page.mouse.click(box.x + 350, box.y + rowY(0));
+  await page.keyboard.down("Shift");
+  await page.mouse.click(box.x + 350, box.y + rowY(3));
+  await page.keyboard.up("Shift");
+  const stats = page.getByRole("group", { name: "Selection statistics" });
+  await expect(stats).toHaveText(/Count:4\s*Sum:3\s*Average:0\.75\s*Min:0\s*Max:1\.5/);
+  // Added up from the loaded rows: no backend call.
+  expect(await invokes(page, "selection_stats")).toHaveLength(0);
+  await stats.getByRole("button", { name: /Sum/ }).click();
+  await expect.poll(() => clipboard(page)).toBe("3");
+
+  // Summarize by column from the cell menu.
+  await page.mouse.click(box.x + 350, box.y + rowY(2), { button: "right" });
+  await page.getByRole("menuitem", { name: "Summarize selection by column…" }).click();
+  const summary = page.getByRole("dialog", { name: "Selection summary" });
+  await expect(summary.getByRole("row", { name: /amount/ })).toContainText("4");
+  await expect(summary.getByRole("row", { name: /amount/ })).toContainText("0.75");
+  await page.keyboard.press("Escape");
+
+  // One cell: nothing to add up.
+  await page.mouse.click(box.x + 350, box.y + rowY(5));
+  await expect(stats).toBeHidden();
+});
+
+test("a big selection is added up by the engine", async ({ page }) => {
+  const box = await open(page, () => 500, {
+    datasets: { "/data/comma.csv": 50_000 },
+    selectionStats: (args) => ({
+      rows: 50_000,
+      distinctApprox: false,
+      columns: (args.columns as string[]).map((column) => ({
+        column,
+        kind: column === "amount" ? "number" : column === "joined" ? "temporal" : "text",
+        values: 50_000,
+        empty: 0,
+        sum: column === "amount" ? 624987500 : null,
+        avg: column === "amount" ? 12499.75 : null,
+        min: column === "amount" ? 0 : null,
+        max: column === "amount" ? 24999.5 : null,
+        minText: null,
+        maxText: null,
+        distinct: null,
+      })),
+    }),
+  });
+  await page.mouse.click(box.x + 350, box.y + 60);
+  await page.keyboard.press("Control+a");
+  const stats = page.getByRole("group", { name: "Selection statistics" });
+  await expect(stats).toContainText("Sum:624,987,500");
+  await expect(stats).toContainText("Count:200,000");
+  const [call] = await invokes(page, "selection_stats");
+  // Every row of the view: no ranges sent.
+  expect(call).toMatchObject({ rows: null, distinct: false });
 });

@@ -8,6 +8,7 @@ import {
   Equal,
   EqualNot,
   RefreshCw,
+  Sigma,
   Table2,
   TextCursorInput,
 } from "lucide-react";
@@ -32,6 +33,8 @@ export interface CellMenuActions {
   filterNotEquals?: () => void;
   sort?: (descending: boolean) => void;
   profile?: () => void;
+  /** Count, sum, average, min and max of each selected column. */
+  summarize?: () => void;
   reload?: () => void;
 }
 
@@ -63,6 +66,7 @@ export function CellMenu({
   filterNotEquals,
   sort,
   profile,
+  summarize,
   reload,
 }: CellMenuProps) {
   const anchorRef = useMemo(() => ({ current: anchor }), [anchor]);
@@ -108,6 +112,14 @@ export function CellMenu({
               {f.label}
             </MenuItem>
           ))}
+          {summarize && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon={<Sigma />} onSelect={choose(summarize)}>
+                Summarize selection by column…
+              </MenuItem>
+            </>
+          )}
           {(filterEquals || sort || profile) && <MenuSeparator />}
           {filterEquals && (
             <MenuItem icon={<Equal />} onSelect={choose(filterEquals)}>
