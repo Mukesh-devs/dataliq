@@ -61,6 +61,7 @@ import {
 } from "../../lib/selectionStats";
 import { useSelection } from "../../stores/selection";
 import { useDataTools } from "../tools/useDataTools";
+import { FilterPresets } from "../filters/FilterPresets";
 import { GoToRow } from "../grid/GoToRow";
 import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { NOT_LOADED, PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
@@ -1223,6 +1224,15 @@ export function FileView({
           onClear={() => setFilters([])}
           sort={sort}
           onSortChange={setSort}
+          start={
+            onViewChange && (
+              <FilterPresets
+                view={view}
+                columns={columns.map((c) => c.name)}
+                onApply={onViewChange}
+              />
+            )
+          }
           end={
             <SearchBox
               ref={searchInput}
