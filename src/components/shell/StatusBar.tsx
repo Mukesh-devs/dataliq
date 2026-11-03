@@ -2,6 +2,7 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   Check,
   ChartColumn,
+  ClipboardList,
   LoaderCircle,
   MemoryStick,
   Monitor,
@@ -83,7 +84,7 @@ function SelectionStatsStrip() {
   if (!summary && !pending && !error) return null;
   const copy = (label: string, text: string, value: string) =>
     void navigator.clipboard.writeText(value).then(
-      () => notice(`Copied ${label} ${text}`),
+      () => notice(`Copied ${label}${text ? ` ${text}` : ""}`),
       (e: unknown) => notice(`Couldn't copy: ${e instanceof Error ? e.message : String(e)}`),
     );
   return (
@@ -118,6 +119,17 @@ function SelectionStatsStrip() {
           <span className="tabular truncate text-fg">{it.text}</span>
         </button>
       ))}
+      {items.length > 0 && (
+        <IconButton
+          label="Copy the statistics"
+          className="size-5 shrink-0"
+          onClick={() =>
+            copy("the statistics", "", items.map((it) => `${it.label}\t${it.copy}`).join("\n"))
+          }
+        >
+          <ClipboardList className="size-3.5" aria-hidden />
+        </IconButton>
+      )}
       <IconButton
         label="Choose selection statistics"
         className="size-5 shrink-0"

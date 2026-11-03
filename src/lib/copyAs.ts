@@ -1,11 +1,12 @@
 import type { ValueFormat } from "./arrow";
 import { formatValue, toJsonText } from "./format";
 
-export type CopyFormat = "csv" | "tsv" | "json" | "markdown" | "sql";
+export type CopyFormat = "csv" | "tsv" | "excel" | "json" | "markdown" | "sql";
 
 export const COPY_FORMATS: { format: CopyFormat; label: string }[] = [
   { format: "csv", label: "CSV" },
   { format: "tsv", label: "TSV" },
+  { format: "excel", label: "Excel (keeps leading zeros)" },
   { format: "json", label: "JSON" },
   { format: "markdown", label: "Markdown table" },
   { format: "sql", label: "SQL INSERT" },
@@ -38,6 +39,42 @@ function delimited(
     lines.push(columns.map((c, i) => field(text(row[i], c) ?? "", delimiter)).join(delimiter));
   }
   return lines.join("\n");
+}
+
+/** Excel shows 15 significant digits; longer numbers lose their end. */
+const EXCEL_DIGITS = 15;
+
+/**
+ * A cell Excel takes as typed when pasted. Text that Excel would turn into
+ * a number or a date ("00123", "1-2", a 16-digit phone or card number) and
+ * whole numbers too long for Excel are pasted as `="…"`, which Excel keeps
+ * as that exact text.
+ */
+export function excelCell(value: unknown, c: CopyColumn): string {
+  const s = text(value, c);
+  if (s === null) return "";
+  const digits = s.replace(/^-/, "").replace(/\./, "");
+  if (isNumeric(c)) {
+    // Long integers (ids, phone numbers stored as numbers) stay exact.
+    return /^\d+$/.test(digits) && digits.length > EXCEL_DIGITS ? asExcelText(s) : s;
+  }
+  if (c.format.kind === "boolean") return s.toUpperCase();
+  if (c.format.kind !== "text") return field(s, "\t");
+  const numberLike = /^[+-]?\d[\d\s.,/:-]*$/.test(s.trim());
+  const leadingZero = /^0\d/.test(s.trim());
+  if (numberLike && (leadingZero || /^\d{16,}$/.test(s) || /[/:-]/.test(s) || s.startsWith("+")))
+    return asExcelText(s);
+  // A leading = + - @ would start a formula: an apostrophe keeps it text.
+  if (!numberLike && /^[=@+-]/.test(s)) return field(`'${s}`, "\t");
+  return field(s, "\t");
+}
+
+const asExcelText = (s: string) => `="${s.replace(/"/g, '""')}"`;
+
+function excel(columns: CopyColumn[], rows: unknown[][], headers: boolean): string {
+  const lines = headers ? [columns.map((c) => field(c.label, "\t")).join("\t")] : [];
+  for (const row of rows) lines.push(columns.map((c, i) => excelCell(row[i], c)).join("\t"));
+  return lines.join("\r\n");
 }
 
 function markdownCell(s: string): string {
@@ -154,6 +191,8 @@ export function formatRows(
       return delimited(columns, rows, ",", headers);
     case "tsv":
       return delimited(columns, rows, "\t", headers);
+    case "excel":
+      return excel(columns, rows, headers);
     case "markdown":
       return markdown(columns, rows);
     case "json":

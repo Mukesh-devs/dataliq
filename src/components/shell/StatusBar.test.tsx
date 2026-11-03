@@ -61,6 +61,10 @@ describe("StatusBar", () => {
     expect(group).toHaveTextContent("Count:3Sum:1,234.5Average:411.5Min:4.5Max:1,000");
     await userEvent.click(screen.getByRole("button", { name: /Sum:/ }));
     expect(writeText).toHaveBeenCalledWith("1234.5");
+    await userEvent.click(screen.getByRole("button", { name: "Copy the statistics" }));
+    expect(writeText).toHaveBeenLastCalledWith(
+      "Count\t3\nSum\t1234.5\nAverage\t411.5\nMin\t4.5\nMax\t1000",
+    );
   });
 
   it("picks which statistics show", async () => {
