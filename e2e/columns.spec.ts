@@ -52,12 +52,17 @@ test("hide a column from its menu, show it again from the sidebar", async ({ pag
   await expect(sidebar.getByLabel("Show name")).not.toBeChecked();
   await sidebar.getByLabel("Show name").check();
   await expect.poll(() => headers(page)).toEqual(["id", "name", "amount", "joined"]);
-  // Hide two from the sidebar, then Show all.
+  // Hide two from the sidebar, then show all of them again.
   await sidebar.getByLabel("Show id").uncheck();
   await sidebar.getByLabel("Show joined").uncheck();
   await expect.poll(() => headers(page)).toEqual(["name", "amount"]);
-  await sidebar.getByRole("button", { name: "Show all" }).click();
+  await sidebar.getByLabel("Show all columns").click();
   await expect.poll(() => headers(page)).toEqual(["id", "name", "amount", "joined"]);
+  // Unselect all keeps the first column; Invert flips the rest back.
+  await sidebar.getByLabel("Show all columns").click();
+  await expect.poll(() => headers(page)).toEqual(["id"]);
+  await sidebar.getByRole("button", { name: "Invert" }).click();
+  await expect.poll(() => headers(page)).toEqual(["name", "amount", "joined"]);
 });
 
 test("pin, rename and drag columns", async ({ page }) => {
