@@ -131,6 +131,12 @@ export interface AppSettings {
   cacheMaxGb: number;
   cacheDir: string | null;
   smallFileMb: number;
+  /** AI assistants may read data through `dataliq mcp`. */
+  mcpEnabled?: boolean;
+  /** The folders they may read. */
+  mcpFolders?: string[];
+  /** They may write query results into those folders. */
+  mcpAllowExport?: boolean;
 }
 
 /** Defaults and limits shown next to the settings. */
@@ -141,6 +147,10 @@ export interface SettingsInfo {
   defaultCacheDir: string;
   defaultTempDir: string;
   settingsFile: string;
+  /** The program an MCP client starts, with the argument `mcp`. */
+  mcpCommand?: string;
+  /** Where `dataliq mcp` logs its calls. */
+  mcpLog?: string;
 }
 
 export interface SourceInfo {
