@@ -5,6 +5,7 @@ import {
   GitCompareArrows,
   ListChecks,
   LoaderCircle,
+  Network,
   SquareTerminal,
   Table,
   WandSparkles,
@@ -110,6 +111,12 @@ import { ImportBar } from "../import/ImportBar";
 import { ImportSettings } from "../import/ImportSettings";
 
 // ECharts is loaded the first time a chart is shown.
+const JsonGraphPanel = lazy(() =>
+  import("../graph/JsonGraphPanel").then((m) => ({ default: m.JsonGraphPanel })),
+);
+/** JSON-like files get a graph view of their records. */
+const isJsonTab = (tab: Tab) => tab.info?.format === "json" || tab.info?.format === "ndjson";
+
 const ChartPanel = lazy(() =>
   import("../chart/ChartPanel").then((m) => ({ default: m.ChartPanel })),
 );
@@ -659,7 +666,10 @@ export function FileView({
   const setMode = useTabs((s) => s.setMode);
   const setChart = useTabs((s) => s.setChart);
   const canChart = tab.status === "ready" && !!baseId;
-  const mode = canChart ? (tab.mode ?? "grid") : "grid";
+  const canGraph = isJsonTab(tab) && tab.status !== "error";
+  const wanted = tab.mode ?? "grid";
+  const mode =
+    (wanted === "chart" && canChart) || (wanted === "graph" && canGraph) ? wanted : "grid";
   const chart = useMemo(
     () => (tab.chart ? fitChart(tab.chart, columns) : defaultChart(columns)),
     [tab.chart, columns],
@@ -872,6 +882,14 @@ export function FileView({
         run: () => void copySelection(f.format),
       });
     }
+    if (canGraph && mode !== "graph")
+      add({
+        id: "show-graph",
+        title: "Show the records as a graph",
+        group: "View",
+        keywords: "json tree nested structure graph nodes",
+        run: () => setMode(tab.id, "graph"),
+      });
     if (canChart && chart)
       add(
         mode === "chart"
@@ -1076,7 +1094,7 @@ export function FileView({
           </span>
         )}
         <div className="flex-1" />
-        {canChart && chart && (
+        {((canChart && chart) || canGraph) && (
           <div
             role="radiogroup"
             aria-label="Show"
@@ -1085,7 +1103,8 @@ export function FileView({
             {(
               [
                 ["grid", "Grid", Table],
-                ["chart", "Chart", ChartColumn],
+                ...(canChart && chart ? ([["chart", "Chart", ChartColumn]] as const) : []),
+                ...(canGraph ? ([["graph", "Graph", Network]] as const) : []),
               ] as const
             ).map(([m, name, Icon]) => (
               <button
@@ -1349,6 +1368,17 @@ export function FileView({
               <p className="text-fg-muted">{tab.error}</p>
             </div>
           </div>
+        ) : mode === "graph" && source ? (
+          <Suspense fallback={null}>
+            <JsonGraphPanel
+              tabId={tab.id}
+              title={tab.title}
+              source={source}
+              datasetId={baseId}
+              view={view}
+              record={gridSelection?.rows[0]?.[0] ?? 0}
+            />
+          </Suspense>
         ) : mode === "chart" && chart && baseId ? (
           <Suspense fallback={null}>
             <ChartPanel

@@ -21,7 +21,7 @@ export interface SavedTab {
   layout?: ColumnLayout;
   recipe?: RecipeStep[];
   chart?: ChartSpec;
-  mode?: "grid" | "chart";
+  mode?: "grid" | "chart" | "graph";
   sqlName?: string;
   recipeOpen?: boolean;
   qualityOpen?: boolean;

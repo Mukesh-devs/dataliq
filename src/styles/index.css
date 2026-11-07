@@ -23,6 +23,10 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-name: var(--syntax-name);
   --font-sans: var(--font-ui);
   --font-mono: var(--font-data);
 }
