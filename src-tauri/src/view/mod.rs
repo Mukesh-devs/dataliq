@@ -7,6 +7,7 @@
 mod open;
 mod profile;
 mod selection;
+mod shape;
 mod sql;
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,7 @@ pub use profile::{
     ProfileKind, TOP_VALUES,
 };
 pub use selection::{MAX_SELECTION_RANGES, SelectionColumnStats, SelectionStats};
+pub use shape::{JsonShape, MAX_SHAPE_STATS, ShapeKind, ShapeNode};
 pub use sql::{BuiltView, ORDER_TABLE, Relation, RowOrder, build, build_at, standalone_sql};
 
 pub(crate) use profile::numeric_expr;

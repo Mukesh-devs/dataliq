@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::engine::{Engine, RequestKey};
 use crate::error::{AppError, Result};
 use crate::view::{
-    ColumnHistogram, ColumnProfile, OpenedView, SelectionStats, ValueList, ViewSpec,
+    ColumnHistogram, ColumnProfile, JsonShape, OpenedView, SelectionStats, ValueList, ViewSpec,
 };
 
 /// Sent as `view-ready` when a view has been written out in full (all its
@@ -189,4 +189,24 @@ pub fn view_sql(
     labels: HashMap<String, String>,
 ) -> Result<String> {
     engine.view_sql(&dataset_id, &spec, &reader, &labels)
+}
+
+/// The structure of a JSON-like dataset under the view's filters: each key
+/// with its type, how often it is present and how long arrays are.
+#[tauri::command]
+pub async fn json_shape(
+    engine: State<'_, Arc<Engine>>,
+    dataset_id: String,
+    spec: ViewSpec,
+    request_id: Option<String>,
+    group: Option<String>,
+) -> Result<JsonShape> {
+    let engine = Arc::clone(&engine);
+    let key = RequestKey {
+        id: request_id,
+        group,
+    };
+    tauri::async_runtime::spawn_blocking(move || engine.json_shape(&dataset_id, &spec, &key))
+        .await
+        .map_err(|e| AppError::Internal(format!("structure task failed: {e}")))?
 }

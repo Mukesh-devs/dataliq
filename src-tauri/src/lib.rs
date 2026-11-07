@@ -151,6 +151,7 @@ pub fn run() {
             commands::view::column_profile,
             commands::view::column_histograms,
             commands::view::selection_stats,
+            commands::view::json_shape,
             commands::view::view_sql,
             commands::sql::register_table,
             commands::sql::unregister_table,

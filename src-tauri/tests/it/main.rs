@@ -21,6 +21,7 @@ mod filters;
 mod folders;
 mod import_cache;
 mod json_parquet_sources;
+mod json_shape;
 mod live_db;
 mod mcp;
 mod paging;
