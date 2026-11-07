@@ -52,6 +52,8 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 - Select cells to see their count, sum, average, min and max in the status bar.
 - Column profiles: nulls, distinct values, min, max, mean and a histogram.
 - **Format cells** with highlight rules and colour scales; save filters as presets.
+- **Graph view** for JSON and NDJSON: a record as connected cards, or the structure of every
+  record with how often each key appears.
 
 ###  Analyze
 

@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-07
+
+A graph view for JSON and NDJSON files.
+
+### Added
+
+- Graph (next to Grid and Chart, for JSON-like files): the selected record as connected
+  cards — an object's plain values on its card, nested objects and arrays branching off — or
+  the structure of every record, with each key's type, how often it is present and how long
+  arrays are. Move between records, collapse and expand branches, search keys and values,
+  pan and zoom, lay out left to right or top to bottom, see and copy any value's JSON path
+  (and, in the structure, the SQL that reads it), copy the record as JSON, and save the
+  graph as PNG or SVG. Big arrays are shown 50 items at a time; the structure is computed by
+  DuckDB, so file size doesn't matter.
+
 ## [1.2.0] - 2026-11-03
 
 Big-data tools without SQL, live MySQL and PostgreSQL databases, an MCP server for AI
@@ -283,7 +298,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mukesh-dsnl/dataliq/compare/v0.6.0...v1.0.0
