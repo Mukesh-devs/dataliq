@@ -115,7 +115,7 @@ export interface Tab {
   /** Table name chosen for the SQL panel (else one made from the file name). */
   sqlName?: string;
   /** The grid, or a chart of the view. */
-  mode?: "grid" | "chart";
+  mode?: "grid" | "chart" | "graph";
   /** The tab's chart (kept while the grid is shown). */
   chart?: ChartSpec;
   /**
@@ -234,7 +234,7 @@ interface TabsState {
   openCompare: (c: { compare: CompareInfo; preview: Table; sql?: string }) => string;
   /** Renames the tab's SQL table; undefined goes back to the file's name. */
   setSqlName: (id: string, name: string | undefined) => void;
-  setMode: (id: string, mode: "grid" | "chart") => void;
+  setMode: (id: string, mode: "grid" | "chart" | "graph") => void;
   setChart: (id: string, chart: ChartSpec) => void;
   /** Replaces the tab's recipe (undoable) and applies it. */
   setRecipe: (id: string, recipe: RecipeStep[]) => Promise<void>;

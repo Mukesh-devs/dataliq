@@ -449,6 +449,54 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 ((c: string[], s: unknown) => Promise<unknown[]>) | undefined;
               return histograms ? histograms(args.columns as string[], args.spec) : [];
             }
+            case "json_shape":
+              return {
+                rows: 3,
+                elapsedMs: 2,
+                fields: [
+                  {
+                    name: "id",
+                    kind: "value",
+                    type: "integer",
+                    present: 3,
+                    avgLen: null,
+                    maxLen: null,
+                    sql: '"id"',
+                    children: [],
+                  },
+                  {
+                    name: "user",
+                    kind: "object",
+                    type: "object",
+                    present: 2,
+                    avgLen: null,
+                    maxLen: null,
+                    sql: '"user"',
+                    children: [
+                      {
+                        name: "name",
+                        kind: "value",
+                        type: "text",
+                        present: 2,
+                        avgLen: null,
+                        maxLen: null,
+                        sql: null,
+                        children: [],
+                      },
+                    ],
+                  },
+                  {
+                    name: "scores",
+                    kind: "array",
+                    type: "integer[]",
+                    present: 3,
+                    avgLen: 1.33,
+                    maxLen: 3,
+                    sql: '"scores"',
+                    children: [],
+                  },
+                ],
+              };
             case "engine_memory":
               return { usedBytes: 180 * 2 ** 20, limitBytes: 8 * 2 ** 30, spilledBytes: 0 };
             case "selection_stats": {

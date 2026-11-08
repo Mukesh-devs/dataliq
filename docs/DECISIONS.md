@@ -913,3 +913,26 @@ read in place (`import::open_query`), the recipe applied as in the app and
 the result written by the app's export. It never replaces an existing file
 without `--overwrite` and exits 0 / 1 / 2. Release builds on Windows have
 no console, so it attaches to the parent's.
+
+## D63 — The JSON graph view: one record or the structure, laid out by DataLiq
+
+JSON-like files (JSON, NDJSON) get a Graph view next to Grid and Chart.
+It never loads the whole file into the UI: the record graph reads one row
+of the view from the grid's pages, and the structure graph comes from
+`json_shape`, the view's Arrow schema plus one aggregate query (presence
+counts and array lengths for keys outside arrays, capped at 600
+statistics).
+
+Cards are HTML elements (titles, values and toggles are buttons, so the
+keyboard reaches them and text can be selected) on a canvas moved with a
+CSS transform; edges are SVG. The layout is computed in
+`src/lib/jsonGraph.ts` rather than by a chart library: ECharts' tree gives
+every node the same space, and multi-line cards overlapped. Cards are
+sized from their text in the monospace data font (character width
+measured once), subtrees get bands as wide as their cards, and parents
+are centred on their children; a test checks that no two cards overlap.
+The same layout writes the SVG and PNG exports.
+
+Big records stay quick: arrays show 50 items at a time with a "more"
+card, a record shows at most 1,500 cards (laid out in about 20 ms), and
+branches deeper than two levels start collapsed.
