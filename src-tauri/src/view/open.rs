@@ -328,6 +328,7 @@ impl Engine {
         if let Some(s) = search.filter(|s| !s.is_empty()) {
             filters.push(Filter {
                 column: column.to_string(),
+                path: None,
                 op: FilterOp::Contains {
                     value: s.to_string(),
                     case_sensitive: false,

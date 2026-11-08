@@ -115,6 +115,7 @@ fn multi_column_sort_with_filters() {
     let spec = ViewSpec {
         filters: vec![Filter {
             column: "active".into(),
+            path: None,
             op: FilterOp::Equals {
                 value: Param::Bool(true),
             },
@@ -153,6 +154,7 @@ fn filter_only_views_are_materialized_without_changing_their_rows() {
     let spec = ViewSpec {
         filters: vec![Filter {
             column: "amount".into(),
+            path: None,
             op: FilterOp::Gt {
                 value: Param::Int(500),
             },
@@ -255,6 +257,7 @@ fn a_newer_sort_cancels_an_older_one_in_the_same_group() {
             let spec = ViewSpec {
                 filters: vec![Filter {
                     column: "t".into(),
+                    path: None,
                     op: FilterOp::Regex {
                         pattern: "7.*3.*1".into(),
                     },
@@ -468,6 +471,7 @@ fn pages_in_between_read_through_the_row_order_before_the_full_sort() {
                 sort: vec![key("name", true), key("k", false)],
                 filters: vec![Filter {
                     column: "k".into(),
+                    path: None,
                     op: FilterOp::Gt {
                         value: Param::Int(100),
                     },

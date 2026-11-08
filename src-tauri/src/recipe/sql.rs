@@ -399,6 +399,40 @@ pub fn step_sql(step: &Step, prev: &str, schema: &[ColumnMeta]) -> Result<String
                 project(schema, |c| (&c.name == name).then(|| expr.clone()))
             )
         }
+        Step::Unnest {
+            column: name,
+            path,
+            into,
+        } => {
+            let meta = column(schema, name)?;
+            let list = crate::view::struct_path(name, path);
+            if path.is_empty() && !meta.r#type.trim_end().ends_with("[]") {
+                return Err(AppError::Query(format!(
+                    "\"{name}\" isn't an array (it is {}).",
+                    meta.r#type
+                )));
+            }
+            // Empty and missing arrays keep their record (as NULL), like a left join.
+            let items = format!("unnest(CASE WHEN len({list}) > 0 THEN {list} ELSE [NULL] END)");
+            match (
+                path.is_empty(),
+                into.as_deref().map(str::trim).filter(|n| !n.is_empty()),
+            ) {
+                (true, None) => format!(
+                    "SELECT {} {from}",
+                    project(schema, |c| (&c.name == name).then(|| items.clone()))
+                ),
+                (_, Some(new)) => {
+                    check_new_name(schema, new, None)?;
+                    format!("SELECT *, {items} AS {} {from}", quote_ident(new))
+                }
+                (false, None) => {
+                    return Err(AppError::Query(
+                        "Give the unnested items a column name.".into(),
+                    ));
+                }
+            }
+        }
         Step::Calculate { name, expression } => {
             check_new_name(schema, name, None)?;
             if expression.trim().is_empty() {
@@ -580,6 +614,7 @@ mod tests {
             sql(Step::RemoveRows {
                 filter: Filter {
                     column: "amount".into(),
+                    path: None,
                     op: FilterOp::Lt {
                         value: Param::Float(0.0),
                     },

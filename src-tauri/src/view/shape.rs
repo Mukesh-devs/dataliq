@@ -15,6 +15,8 @@ use crate::error::{AppError, Result};
 /// Most statistics computed in one query (wide files keep their structure,
 /// the rest go without counts).
 pub const MAX_SHAPE_STATS: usize = 600;
+/// Most arrays counted inside by the deep count (one query each).
+pub const MAX_DEEP_ARRAYS: usize = 50;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +41,9 @@ pub struct ShapeNode {
     pub max_len: Option<u64>,
     /// SQL that reads it (keys outside arrays), e.g. `"user"."address"."city"`.
     pub sql: Option<String>,
+    /// Arrays, with the deep count: items in every record together (the
+    /// keys inside count against this).
+    pub items: Option<u64>,
     pub children: Vec<ShapeNode>,
 }
 
@@ -121,6 +126,7 @@ fn node(
             present: None,
             avg_len: None,
             max_len: None,
+            items: None,
             children: fields
                 .iter()
                 .enumerate()
@@ -168,6 +174,7 @@ fn node(
                 present: None,
                 avg_len: None,
                 max_len: None,
+                items: None,
                 sql,
                 children,
             }
@@ -179,6 +186,7 @@ fn node(
             present: None,
             avg_len: None,
             max_len: None,
+            items: None,
             sql,
             children: Vec::new(),
         },
@@ -189,6 +197,7 @@ fn node(
             present: None,
             avg_len: None,
             max_len: None,
+            items: None,
             sql,
             children: Vec::new(),
         },
@@ -207,7 +216,13 @@ fn at_path<'a>(nodes: &'a mut [ShapeNode], path: &[usize]) -> Option<&'a mut Sha
 
 impl Engine {
     /// The structure of dataset `id` under the view's filters and search.
-    pub fn json_shape(&self, id: &str, spec: &ViewSpec, key: &RequestKey) -> Result<JsonShape> {
+    pub fn json_shape(
+        &self,
+        id: &str,
+        spec: &ViewSpec,
+        deep: bool,
+        key: &RequestKey,
+    ) -> Result<JsonShape> {
         let started = std::time::Instant::now();
         let base = self.datasets.get(id)?;
         let schema = self.dataset_columns(id)?;
@@ -270,11 +285,148 @@ impl Engine {
                 }
             }
         }
+        if deep {
+            let mut budget = MAX_DEEP_ARRAYS;
+            for f in fields.iter_mut() {
+                self.deep_count(f, &view.select, &view.params, &mut budget, key)?;
+            }
+        }
         Ok(JsonShape {
             rows,
             fields,
             elapsed_ms: started.elapsed().as_millis() as u64,
         })
+    }
+
+    /// The deep count under `node` (outside arrays): every array of objects
+    /// is unnested once, and its keys (and arrays inside them) counted.
+    fn deep_count(
+        &self,
+        node: &mut ShapeNode,
+        view: &str,
+        params: &[Param],
+        budget: &mut usize,
+        key: &RequestKey,
+    ) -> Result<()> {
+        match node.kind {
+            ShapeKind::Object => {
+                for c in node.children.iter_mut() {
+                    self.deep_count(c, view, params, budget, key)?;
+                }
+                Ok(())
+            }
+            ShapeKind::Array => match node.sql.clone() {
+                Some(sql) if !node.children.is_empty() => {
+                    let items = format!("(SELECT unnest({sql}) AS item FROM ({view}))");
+                    self.count_items(node, &items, params, budget, key)
+                }
+                _ => Ok(()),
+            },
+            ShapeKind::Value => Ok(()),
+        }
+    }
+
+    /// Counts the items of array `node` (rows of `items`, a relation with
+    /// one column `item`): how many, and how often each key inside appears.
+    fn count_items(
+        &self,
+        node: &mut ShapeNode,
+        items: &str,
+        params: &[Param],
+        budget: &mut usize,
+        key: &RequestKey,
+    ) -> Result<()> {
+        if *budget == 0 {
+            return Ok(());
+        }
+        *budget -= 1;
+        // Keys of the items (and of objects inside them, not of inner arrays).
+        let mut exprs = vec!["count(item)::BIGINT".to_string()];
+        let mut targets: Vec<(Vec<usize>, Stat)> = Vec::new();
+        fn walk(
+            n: &ShapeNode,
+            base: &str,
+            at: Vec<usize>,
+            exprs: &mut Vec<String>,
+            targets: &mut Vec<(Vec<usize>, Stat)>,
+        ) {
+            for (i, c) in n.children.iter().enumerate() {
+                if exprs.len() >= MAX_SHAPE_STATS {
+                    return;
+                }
+                let e = format!(
+                    "struct_extract({base}, {})",
+                    literal(&Param::Text(c.name.clone()))
+                );
+                let mut pos = at.clone();
+                pos.push(i);
+                exprs.push(format!("count({e})::BIGINT"));
+                targets.push((pos.clone(), Stat::Present));
+                match c.kind {
+                    ShapeKind::Array => {
+                        exprs.push(format!("CAST(avg(len({e})) AS DOUBLE)"));
+                        targets.push((pos.clone(), Stat::AvgLen));
+                        exprs.push(format!("max(len({e}))::BIGINT"));
+                        targets.push((pos, Stat::MaxLen));
+                    }
+                    ShapeKind::Object => walk(c, &e, pos, exprs, targets),
+                    ShapeKind::Value => {}
+                }
+            }
+        }
+        walk(node, "item", Vec::new(), &mut exprs, &mut targets);
+        let out = self.query(
+            &format!("SELECT {} FROM {items}", exprs.join(", ")),
+            params,
+            1,
+            key,
+        )?;
+        let Some(b) = out.batches.first() else {
+            return Ok(());
+        };
+        let int = |c: usize| {
+            let a = b.column(c).as_primitive::<Int64Type>();
+            (!a.is_null(0)).then(|| a.value(0) as u64)
+        };
+        node.items = int(0);
+        for (i, (path, which)) in targets.iter().enumerate() {
+            let Some(n) = at_path(&mut node.children, path) else {
+                continue;
+            };
+            match which {
+                Stat::Present => n.present = int(i + 1),
+                Stat::MaxLen => n.max_len = int(i + 1),
+                Stat::AvgLen => {
+                    let a = b.column(i + 1).as_primitive::<Float64Type>();
+                    n.avg_len = (!a.is_null(0)).then(|| a.value(0));
+                }
+            }
+        }
+        // Arrays of objects inside the items: their own items, one level down.
+        fn inner<'a>(
+            n: &'a mut ShapeNode,
+            base: String,
+            out: &mut Vec<(&'a mut ShapeNode, String)>,
+        ) {
+            for c in n.children.iter_mut() {
+                let e = format!(
+                    "struct_extract({base}, {})",
+                    literal(&Param::Text(c.name.clone()))
+                );
+                match c.kind {
+                    ShapeKind::Array if !c.children.is_empty() => out.push((c, e)),
+                    ShapeKind::Object => inner(c, e, out),
+                    _ => {}
+                }
+            }
+        }
+        let mut nested = Vec::new();
+        inner(node, "item".into(), &mut nested);
+        for (child, e) in nested {
+            let rel = format!("(SELECT unnest({e}) AS item FROM {items})");
+            self.count_items(child, &rel, params, budget, key)?;
+        }
+        Ok(())
     }
 }
 

@@ -129,6 +129,16 @@ pub enum Step {
         column: String,
         minutes: i64,
     },
+    /// One row per item of an array: the array `column` (or the array at
+    /// `path` inside it, as a new column `into`), the other columns repeated.
+    /// Records with an empty or missing array are kept, with NULL.
+    Unnest {
+        column: String,
+        #[serde(default)]
+        path: Vec<String>,
+        #[serde(default)]
+        into: Option<String>,
+    },
 }
 
 /// A step and whether it runs.

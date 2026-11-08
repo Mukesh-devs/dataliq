@@ -100,6 +100,7 @@ fn sort(column: &str, descending: bool) -> SortKey {
 fn filter(column: &str, op: FilterOp, not: bool) -> Filter {
     Filter {
         column: column.into(),
+        path: None,
         op,
         not,
     }

@@ -71,6 +71,7 @@ fn quantity(op: FilterOp) -> ViewSpec {
     ViewSpec {
         filters: vec![Filter {
             column: "quantity".into(),
+            path: None,
             op,
             not: false,
         }],
@@ -428,6 +429,7 @@ fn perf_recipe_compare_50m() {
         on(Step::RemoveRows {
             filter: dataliq_lib::view::Filter {
                 column: "quantity".into(),
+                path: None,
                 op: FilterOp::Equals {
                     value: Param::Int(1),
                 },

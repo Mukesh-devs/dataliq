@@ -19,7 +19,9 @@ pub use profile::{
 };
 pub use selection::{MAX_SELECTION_RANGES, SelectionColumnStats, SelectionStats};
 pub use shape::{JsonShape, MAX_SHAPE_STATS, ShapeKind, ShapeNode};
-pub use sql::{BuiltView, ORDER_TABLE, Relation, RowOrder, build, build_at, standalone_sql};
+pub use sql::{
+    BuiltView, ORDER_TABLE, Relation, RowOrder, build, build_at, standalone_sql, struct_path,
+};
 
 pub(crate) use profile::numeric_expr;
 
@@ -60,6 +62,10 @@ pub struct SortKey {
 #[serde(rename_all = "camelCase")]
 pub struct Filter {
     pub column: String,
+    /// Keys inside a nested (struct) column: the filter tests
+    /// `column.key1.key2` (JSON files' nested values).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<Vec<String>>,
     #[serde(flatten)]
     pub op: FilterOp,
     /// Keep the rows that do *not* match (rows where the test is NULL are
