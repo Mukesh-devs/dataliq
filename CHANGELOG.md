@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-08
+
+Flatten and filter nested JSON from the graph view.
+
+### Added
+
+- From the graph, pick a value or card: only records where a nested value equals it, only
+  records that have a key, add a value (or all of an object's values) as columns, or unnest
+  an array into one row per item. Columns and unnesting are cleaning steps (undoable, saved
+  in recipes); filters on nested keys show as chips.
+- An "Unnest into rows" cleaning step; records with an empty array are kept.
+- Structure: "Count keys inside arrays" — how often each key appears among an array's
+  items.
+- The graph view for any file with nested columns (Parquet structs, lists and maps).
+
+### Fixed
+
+- Dates, timestamps, times, decimals and bytes inside objects show as dates and values in
+  the graph, not raw numbers.
+- A record that can't be read says so instead of loading forever.
+
 ## [1.3.0] - 2026-11-07
 
 A graph view for JSON and NDJSON files.
@@ -298,7 +319,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.0.0...v1.1.0
