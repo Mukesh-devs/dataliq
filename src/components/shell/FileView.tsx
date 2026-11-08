@@ -666,7 +666,9 @@ export function FileView({
   const setMode = useTabs((s) => s.setMode);
   const setChart = useTabs((s) => s.setChart);
   const canChart = tab.status === "ready" && !!baseId;
-  const canGraph = isJsonTab(tab) && tab.status !== "error";
+  // JSON files, and any file with nested columns (Parquet structs and lists).
+  const canGraph =
+    (isJsonTab(tab) || columns.some((c) => c.kind === "json")) && tab.status !== "error";
   const wanted = tab.mode ?? "grid";
   const mode =
     (wanted === "chart" && canChart) || (wanted === "graph" && canGraph) ? wanted : "grid";
@@ -1239,6 +1241,8 @@ export function FileView({
           columns={columns}
           onAdd={(column, anchor) => setEditing({ column, anchor })}
           onEdit={(index, anchor) => {
+            // Filters on keys inside nested columns come from the graph; they are removed, not edited.
+            if (filters[index]?.path?.length) return;
             const column = columns.find((c) => c.name === filters[index]?.column);
             if (column) setEditing({ column, index, anchor });
           }}
@@ -1377,6 +1381,43 @@ export function FileView({
               datasetId={baseId}
               view={view}
               record={gridSelection?.rows[0]?.[0] ?? 0}
+              columns={columns.map((c) => c.name)}
+              onFilter={onViewChange ? (f) => setFilters([...filters, f]) : undefined}
+              onAddColumns={
+                canClean
+                  ? (cols) => {
+                      void setRecipe(tab.id, [
+                        ...recipeSteps,
+                        ...cols.map((c) => ({
+                          op: "calculate" as const,
+                          name: c.name,
+                          expression: c.expression,
+                        })),
+                      ]);
+                      notice(
+                        cols.length === 1
+                          ? `Added the column ${cols[0]!.name} (a cleaning step you can undo)`
+                          : `Added ${cols.length} columns (cleaning steps you can undo)`,
+                      );
+                    }
+                  : undefined
+              }
+              onUnnest={
+                canClean
+                  ? (column, path, into) => {
+                      void setRecipe(tab.id, [
+                        ...recipeSteps,
+                        {
+                          op: "unnest",
+                          column,
+                          ...(path.length > 0 && { path }),
+                          ...(into && { into }),
+                        },
+                      ]);
+                      notice("Unnested into one row per item (a cleaning step you can undo)");
+                    }
+                  : undefined
+              }
             />
           </Suspense>
         ) : mode === "chart" && chart && baseId ? (

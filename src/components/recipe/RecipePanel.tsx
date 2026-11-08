@@ -383,6 +383,8 @@ function StepForm({
         return TEMPORAL.has(info!.kind)
           ? { op, column: col, unit, into: text.trim() || undefined }
           : null;
+      case "unnest":
+        return info!.kind === "json" ? { op, column: col } : null;
       case "shiftTime": {
         const minutes = parseShift(text);
         return minutes !== null && minutes !== 0 && info!.kind === "timestamp"
@@ -616,6 +618,11 @@ function StepForm({
             />
           </Field>
         </>
+      )}
+      {op === "unnest" && info && info.kind !== "json" && (
+        <p className="text-[11px] text-fg-subtle">
+          Pick an array column (or unnest a nested array from the Graph view).
+        </p>
       )}
       {op === "shiftTime" && (
         <>

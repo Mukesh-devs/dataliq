@@ -78,3 +78,14 @@ describe("sorting from the header", () => {
     expect(sortMark(two, "c")).toBe("");
   });
 });
+
+describe("filters on nested keys", () => {
+  it("names the key inside the column", () => {
+    expect(
+      describeFilter({ column: "user", path: ["address", "city"], op: "equals", value: "Berlin" }),
+    ).toBe('user.address.city = "Berlin"');
+    expect(describeFilter({ column: "user", path: ["email"], op: "notNull" })).toMatch(
+      /^user\.email /,
+    );
+  });
+});

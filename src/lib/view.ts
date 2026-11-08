@@ -14,6 +14,8 @@ export type FilterOp =
 
 export type Filter = FilterOp & {
   column: string;
+  /** Keys inside a nested column (JSON): the filter tests `column.key1.key2`. */
+  path?: string[];
   /** Keep the rows that do not match (cells where the test is NULL too). */
   not?: boolean;
 };
@@ -167,8 +169,8 @@ export function describeFilter(f: Filter, kind?: ColumnKind): string {
       break;
     case "range":
       if (f.min !== undefined && f.max !== undefined) rest = ` ${lit(f.min)} and ${lit(f.max)}`;
-      else if (f.min !== undefined) return `${prefix}${f.column} ≥ ${lit(f.min)}`;
-      else if (f.max !== undefined) return `${prefix}${f.column} ≤ ${lit(f.max)}`;
+      else if (f.min !== undefined) return `${prefix}${filterTarget(f)} ≥ ${lit(f.min)}`;
+      else if (f.max !== undefined) return `${prefix}${filterTarget(f)} ≤ ${lit(f.max)}`;
       break;
     case "lastDays":
       rest = ` ${f.days} ${f.days === 1 ? "day" : "days"}`;
@@ -180,7 +182,12 @@ export function describeFilter(f: Filter, kind?: ColumnKind): string {
       break;
     }
   }
-  return `${prefix}${f.column} ${label}${rest}`;
+  return `${prefix}${filterTarget(f)} ${label}${rest}`;
+}
+
+/** The column a filter tests, with the keys inside it: `user.address.city`. */
+export function filterTarget(f: Pick<Filter, "column" | "path">): string {
+  return [f.column, ...(f.path ?? [])].join(".");
 }
 
 /**
