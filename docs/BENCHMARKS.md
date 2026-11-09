@@ -554,6 +554,11 @@ version instead of once per command (D65), the import starts as soon as the info
 and a reopen reads nothing from the file. ¹ The 1 GB import varies with the disk (4.6–6.0 s
 across runs before and after); its time is the import's, not the open's.
 
+Grid scroll over 50M rows (`pnpm e2e:perf`, Chromium, mocked backend), with the grid
+reading ahead in the scroll direction (D66): 60 fps throughout; page wait p95 21 ms / max
+21 ms on a fast scroll (was 42 / 51 ms at v0.1.0), p95 23 ms / max 28 ms on a fling (was
+56 / 77 ms).
+
 New flows in the small suite (`pnpm bench`) with their CI budgets (`bench/budgets.json`):
 
 | Flow | linux-dev | Budget |
