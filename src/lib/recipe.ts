@@ -27,7 +27,8 @@ export type Step =
   | { op: "removeRows"; filter: Filter }
   | { op: "calculate"; name: string; expression: string }
   | { op: "roundDate"; column: string; unit: DateUnit; into?: string }
-  | { op: "shiftTime"; column: string; minutes: number };
+  | { op: "shiftTime"; column: string; minutes: number }
+  | { op: "unnest"; column: string; path?: string[]; into?: string };
 
 /** What "Round dates" rounds down to (weeks start on Monday). */
 export type DateUnit = "hour" | "day" | "week" | "month" | "quarter" | "year";
@@ -207,6 +208,7 @@ export const STEP_NAMES: Record<StepOp, string> = {
   calculate: "Calculated column",
   roundDate: "Round dates",
   shiftTime: "Shift times",
+  unnest: "Unnest into rows",
 };
 
 export const TYPE_NAMES: Record<NewType, string> = {
@@ -255,6 +257,8 @@ export function describeStep(s: Step): string {
       return `Round ${q(s.column)} to the ${s.unit}${s.into ? ` as ${q(s.into)}` : ""}`;
     case "shiftTime":
       return `Shift ${q(s.column)} by ${formatShift(s.minutes)}`;
+    case "unnest":
+      return `One row per item of ${q([s.column, ...(s.path ?? [])].join("."))}${s.into ? ` as ${q(s.into)}` : ""}`;
   }
 }
 

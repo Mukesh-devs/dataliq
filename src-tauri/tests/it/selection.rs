@@ -113,6 +113,7 @@ fn row_ranges_follow_the_view_sort_and_filters() {
     let spec = ViewSpec {
         filters: vec![Filter {
             column: "amount".into(),
+            path: None,
             op: FilterOp::NotNull,
             not: false,
         }],

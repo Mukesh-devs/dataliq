@@ -2,7 +2,7 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RowSource } from "../grid/rowSource";
+import { NOT_LOADED, type RowSource } from "../grid/rowSource";
 import { JsonGraphPanel } from "./JsonGraphPanel";
 
 const rows = [
@@ -18,7 +18,7 @@ class FakeSource implements RowSource {
     { name: "user", kind: "json" as const, type: "Struct", nullable: true },
     { name: "items", kind: "json" as const, type: "List", nullable: true },
   ];
-  getValue(row: number, col: number) {
+  getValue(row: number, col: number): unknown {
     const r = rows[row]!;
     return [r.id, r.user, r.items][col];
   }
@@ -81,7 +81,9 @@ describe("JSON graph view", () => {
   });
 
   it("shows the whole file's structure from the engine", async () => {
-    mockIPC((cmd) => {
+    const asked: unknown[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === "json_shape") asked.push((args as { deep?: boolean }).deep);
       if (cmd === "json_shape")
         return {
           rows: 2,
@@ -139,5 +141,84 @@ describe("JSON graph view", () => {
     expect(card("$.user")).toHaveTextContent("in 50% of records");
     await user.click(within(card("$.user")!).getByRole("button", { name: /^user/ }));
     expect(screen.getByRole("complementary", { name: "Details" })).toHaveTextContent('"user"');
+    // The deep count is asked for on demand.
+    expect(asked).toEqual([false]);
+    await user.click(screen.getByRole("checkbox", { name: "Count keys inside arrays" }));
+    await screen.findByRole("group", { name: "Graph of the file's structure" });
+    expect(asked).toEqual([false, true]);
+  });
+
+  it("filters, adds columns and unnests arrays from the selection", async () => {
+    const onFilter = vi.fn();
+    const onAddColumns = vi.fn();
+    const onUnnest = vi.fn();
+    render(
+      <JsonGraphPanel
+        tabId="t1"
+        title="o.json"
+        source={new FakeSource()}
+        view={{}}
+        record={0}
+        columns={["id", "user", "items"]}
+        onFilter={onFilter}
+        onAddColumns={onAddColumns}
+        onUnnest={onUnnest}
+      />,
+    );
+    await screen.findByRole("group", { name: "Graph of record 1" });
+    const user = userEvent.setup();
+    const actions = () => screen.getByRole("group", { name: "Use this" });
+
+    // A value inside an object.
+    await user.click(within(card("$.user")!).getByRole("button", { name: /city/ }));
+    await user.click(
+      within(actions()).getByRole("button", { name: "Only records where user.city = “Berlin”" }),
+    );
+    expect(onFilter).toHaveBeenLastCalledWith({
+      column: "user",
+      path: ["city"],
+      op: "equals",
+      value: "Berlin",
+    });
+    await user.click(
+      within(actions()).getByRole("button", { name: "Only records that have user.city" }),
+    );
+    expect(onFilter).toHaveBeenLastCalledWith({ column: "user", path: ["city"], op: "notNull" });
+    await user.click(within(actions()).getByRole("button", { name: "Add as a column" }));
+    expect(onAddColumns).toHaveBeenLastCalledWith([
+      { name: "city", expression: `struct_extract("user", 'city')` },
+    ]);
+
+    // An object: all its values as columns.
+    await user.click(within(card("$.user")!).getByRole("button", { name: /^user/ }));
+    await user.click(
+      within(actions()).getByRole("button", { name: "Add its 2 values as columns" }),
+    );
+    expect(onAddColumns.mock.lastCall![0].map((c: { name: string }) => c.name)).toEqual([
+      "name",
+      "city",
+    ]);
+
+    // An array, and a value inside one of its items.
+    await user.click(within(card("$.items")!).getByRole("button", { name: /^items/ }));
+    await user.click(
+      within(actions()).getByRole("button", { name: "Unnest into rows (one row per item)" }),
+    );
+    expect(onUnnest).toHaveBeenLastCalledWith("items", [], undefined);
+    await user.click(within(card("$.items[1]")!).getByRole("button", { name: /sku/ }));
+    await user.click(
+      within(actions()).getByRole("button", { name: "Unnest $.items into rows first" }),
+    );
+    expect(onUnnest).toHaveBeenCalledTimes(2);
+  });
+
+  it("says when a record can't be read", async () => {
+    class Broken extends FakeSource {
+      getValue() {
+        return NOT_LOADED;
+      }
+    }
+    render(<JsonGraphPanel tabId="t1" title="o.json" source={new Broken()} view={{}} record={0} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Record 1 couldn't be read.");
   });
 });

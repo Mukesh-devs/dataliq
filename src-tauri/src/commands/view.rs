@@ -192,12 +192,14 @@ pub fn view_sql(
 }
 
 /// The structure of a JSON-like dataset under the view's filters: each key
-/// with its type, how often it is present and how long arrays are.
+/// with its type, how often it is present and how long arrays are; with
+/// `deep`, also how often keys appear among arrays' items.
 #[tauri::command]
 pub async fn json_shape(
     engine: State<'_, Arc<Engine>>,
     dataset_id: String,
     spec: ViewSpec,
+    deep: Option<bool>,
     request_id: Option<String>,
     group: Option<String>,
 ) -> Result<JsonShape> {
@@ -206,7 +208,9 @@ pub async fn json_shape(
         id: request_id,
         group,
     };
-    tauri::async_runtime::spawn_blocking(move || engine.json_shape(&dataset_id, &spec, &key))
-        .await
-        .map_err(|e| AppError::Internal(format!("structure task failed: {e}")))?
+    tauri::async_runtime::spawn_blocking(move || {
+        engine.json_shape(&dataset_id, &spec, deep.unwrap_or(false), &key)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("structure task failed: {e}")))?
 }

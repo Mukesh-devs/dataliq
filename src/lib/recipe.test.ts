@@ -156,3 +156,12 @@ describe("date steps", () => {
     );
   });
 });
+
+describe("unnest step", () => {
+  it("describes it", () => {
+    expect(describeStep({ op: "unnest", column: "items" })).toBe("One row per item of “items”");
+    expect(describeStep({ op: "unnest", column: "user", path: ["orders"], into: "order" })).toBe(
+      "One row per item of “user.orders” as “order”",
+    );
+  });
+});

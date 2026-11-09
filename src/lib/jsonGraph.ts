@@ -1,3 +1,4 @@
+import { Type, type DataType } from "apache-arrow";
 import type { ColumnInfo } from "./arrow";
 import { formatValue, toJsonText } from "./format";
 import { call } from "./ipc";
@@ -163,12 +164,80 @@ export function buildRecordGraph(
   return { root, nodes: Math.max(nodes, 1), truncated };
 }
 
-/** A record of the grid as JSON: nested columns parsed, dates as text, big integers exact. */
+const TICKS_PER_SECOND = [1, 1e3, 1e6, 1e9];
+
+/**
+ * An Arrow value as JSON, following its type into structs, lists and maps:
+ * dates and times as text (also when nested), decimals by their scale,
+ * big integers exact (as text past 2^53).
+ */
+export function arrowJson(v: unknown, type: DataType | undefined): JsonValue {
+  if (v === null || v === undefined) return null;
+  if (!type) return JSON.parse(toJsonText(v)) as JsonValue;
+  const t = type as DataType & {
+    children?: { name: string; type: DataType }[];
+    scale?: number;
+    unit?: number;
+  };
+  switch (type.typeId) {
+    case Type.Struct: {
+      const out: Record<string, JsonValue> = {};
+      const row = v as Record<string, unknown>;
+      for (const f of t.children ?? []) out[f.name] = arrowJson(row[f.name], f.type);
+      return out;
+    }
+    case Type.List:
+    case Type.LargeList:
+    case Type.FixedSizeList: {
+      const item = t.children?.[0]?.type;
+      const list = v as { length: number; get(i: number): unknown };
+      return Array.from({ length: list.length }, (_, i) => arrowJson(list.get(i), item));
+    }
+    case Type.Map: {
+      const entry = t.children?.[0]?.type as DataType & { children?: { type: DataType }[] };
+      const valueType = entry?.children?.[1]?.type;
+      const out: Record<string, JsonValue> = {};
+      const plain = (v as { toJSON(): Record<string, unknown> }).toJSON();
+      for (const [k, x] of Object.entries(plain)) out[k] = arrowJson(x, valueType);
+      return out;
+    }
+    case Type.Date:
+      return formatValue(v, "date");
+    case Type.Timestamp:
+      return formatValue(v, "timestamp");
+    case Type.Time:
+      return formatValue(v, { kind: "time", timeTicksPerSecond: TICKS_PER_SECOND[t.unit ?? 0] });
+    case Type.Decimal: {
+      const text = formatValue(v, { kind: "number", scale: t.scale ?? 0 }) ?? "";
+      const n = Number(text);
+      return Number.isFinite(n) && String(n) === text.replace(/\.?0+$/, "") ? n : text;
+    }
+    case Type.Int:
+      if (typeof v === "bigint") return Number.isSafeInteger(Number(v)) ? Number(v) : v.toString();
+      return v as number;
+    case Type.Bool:
+      return v === true;
+    case Type.Binary:
+    case Type.LargeBinary:
+    case Type.FixedSizeBinary:
+      // Bytes as one value, written as the grid shows them.
+      return formatValue(v, "binary");
+    case Type.Float:
+    case Type.Utf8:
+    case Type.LargeUtf8:
+      return v as JsonValue;
+    default:
+      return JSON.parse(toJsonText(v)) as JsonValue;
+  }
+}
+
+/** A record of the grid as JSON: nested columns followed by type, dates as text, big integers exact. */
 export function recordValue(columns: ColumnInfo[], values: unknown[]): Record<string, JsonValue> {
   const out: Record<string, JsonValue> = {};
   columns.forEach((c, i) => {
     const v = values[i];
     if (v === null || v === undefined) out[c.name] = null;
+    else if (c.arrow) out[c.name] = arrowJson(v, c.arrow);
     else if (c.kind === "json") out[c.name] = JSON.parse(toJsonText(v)) as JsonValue;
     else if (c.kind === "integer" || c.kind === "number") {
       const text = formatValue(v, c) ?? "";
@@ -181,6 +250,46 @@ export function recordValue(columns: ColumnInfo[], values: unknown[]): Record<st
   return out;
 }
 
+/** A JSON path's parts: keys, item indexes, and `*` (every item, in the structure). */
+export function parsePath(path: string): (string | number)[] {
+  const parts: (string | number)[] = [];
+  const re = /\.([A-Za-z_$][\w$]*)|\[(\d+)\]|\[(\*)\]|\[("(?:[^"\\]|\\.)*")\]/g;
+  for (const m of path.slice(1).matchAll(re)) {
+    if (m[1] !== undefined) parts.push(m[1]);
+    else if (m[2] !== undefined) parts.push(Number(m[2]));
+    else if (m[3] !== undefined) parts.push("*");
+    else parts.push(JSON.parse(m[4]!) as string);
+  }
+  return parts;
+}
+
+/**
+ * A path as a column and the keys inside it, when it goes through no
+ * array (`$.user.address.city` → `user`, [`address`, `city`]); null otherwise.
+ */
+export function nestedTarget(path: string): { column: string; keys: string[] } | null {
+  const parts = parsePath(path);
+  if (parts.length === 0 || parts.some((p) => typeof p === "number" || p === "*")) return null;
+  const [column, ...keys] = parts as string[];
+  return { column: column!, keys };
+}
+
+/** The array a path first goes into (`$.items[2].sku` → `$.items`), if any. */
+export function firstArray(path: string): string | null {
+  const parts = parsePath(path);
+  const i = parts.findIndex((p) => typeof p === "number" || p === "*");
+  if (i <= 0) return null;
+  return parts.slice(0, i).reduce<string>((acc, p) => childPath(acc, p as string), "$");
+}
+
+/** DuckDB SQL that reads `keys` inside `column`. */
+export function sqlPath(column: string, keys: string[]): string {
+  return keys.reduce(
+    (e, k) => `struct_extract(${e}, '${k.replace(/'/g, "''")}')`,
+    `"${column.replace(/"/g, '""')}"`,
+  );
+}
+
 /** The structure of a JSON-like file (from `json_shape`). */
 export interface ShapeNode {
   name: string;
@@ -190,6 +299,8 @@ export interface ShapeNode {
   avgLen: number | null;
   maxLen: number | null;
   sql: string | null;
+  /** Arrays, with the deep count: items in every record together. */
+  items?: number | null;
   children: ShapeNode[];
 }
 
@@ -199,20 +310,42 @@ export interface JsonShape {
   elapsedMs: number;
 }
 
-export function jsonShape(datasetId: string, spec: ViewSpec, group?: string): Promise<JsonShape> {
-  return call("json_shape", { datasetId, spec, group });
+/** The structure; `deep` also counts keys among arrays' items (one more pass). */
+export function jsonShape(
+  datasetId: string,
+  spec: ViewSpec,
+  group?: string,
+  deep = false,
+): Promise<JsonShape> {
+  return call("json_shape", { datasetId, spec, group, deep });
 }
 
-function share(present: number | null, rows: number): string | undefined {
-  if (present === null || rows === 0) return undefined;
-  if (present === rows) return "in every record";
-  const p = (present / rows) * 100;
-  return `in ${p < 1 && p > 0 ? "<1" : Math.round(p)}% of records`;
+/** A new column name like `base`, not taken (any case): `city`, `city_2`, … */
+export function freeName(base: string, taken: readonly string[]): string {
+  const used = new Set(taken.map((t) => t.toLowerCase()));
+  let name = base;
+  for (let i = 2; used.has(name.toLowerCase()); i++) name = `${base}_${i}`;
+  return name;
+}
+
+/** What presence counts against: the records, or an array's items (deep count). */
+interface Base {
+  total: number | null;
+  unit: "record" | "item";
+}
+
+function share(present: number | null | undefined, base: Base): string | undefined {
+  if (present === null || present === undefined || !base.total) return undefined;
+  if (present === base.total) return `in every ${base.unit}`;
+  const p = (present / base.total) * 100;
+  return `in ${p < 1 && p > 0 ? "<1" : Math.round(p)}% of ${base.unit}s`;
 }
 
 /** The structure as a graph: object keys as lines (type · presence), objects and arrays as cards. */
 export function buildShapeGraph(shape: JsonShape, title = "Every record"): GraphNode {
-  const make = (n: ShapeNode, id: string): GraphNode => {
+  const make = (n: ShapeNode, id: string, base: Base): GraphNode => {
+    // Keys inside an array count against its items (when deep-counted).
+    const inner: Base = n.kind === "array" ? { total: n.items ?? null, unit: "item" } : base;
     const node: GraphNode = {
       id,
       title: n.name,
@@ -224,11 +357,11 @@ export function buildShapeGraph(shape: JsonShape, title = "Every record"): Graph
               n.avgLen !== null
                 ? `avg ${Number(n.avgLen.toFixed(1)).toLocaleString("en-US")}, max ${(n.maxLen ?? 0).toLocaleString("en-US")} items`
                 : undefined,
-              share(n.present, shape.rows),
+              share(n.present, base),
             ]
               .filter(Boolean)
               .join(" · ")
-          : share(n.present, shape.rows),
+          : share(n.present, base),
       lines: [],
       children: [],
       sql: n.sql ?? undefined,
@@ -236,16 +369,18 @@ export function buildShapeGraph(shape: JsonShape, title = "Every record"): Graph
     for (const c of n.children) {
       const path = n.kind === "array" ? `${id}[*]${childPath("", c.name)}` : childPath(id, c.name);
       if (c.kind === "value" || (c.kind === "object" && c.children.length === 0)) {
-        const seen = share(c.present, shape.rows);
+        const seen = share(c.present, inner);
         node.lines.push({
           key: c.name,
           path,
           text:
-            seen && seen !== "in every record" ? `${c.type} · ${seen.replace("in ", "")}` : c.type,
+            seen && !seen.startsWith("in every")
+              ? `${c.type} · ${seen.replace("in ", "")}`
+              : c.type,
           kind: "type",
         });
       } else {
-        node.children.push(make(c, path));
+        node.children.push(make(c, path, inner));
       }
     }
     return node;
@@ -262,6 +397,7 @@ export function buildShapeGraph(shape: JsonShape, title = "Every record"): Graph
       children: shape.fields,
     },
     "$",
+    { total: shape.rows, unit: "record" },
   );
 }
 

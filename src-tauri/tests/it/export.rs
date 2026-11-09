@@ -32,6 +32,7 @@ fn spec() -> ViewSpec {
     ViewSpec {
         filters: vec![Filter {
             column: "amount".into(),
+            path: None,
             op: FilterOp::Gt {
                 value: Param::Float(500.0),
             },
@@ -329,6 +330,7 @@ fn selected_rows_are_the_rows_the_grid_shows() {
         .unwrap();
     let k = |op| Filter {
         column: "k".into(),
+        path: None,
         op,
         not: false,
     };

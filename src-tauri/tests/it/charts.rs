@@ -41,6 +41,7 @@ fn active_only() -> ViewSpec {
     ViewSpec {
         filters: vec![Filter {
             column: "active".into(),
+            path: None,
             op: FilterOp::Equals {
                 value: Param::Bool(true),
             },

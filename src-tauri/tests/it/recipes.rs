@@ -282,6 +282,7 @@ fn row_steps_keep_file_order() {
         &[on(Step::RemoveRows {
             filter: Filter {
                 column: "amount".into(),
+                path: None,
                 op: FilterOp::Lt {
                     value: Param::Float(500.0),
                 },
@@ -383,6 +384,7 @@ fn the_script_gives_the_same_rows_in_plain_duckdb() {
         on(Step::RemoveRows {
             filter: Filter {
                 column: "city".into(),
+                path: None,
                 op: FilterOp::IsNull,
                 not: false,
             },
@@ -492,6 +494,7 @@ fn a_saved_recipe_cleans_another_file_with_the_same_columns() {
         on(Step::RemoveRows {
             filter: Filter {
                 column: "amount".into(),
+                path: None,
                 op: FilterOp::Lt {
                     value: Param::Float(0.0),
                 },

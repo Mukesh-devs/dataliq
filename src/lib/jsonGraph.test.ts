@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  arrowJson,
   buildRecordGraph,
   buildShapeGraph,
   childPath,
   collapsedBelow,
+  firstArray,
+  freeName,
   graphSvg,
   layoutGraph,
+  nestedTarget,
+  parsePath,
   recordValue,
   search,
+  sqlPath,
   type GraphColors,
   type JsonShape,
   type JsonValue,
@@ -219,5 +225,123 @@ describe("layout", () => {
     expect(svg).toContain("&quot;Berlin&quot;");
     expect(svg).toContain('font-family="Mono &lt;x&gt;"');
     expect(svg.match(/<rect /g)).toHaveLength(7);
+  });
+});
+
+describe("nested values from Arrow", () => {
+  it("formats dates, timestamps, decimals and big integers inside structs and lists", async () => {
+    const {
+      Field,
+      List,
+      Struct,
+      DateDay,
+      TimestampMillisecond,
+      Int64,
+      Utf8,
+      vectorFromArray,
+      Table,
+    } = await import("apache-arrow");
+    const type = new Struct([
+      new Field("when", new DateDay(), true),
+      new Field("events", new List(new Field("item", new TimestampMillisecond(), true)), true),
+      new Field("big", new Int64(), true),
+      new Field("name", new Utf8(), true),
+    ]);
+    const vec = vectorFromArray(
+      [
+        {
+          when: new Date(Date.UTC(2024, 0, 31)),
+          events: [Date.UTC(2024, 1, 1, 10, 30), null],
+          big: 9007199254740993n,
+          name: "a",
+        },
+      ],
+      type,
+    );
+    const table = new Table({ obj: vec });
+    const { describeColumns, cellValue } = await import("./arrow");
+    const cols = describeColumns(table);
+    expect(recordValue(cols, [cellValue(table, 0, 0)])).toEqual({
+      obj: {
+        when: "2024-01-31",
+        events: ["2024-02-01 10:30:00", null],
+        big: "9007199254740993",
+        name: "a",
+      },
+    });
+  });
+});
+
+describe("binary values", () => {
+  it("are one value, not an array of bytes", async () => {
+    const { Binary } = await import("apache-arrow");
+    expect(arrowJson(new Uint8Array([170, 187]), new Binary())).toBe("\\xaabb");
+  });
+});
+
+describe("paths for flattening and filtering", () => {
+  it("parses paths and finds the column and keys", () => {
+    expect(parsePath('$.user["first name"].tags[2]')).toEqual(["user", "first name", "tags", 2]);
+    expect(nestedTarget("$.user.address.city")).toEqual({
+      column: "user",
+      keys: ["address", "city"],
+    });
+    expect(nestedTarget("$.id")).toEqual({ column: "id", keys: [] });
+    expect(nestedTarget("$.items[0].sku")).toBeNull();
+    expect(nestedTarget("$.items[*].sku")).toBeNull();
+    expect(firstArray("$.order.items[3].sku")).toBe("$.order.items");
+    expect(firstArray("$.items[*].qty")).toBe("$.items");
+    expect(firstArray("$.user.name")).toBeNull();
+  });
+
+  it("writes SQL and free column names", () => {
+    expect(sqlPath("user", ["it's", "city"])).toBe(
+      `struct_extract(struct_extract("user", 'it''s'), 'city')`,
+    );
+    expect(freeName("city", ["id", "City", "city_2"])).toBe("city_3");
+    expect(freeName("zip", ["id"])).toBe("zip");
+  });
+
+  it("counts keys inside arrays against the array's items", () => {
+    const shape: JsonShape = {
+      rows: 10,
+      elapsedMs: 1,
+      fields: [
+        {
+          name: "items",
+          kind: "array",
+          type: "object[]",
+          present: 10,
+          avgLen: 2,
+          maxLen: 4,
+          sql: '"items"',
+          items: 20,
+          children: [
+            {
+              name: "sku",
+              kind: "value",
+              type: "text",
+              present: 20,
+              avgLen: null,
+              maxLen: null,
+              sql: null,
+              children: [],
+            },
+            {
+              name: "qty",
+              kind: "value",
+              type: "integer",
+              present: 5,
+              avgLen: null,
+              maxLen: null,
+              sql: null,
+              children: [],
+            },
+          ],
+        },
+      ],
+    };
+    const items = buildShapeGraph(shape).children[0]!;
+    expect(items.lines.map((l) => l.text)).toEqual(["text", "integer · 25% of items"]);
   });
 });

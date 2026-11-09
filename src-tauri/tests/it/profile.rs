@@ -159,6 +159,7 @@ fn top_values_and_filters() {
         filters: vec![
             Filter {
                 column: "active".into(),
+                path: None,
                 op: FilterOp::Equals {
                     value: Param::Bool(true),
                 },
@@ -166,6 +167,7 @@ fn top_values_and_filters() {
             },
             Filter {
                 column: "amount".into(),
+                path: None,
                 op: FilterOp::Gt {
                     value: Param::Int(100),
                 },
@@ -201,6 +203,7 @@ fn top_values_and_filters() {
     let none = ViewSpec {
         filters: vec![Filter {
             column: "amount".into(),
+            path: None,
             op: FilterOp::Gt {
                 value: Param::Int(1_000_000),
             },
@@ -263,6 +266,7 @@ fn header_histograms_edge_cases() {
     let none = ViewSpec {
         filters: vec![Filter {
             column: "id".into(),
+            path: None,
             op: FilterOp::Lt {
                 value: Param::Int(-1),
             },
@@ -376,6 +380,7 @@ fn near_unique_columns_still_list_every_common_value() {
     let spec = ViewSpec {
         filters: vec![Filter {
             column: "id".into(),
+            path: None,
             op: FilterOp::Lt {
                 value: Param::Int(1_400_000),
             },

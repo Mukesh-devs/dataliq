@@ -146,6 +146,7 @@ fn percent(part: u64, whole: u64) -> String {
 fn filter(column: &str, op: FilterOp, not: bool) -> Filter {
     Filter {
         column: column.to_string(),
+        path: None,
         op,
         not,
     }

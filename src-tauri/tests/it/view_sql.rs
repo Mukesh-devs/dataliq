@@ -106,6 +106,7 @@ impl Fixture {
 fn f(column: &str, op: FilterOp) -> Filter {
     Filter {
         column: column.into(),
+        path: None,
         op,
         not: false,
     }

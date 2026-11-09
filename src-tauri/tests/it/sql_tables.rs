@@ -151,6 +151,7 @@ fn current_view_follows_a_filtered_sorted_view() {
     let spec = ViewSpec {
         filters: vec![Filter {
             column: "amount".into(),
+            path: None,
             op: FilterOp::Gt {
                 value: Param::Int(500),
             },

@@ -23,6 +23,8 @@ export interface ColumnInfo {
   scale?: number;
   /** Ticks per second for TIME columns (1, 1e3, 1e6 or 1e9). */
   timeTicksPerSecond?: number;
+  /** The Arrow type itself (nested columns: their fields' types). */
+  arrow?: DataType;
 }
 
 /** What the formatter needs to know about a column. */
@@ -82,6 +84,7 @@ export function describeField(field: Field): ColumnInfo {
     kind: columnKind(field.type),
     type: String(field.type),
     nullable: field.nullable,
+    arrow: field.type,
   };
   if (type.typeId === Type.Decimal) info.scale = type.scale ?? 0;
   if (type.typeId === Type.Time) info.timeTicksPerSecond = TICKS_PER_SECOND[type.unit ?? 0];

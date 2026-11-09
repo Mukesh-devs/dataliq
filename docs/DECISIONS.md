@@ -936,3 +936,24 @@ The same layout writes the SVG and PNG exports.
 Big records stay quick: arrays show 50 items at a time with a "more"
 card, a record shows at most 1,500 cards (laid out in about 20 ms), and
 branches deeper than two levels start collapsed.
+
+## D64 — Nested JSON: filters on keys, unnesting as a step, counts on demand
+
+Flattening JSON is the step before most analysis, so the graph turns a
+selection into the app's existing tools rather than new ones:
+
+- A filter can carry a `path` of keys inside a struct column; the view
+  SQL reads it with `struct_extract` (its type isn't known, so text tests
+  cast it and comparisons let DuckDB convert the value). Path filters are
+  removed, not edited, since the filter editor works on columns.
+- "Add as a column" is a Calculate step with a `struct_extract` chain;
+  "Unnest into rows" is a new Unnest step. Unnesting keeps records whose
+  array is empty or missing (`unnest(CASE WHEN len(x) > 0 THEN x ELSE
+  [NULL] END)`), like a left join, so no record silently disappears.
+- Counting keys among array items needs a pass per array of objects, so
+  it is a toggle in the structure view (at most 50 arrays), not the
+  default.
+
+Nested values are converted by following the column's Arrow type
+(`arrowJson`), so dates, decimals and bytes inside structs read like the
+grid's; the graph is offered for any file with nested columns.

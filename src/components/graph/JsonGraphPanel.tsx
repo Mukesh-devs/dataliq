@@ -36,11 +36,16 @@ import {
   type JsonValue,
   type Line,
   type Orient,
+  firstArray,
+  freeName,
+  nestedTarget,
+  sqlPath,
 } from "../../lib/jsonGraph";
-import { statsSpec, type ViewSpec } from "../../lib/view";
+import type { Param } from "../../lib/ipc";
+import { filterTarget, statsSpec, type Filter, type ViewSpec } from "../../lib/view";
 import { useAppliedTheme } from "../../stores/appliedTheme";
 import { useNotice } from "../../stores/notice";
-import type { RowSource } from "../grid/rowSource";
+import { NOT_LOADED, type RowSource } from "../grid/rowSource";
 import { Button, IconButton } from "../ui/Button";
 import { MenuItem } from "../ui/Menu";
 import { GraphCanvas, type GraphCanvasHandle } from "./GraphCanvas";
@@ -61,6 +66,14 @@ interface JsonGraphPanelProps {
   /** The record to show first (the grid's selected row). */
   record: number;
   onRecordChange?: (row: number) => void;
+  /** The file's columns (new column names must differ). */
+  columns?: string[];
+  /** Adds a filter on the view (a key inside a nested column). */
+  onFilter?: (filter: Filter) => void;
+  /** Adds cleaning steps: new columns from SQL. */
+  onAddColumns?: (columns: { name: string; expression: string }[]) => void;
+  /** Adds a cleaning step: one row per item of an array. */
+  onUnnest?: (column: string, keys: string[], into?: string) => void;
 }
 
 function cssVar(name: string, fallback: string): string {
@@ -126,6 +139,10 @@ export function JsonGraphPanel({
   view,
   record,
   onRecordChange,
+  columns = [],
+  onFilter,
+  onAddColumns,
+  onUnnest,
 }: JsonGraphPanelProps) {
   const notice = useNotice((s) => s.show);
   const themeVersion = useAppliedTheme((s) => s.version);
@@ -150,7 +167,9 @@ export function JsonGraphPanel({
 
   // What is wanted now, and what has arrived (loading = they differ).
   const statsKey = JSON.stringify(statsSpec(view));
-  const want = mode === "record" ? `record:${row}` : `structure:${statsKey}`;
+  // The deep count (keys among arrays' items) costs one more pass: on demand.
+  const [deep, setDeep] = useState(false);
+  const want = mode === "record" ? `record:${row}` : `structure:${deep}:${statsKey}`;
   const [loaded, setLoaded] = useState<{
     key: string;
     value?: Record<string, JsonValue>;
@@ -167,7 +186,16 @@ export function JsonGraphPanel({
       () => {
         if (!alive) return;
         const values = source.columns.map((_, c) => source.getValue(row, c));
-        setLoaded({ key, value: recordValue(source.columns, values) });
+        // A page that failed to load leaves its cells unread: say so.
+        if (values.some((v) => v === NOT_LOADED)) {
+          setLoaded({ key, error: `Record ${row + 1} couldn't be read.` });
+          return;
+        }
+        try {
+          setLoaded({ key, value: recordValue(source.columns, values) });
+        } catch (e) {
+          setLoaded({ key, error: e instanceof Error ? e.message : String(e) });
+        }
       },
       (e: unknown) =>
         alive && setLoaded({ key, error: e instanceof Error ? e.message : String(e) }),
@@ -181,8 +209,8 @@ export function JsonGraphPanel({
   useEffect(() => {
     if (mode !== "structure" || !datasetId) return;
     let alive = true;
-    const key = `structure:${statsKey}`;
-    jsonShape(datasetId, JSON.parse(statsKey) as ViewSpec, `shape:${tabId}`).then(
+    const key = `structure:${deep}:${statsKey}`;
+    jsonShape(datasetId, JSON.parse(statsKey) as ViewSpec, `shape:${tabId}`, deep).then(
       (shape) => alive && setLoaded({ key, shape }),
       (e: unknown) => {
         if (alive && (e as { kind?: string }).kind !== "cancelled")
@@ -192,7 +220,7 @@ export function JsonGraphPanel({
     return () => {
       alive = false;
     };
-  }, [mode, datasetId, statsKey, tabId]);
+  }, [mode, datasetId, statsKey, tabId, deep]);
 
   const current = loaded?.key === want ? loaded : null;
   const loading = current === null && (mode === "structure" ? !!datasetId : source.rowCount > 0);
@@ -374,6 +402,15 @@ export function JsonGraphPanel({
             </button>
           ))}
         </div>
+        {mode === "structure" && (
+          <label
+            className="flex items-center gap-1 text-fg-muted"
+            title="One more pass over the data: how often each key appears among an array's items"
+          >
+            <input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} />
+            Count keys inside arrays
+          </label>
+        )}
         {mode === "record" && (
           <div className="flex items-center gap-1 text-fg-muted">
             <IconButton
@@ -598,6 +635,17 @@ export function JsonGraphPanel({
                 </Button>
               </>
             )}
+            <GraphActions
+              path={selected.id}
+              line={selected.line}
+              node={selected.line ? undefined : (detailNode ?? undefined)}
+              value={mode === "record" ? detailValue : undefined}
+              structure={mode === "structure"}
+              columns={columns}
+              onFilter={onFilter}
+              onAddColumns={onAddColumns}
+              onUnnest={onUnnest}
+            />
           </aside>
         )}
       </div>
@@ -644,5 +692,147 @@ function ExportMenu({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  );
+}
+
+/**
+ * What can be done with the selected value or card: filter the records by
+ * it, add it (or an object's values) as columns, or unnest an array into
+ * rows. Paths through an array offer to unnest that array first.
+ */
+function GraphActions({
+  path,
+  line,
+  node,
+  value,
+  structure,
+  columns,
+  onFilter,
+  onAddColumns,
+  onUnnest,
+}: {
+  path: string;
+  line?: Line;
+  node?: GraphNode;
+  value: JsonValue | undefined;
+  structure: boolean;
+  columns: string[];
+  onFilter?: (filter: Filter) => void;
+  onAddColumns?: (cols: { name: string; expression: string }[]) => void;
+  onUnnest?: (column: string, keys: string[], into?: string) => void;
+}) {
+  const target = nestedTarget(path);
+  const isArray =
+    node?.kind === "array" ||
+    (Array.isArray(value) && value.length > 0) ||
+    (structure && line?.text.endsWith("[]"));
+  const isObject = node?.kind === "object" && path !== "$";
+  const plainValue =
+    !structure &&
+    line &&
+    (value === null || ["string", "number", "boolean"].includes(typeof value));
+  const actions: { label: string; run: () => void }[] = [];
+  if (target) {
+    const filterOf = (op: Filter): Filter => op;
+    const base = { column: target.column, ...(target.keys.length > 0 && { path: target.keys }) };
+    const where = filterTarget(base);
+    if (onFilter && plainValue) {
+      const shown =
+        typeof value === "string"
+          ? `“${value.length > 24 ? `${value.slice(0, 23)}…` : value}”`
+          : String(value);
+      actions.push({
+        label: `Only records where ${where} = ${shown}`,
+        run: () =>
+          onFilter(
+            value === null
+              ? filterOf({ ...base, op: "isNull" })
+              : filterOf({ ...base, op: "equals", value: value as Param }),
+          ),
+      });
+    }
+    if (onFilter && target.keys.length > 0)
+      actions.push({
+        label: `Only records that have ${where}`,
+        run: () => onFilter(filterOf({ ...base, op: "notNull" })),
+      });
+    if (
+      onAddColumns &&
+      target.keys.length > 0 &&
+      !isArray &&
+      !isObject &&
+      !target.keys.some((k) => k.includes(";"))
+    )
+      actions.push({
+        label: "Add as a column",
+        run: () =>
+          onAddColumns([
+            {
+              name: freeName(target.keys.join("_"), columns),
+              expression: sqlPath(target.column, target.keys),
+            },
+          ]),
+      });
+    if (onAddColumns && isObject && node) {
+      const plain = node.lines.filter((l) => l.kind !== "empty" && nestedTarget(l.path));
+      if (plain.length > 0)
+        actions.push({
+          label: `Add its ${plain.length} value${plain.length === 1 ? "" : "s"} as columns`,
+          run: () => {
+            const taken = [...columns];
+            onAddColumns(
+              plain.map((l) => {
+                const t = nestedTarget(l.path)!;
+                const name = freeName(t.keys.join("_"), taken);
+                taken.push(name);
+                return { name, expression: sqlPath(t.column, t.keys) };
+              }),
+            );
+          },
+        });
+    }
+    if (onUnnest && isArray)
+      actions.push({
+        label: "Unnest into rows (one row per item)",
+        run: () =>
+          onUnnest(
+            target.column,
+            target.keys,
+            target.keys.length > 0 ? freeName(`${target.keys.join("_")}_item`, columns) : undefined,
+          ),
+      });
+  } else {
+    const array = firstArray(path);
+    const at = array && nestedTarget(array);
+    if (onUnnest && at)
+      actions.push({
+        label: `Unnest ${array} into rows first`,
+        run: () =>
+          onUnnest(
+            at.column,
+            at.keys,
+            at.keys.length > 0 ? freeName(`${at.keys.join("_")}_item`, columns) : undefined,
+          ),
+      });
+  }
+  if (actions.length === 0) return null;
+  return (
+    <div
+      className="flex flex-col gap-1 border-t border-border pt-2"
+      role="group"
+      aria-label="Use this"
+    >
+      {actions.map((a) => (
+        <Button
+          key={a.label}
+          size="sm"
+          variant="ghost"
+          className="h-auto min-h-6 justify-start py-1 text-left whitespace-normal"
+          onClick={a.run}
+        >
+          {a.label}
+        </Button>
+      ))}
+    </div>
   );
 }

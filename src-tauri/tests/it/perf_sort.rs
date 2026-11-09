@@ -222,6 +222,7 @@ fn perf_views_50m() {
     };
     let filter = |c: &str, op: FilterOp| Filter {
         column: c.into(),
+        path: None,
         op,
         not: false,
     };

@@ -4,7 +4,7 @@
 use chrono::NaiveDate;
 
 use super::{Filter, FilterOp, SortKey, ViewSpec};
-use crate::engine::sql::quote_ident;
+use crate::engine::sql::{literal, quote_ident};
 use crate::engine::{DatasetSource, Param};
 use crate::error::{AppError, Result};
 use crate::sources::ColumnMeta;
@@ -247,6 +247,28 @@ fn kind(duckdb_type: &str) -> Kind {
     }
 }
 
+/// What a filter tests: a column, or a key inside a nested column.
+struct Target {
+    expr: String,
+    kind: Kind,
+}
+
+impl Target {
+    fn of(col: &ColumnMeta) -> Target {
+        Target {
+            expr: quote_ident(&col.name),
+            kind: kind(&col.r#type),
+        }
+    }
+}
+
+/// `col` then `struct_extract(…, 'key')` for each key of `path`.
+pub fn struct_path(col: &str, path: &[String]) -> String {
+    path.iter().fold(quote_ident(col), |e, k| {
+        format!("struct_extract({e}, {})", literal(&Param::Text(k.clone())))
+    })
+}
+
 impl Builder<'_> {
     fn column(&self, name: &str) -> Result<&ColumnMeta> {
         self.schema
@@ -292,23 +314,16 @@ impl Builder<'_> {
         Ok(out.join(", "))
     }
 
-    /// The column as text: itself for VARCHAR, otherwise cast.
-    fn text_of(col: &ColumnMeta) -> String {
-        let q = quote_ident(&col.name);
-        match kind(&col.r#type) {
-            Kind::Text => q,
-            Kind::Other => format!("CAST({q} AS VARCHAR)"),
+    /// The target as text: itself for VARCHAR, otherwise cast.
+    fn text_of(t: &Target) -> String {
+        match t.kind {
+            Kind::Text => t.expr.clone(),
+            Kind::Other => format!("CAST({} AS VARCHAR)", t.expr),
         }
     }
 
     /// A text test `func(text, ?)`, lower-cased on both sides unless case-sensitive.
-    fn text_test(
-        &mut self,
-        func: &str,
-        col: &ColumnMeta,
-        value: &str,
-        case_sensitive: bool,
-    ) -> String {
+    fn text_test(&mut self, func: &str, col: &Target, value: &str, case_sensitive: bool) -> String {
         let text = Self::text_of(col);
         let p = self.bind(Param::Text(value.to_string()));
         if case_sensitive {
@@ -318,15 +333,24 @@ impl Builder<'_> {
         }
     }
 
-    fn compare(&mut self, col: &ColumnMeta, op: &str, value: &Param) -> String {
-        let q = quote_ident(&col.name);
+    fn compare(&mut self, col: &Target, op: &str, value: &Param) -> String {
+        let q = &col.expr;
         let p = self.bind(value.clone());
         format!("{q} {op} {p}")
     }
 
     fn filter(&mut self, f: &Filter) -> Result<String> {
-        let col = self.column(&f.column)?.clone();
-        let q = quote_ident(&col.name);
+        let meta = self.column(&f.column)?.clone();
+        // A key inside a nested column: its type isn't known here, so text
+        // tests cast it and comparisons let DuckDB convert the value.
+        let col = match &f.path {
+            Some(path) if !path.is_empty() => Target {
+                expr: struct_path(&meta.name, path),
+                kind: Kind::Other,
+            },
+            _ => Target::of(&meta),
+        };
+        let q = col.expr.clone();
         let test = match &f.op {
             FilterOp::Contains {
                 value,
@@ -345,7 +369,7 @@ impl Builder<'_> {
                 let p = self.bind(Param::Text(pattern.clone()));
                 format!("regexp_matches({text}, {p})")
             }
-            FilterOp::Empty => match kind(&col.r#type) {
+            FilterOp::Empty => match col.kind {
                 Kind::Text => format!("({q} IS NULL OR {q} = '')"),
                 Kind::Other => format!("{q} IS NULL"),
             },
@@ -401,11 +425,11 @@ impl Builder<'_> {
 
     /// Case-insensitive "contains" over every text column.
     fn search(&mut self, text: &str) -> String {
-        let cols: Vec<ColumnMeta> = self
+        let cols: Vec<Target> = self
             .schema
             .iter()
             .filter(|c| kind(&c.r#type) == Kind::Text)
-            .cloned()
+            .map(Target::of)
             .collect();
         if cols.is_empty() {
             return "FALSE".into();
@@ -461,6 +485,7 @@ mod tests {
     fn f(column: &str, op: FilterOp) -> Filter {
         Filter {
             column: column.into(),
+            path: None,
             op,
             not: false,
         }
@@ -479,6 +504,41 @@ mod tests {
             filters: vec![filter],
             ..ViewSpec::default()
         })
+    }
+
+    #[test]
+    fn filters_on_keys_inside_nested_columns() {
+        let at = |op: FilterOp| Filter {
+            column: "note".into(),
+            path: Some(vec!["user's".into(), "city".into()]),
+            op,
+            not: false,
+        };
+        let eq = filter_sql(at(FilterOp::Equals {
+            value: Param::Text("Berlin".into()),
+        }));
+        assert!(
+            eq.contains("struct_extract(struct_extract(\"note\", 'user''s'), 'city') = ?"),
+            "{eq}"
+        );
+        let has = filter_sql(at(FilterOp::Contains {
+            value: "o".into(),
+            case_sensitive: false,
+        }));
+        assert!(has.contains("contains(lower(CAST(struct_extract("), "{has}");
+        // A path to an unknown column is still an error in words.
+        let bad = build(
+            &ViewSpec {
+                filters: vec![Filter {
+                    column: "nope".into(),
+                    ..at(FilterOp::NotNull)
+                }],
+                ..ViewSpec::default()
+            },
+            &table(),
+            &schema(),
+        );
+        assert!(bad.is_err());
     }
 
     #[test]

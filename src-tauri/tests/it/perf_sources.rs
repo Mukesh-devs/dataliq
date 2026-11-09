@@ -151,6 +151,7 @@ fn perf_sources_duckdb_file_50m() {
     let filter = ViewSpec {
         filters: vec![Filter {
             column: "country".into(),
+            path: None,
             op: FilterOp::Contains {
                 value: "an".into(),
                 case_sensitive: false,
