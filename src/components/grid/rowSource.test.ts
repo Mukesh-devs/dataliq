@@ -111,3 +111,98 @@ describe("PagedRowSource", () => {
     expect(s.getValue(0, 0)).toBe(NOT_LOADED);
   });
 });
+
+describe("PagedRowSource: prefetch and dropped requests", () => {
+  /** A backend whose answers the test releases. */
+  function heldFetch() {
+    const waiting: { start: number; release: () => void }[] = [];
+    const fetchPage = vi.fn(
+      (start: number, count: number) =>
+        new Promise<ReturnType<typeof tableFromArrays>>((resolve) => {
+          waiting.push({
+            start,
+            release: () =>
+              resolve(
+                tableFromArrays({ id: Int32Array.from({ length: count }, (_, i) => start + i) }),
+              ),
+          });
+        }),
+    );
+    return { fetchPage, waiting };
+  }
+
+  it("reads further ahead in the direction of a fast scroll", async () => {
+    let t = 0;
+    const fetchPage = fakeFetch();
+    const s = new PagedRowSource({
+      rowCount: 1_000_000,
+      columns,
+      fetchPage,
+      pageSize: 100,
+      maxInflight: 16,
+      now: () => t,
+    });
+    s.ensure(0, 40);
+    await flush();
+    // Two pages every 50 ms: fast, downwards.
+    for (let top = 200; top <= 1000; top += 200) {
+      t += 50;
+      s.ensure(top, top + 40);
+      await flush();
+    }
+    const pages = new Set(fetchPage.mock.calls.map((c) => c[0] / 100));
+    // Four pages ahead of page 10, one behind.
+    for (const p of [10, 11, 12, 13, 14, 9]) expect(pages.has(p)).toBe(true);
+    expect(pages.has(15)).toBe(false);
+  });
+
+  it("scrolling up reads ahead upwards", async () => {
+    let t = 0;
+    const fetchPage = fakeFetch();
+    const s = new PagedRowSource({
+      rowCount: 1_000_000,
+      columns,
+      fetchPage,
+      pageSize: 100,
+      maxInflight: 16,
+      now: () => t,
+    });
+    for (const top of [5000, 4800, 4600]) {
+      s.ensure(top, top + 40);
+      await flush();
+      t += 50;
+    }
+    const pages = new Set(fetchPage.mock.calls.map((c) => c[0] / 100));
+    for (const p of [45, 44, 43, 42]) expect(pages.has(p)).toBe(true);
+  });
+
+  it("a fast drag drops the pages it left behind before asking for them", async () => {
+    const { fetchPage, waiting } = heldFetch();
+    const s = new PagedRowSource({
+      rowCount: 50_000_000,
+      columns,
+      fetchPage,
+      pageSize: 500,
+      maxInflight: 2,
+    });
+    // Twenty stops on the way down; the backend answers nothing meanwhile.
+    for (let i = 0; i < 20; i++) s.ensure(i * 2_000_000, i * 2_000_000 + 40);
+    expect(s.pending).toBe(2);
+    expect(s.dropped).toBeGreaterThan(0);
+    // Answer everything: only the first two and where the drag stopped load.
+    while (waiting.length) {
+      waiting.shift()!.release();
+      await flush();
+    }
+    const asked = fetchPage.mock.calls.map((c) => c[0]);
+    expect(asked.length).toBeLessThanOrEqual(2 + 3);
+    expect(s.getValue(38_000_000, 0)).toBe(38_000_000);
+  });
+
+  it("copying (load) never waits behind the queue", async () => {
+    const fetchPage = fakeFetch();
+    const s = new PagedRowSource({ rowCount: 10_000, columns, fetchPage, maxInflight: 1 });
+    await s.load(0, 5000);
+    expect(s.getValue(4999, 0)).toBe(4999);
+  });
+});
