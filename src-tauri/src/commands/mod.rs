@@ -11,6 +11,7 @@ pub mod quality;
 pub mod query;
 pub mod recipe;
 pub mod remote;
+pub mod session;
 pub mod settings;
 pub mod sql;
 pub mod update;

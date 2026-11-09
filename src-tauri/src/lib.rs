@@ -16,6 +16,7 @@ pub mod quality;
 pub mod recipe;
 pub mod remote;
 pub mod sample;
+pub mod session;
 pub mod settings;
 pub mod sources;
 pub mod sql;
@@ -74,8 +75,11 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             menu::install(app)?;
             let paths = app.path();
-            let log_guard = logging::init(&paths.app_log_dir()?);
+            let log_dir = paths.app_log_dir()?;
+            let log_guard = logging::init(&log_dir);
             app.manage(log_guard);
+            session::install_panic_hook(log_dir.clone());
+            app.manage(session::Session::begin(&paths.app_data_dir()?, &log_dir));
 
             let settings_path = paths.app_config_dir()?.join(SETTINGS_FILE);
             let settings = Settings::load_or_default(&settings_path);
@@ -130,6 +134,12 @@ pub fn run() {
             commands::query::cancel_query,
             commands::query::fetch_rows,
             commands::files::open_file,
+            commands::files::source_stamps,
+            commands::session::session_start,
+            commands::session::session_save,
+            commands::session::session_clear,
+            commands::session::report_ui_error,
+            commands::session::diagnostics,
             commands::files::preview_file,
             commands::import::import_file,
             commands::import::cancel_import,
@@ -193,6 +203,10 @@ pub fn run() {
         .expect("error while building DataLiq")
         .run(|app, event| match event {
             tauri::RunEvent::Exit => {
+                // A normal exit: the next start doesn't report a crash.
+                if let Some(session) = app.try_state::<session::Session>() {
+                    session.end();
+                }
                 // Uncached imports are session-only.
                 if let Some(state) = app.try_state::<Arc<commands::import::ImportState>>() {
                     let _ = std::fs::remove_dir_all(&state.temp_dir);

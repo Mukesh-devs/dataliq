@@ -181,3 +181,27 @@ fn caching_off_or_parquet_never_reopens_from_the_cache() {
             .is_none()
     );
 }
+
+#[test]
+fn the_info_carries_the_version_shown_and_a_change_is_seen() {
+    let env = env();
+    let path = env.dir.join("s.csv");
+    std::fs::write(&path, "a,b\n1,2\n").unwrap();
+    let engine = engine(&env);
+    let cache = cache(&env);
+    let info = open::info(&engine, &cache, &path, OpenOptions::default()).unwrap();
+    let shown = info.stamp.clone().expect("a local file has a stamp");
+    let now = dataliq_lib::sources::Source::current_stamp(&path).unwrap();
+    assert_eq!((now.size, now.modified_ms), (shown.size, shown.modified_ms));
+    std::fs::write(&path, "a,b\n1,2\n3,4\n").unwrap();
+    let now = dataliq_lib::sources::Source::current_stamp(&path).unwrap();
+    assert_ne!(now.size, shown.size);
+    // From the cache, the stamp is the imported version's.
+    import(&engine, &cache, &env, &path);
+    let r = open::reopen(&engine, &cache, &path, &OpenOptions::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(r.info.stamp.unwrap().size, now.size);
+    std::fs::remove_file(&path).unwrap();
+    assert!(dataliq_lib::sources::Source::current_stamp(&path).is_none());
+}

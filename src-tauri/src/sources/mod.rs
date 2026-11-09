@@ -79,6 +79,10 @@ pub struct SourceInfo {
     /// A folder or pattern: its files (relative to its folder, at most
     /// [`MAX_LISTED_FILES`]), how many there are, how many were left out.
     pub files: Option<FileList>,
+    /// The version of the files shown (size, last change), to notice when
+    /// they change on disk. None for URLs.
+    #[serde(default)]
+    pub stamp: Option<crate::cache::SourceStamp>,
 }
 
 /// The files a folder or pattern opened together.
@@ -735,7 +739,25 @@ impl Source {
             reader_sql,
             dataset: None,
             path: self.path.clone(),
+            stamp: if self.is_remote() {
+                None
+            } else {
+                self.stamp().ok()
+            },
         })
+    }
+
+    /// The current version of what `path` names (a file, folder or
+    /// pattern): None when it is gone or can't be read.
+    pub fn current_stamp(path: &Path) -> Option<crate::cache::SourceStamp> {
+        if crate::remote::is_url(path) {
+            return None;
+        }
+        if path.is_file() {
+            // Even emptied, it is still there (and changed).
+            return crate::cache::SourceStamp::of(path).ok();
+        }
+        Source::new(path, OpenOptions::default()).ok()?.stamp().ok()
     }
 
     /// The file's name; for a pattern its last two parts (`logs/*.csv.gz`),

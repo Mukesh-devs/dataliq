@@ -107,6 +107,7 @@ import {
 } from "../../lib/layout";
 import { FilterBar } from "../filters/FilterBar";
 import { SearchBox } from "../filters/SearchBox";
+import { DiskChangeNotice } from "./DiskChangeNotice";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
 import { DatabaseSettings } from "../import/DatabaseSettings";
 import { ExcelSettings } from "../import/ExcelSettings";
@@ -1121,6 +1122,11 @@ export function FileView({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      <DiskChangeNotice
+        tab={tab}
+        onReload={onReload}
+        onIgnore={() => useTabs.getState().ignoreOnDisk(tab.id)}
+      />
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="truncate font-medium text-fg" title={tab.path}>
           {tab.title}

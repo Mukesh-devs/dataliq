@@ -14,6 +14,7 @@ import {
   type OpenOptions,
   type DatasetInfo,
   type SourceInfo,
+  type SourceStamp,
 } from "../lib/files";
 import { cancelQuery } from "../lib/ipc";
 import { describeColumns } from "../lib/arrow";
@@ -131,6 +132,10 @@ export interface Tab {
   qualityOpen?: boolean;
   /** A comparison of two files: its counts (the tab's rows are the differences). */
   compare?: CompareInfo;
+  /** The file changed on disk (or is gone) since the tab read it. */
+  onDisk?: { status: "changed" | "missing"; stamp: SourceStamp | null };
+  /** A change on disk the user chose to keep working without. */
+  ignoredStamp?: SourceStamp;
 }
 
 /** What a tab's views, charts and SQL table read: the cleaned rows or the file. */
@@ -248,6 +253,10 @@ interface TabsState {
    * as soon as its data is there.
    */
   restore: (saved: SavedTab[], active: number | null) => Promise<void>;
+  /** The file at `path` changed on disk (or is gone, stamp null). */
+  markOnDisk: (path: string, stamp: SourceStamp | null, missing?: boolean) => void;
+  /** Keep working with the rows as read: no more notice for this version. */
+  ignoreOnDisk: (id: string) => void;
 }
 
 let nextId = 1;
@@ -481,7 +490,14 @@ export const useTabs = create<TabsState>()((set, get) => {
   const load = async (id: string, path: string, options: OpenOptions) => {
     const started = performance.now();
     const requestId = `${id}:${started}`;
-    patch(id, { status: "loading", options, error: undefined, import: undefined });
+    patch(id, {
+      status: "loading",
+      options,
+      error: undefined,
+      import: undefined,
+      onDisk: undefined,
+      ignoredStamp: undefined,
+    });
     const wanted = () => find(id)?.options === options; // not superseded or closed
     try {
       const previewing = previewFile(path, options, requestId);
@@ -787,6 +803,19 @@ export const useTabs = create<TabsState>()((set, get) => {
       }));
       set({ tabs, activeId: tabs[active ?? 0]?.id ?? tabs.at(-1)?.id ?? null });
       await Promise.all(tabs.map((t) => load(t.id, t.path, t.options)));
+    },
+    markOnDisk: (path, stamp, missing = false) =>
+      set((s) => ({
+        tabs: s.tabs.map((t) =>
+          t.path === path && t.status === "ready"
+            ? { ...t, onDisk: { status: missing ? "missing" : "changed", stamp } }
+            : t,
+        ),
+      })),
+    ignoreOnDisk: (id) => {
+      const tab = find(id);
+      if (!tab?.onDisk) return;
+      patch(id, { onDisk: undefined, ignoredStamp: tab.onDisk.stamp ?? undefined });
     },
     close: (id) => {
       const tab = find(id);

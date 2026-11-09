@@ -168,6 +168,33 @@ export interface SourceInfo {
   dataset: DatasetInfo | null;
   /** A folder or pattern of files read as one table. */
   files?: FileList | null;
+  /** The version shown (size, last change); none for URLs. */
+  stamp?: SourceStamp | null;
+}
+
+/** Mirrors `SourceStamp` in src-tauri/src/cache. */
+export interface SourceStamp {
+  path: string;
+  size: number;
+  modifiedMs: number;
+  /** Folders and patterns: a digest of every file's version. */
+  parts?: string;
+}
+
+/** Whether two stamps are the same version of the files. */
+export function sameVersion(a: SourceStamp, b: SourceStamp): boolean {
+  return a.size === b.size && a.modifiedMs === b.modifiedMs && (a.parts ?? "") === (b.parts ?? "");
+}
+
+/** The current version of each path (null: gone). */
+export function sourceStamps(paths: string[]): Promise<(SourceStamp | null)[]> {
+  return call("source_stamps", { paths });
+}
+
+/** A file reopened from the cache turned out to have changed (its path). */
+export async function onSourceChanged(handler: (path: string) => void): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<string>("source-changed", (e) => handler(e.payload));
 }
 
 export function openFile(path: string, options: OpenOptions): Promise<SourceInfo> {

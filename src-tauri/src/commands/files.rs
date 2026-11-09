@@ -78,3 +78,16 @@ pub async fn preview_file(
     .await?;
     Ok(Response::new(bytes))
 }
+
+/// The current version (size, last change) of each path: None for a file
+/// that is gone. The UI compares them with what it opened (`SourceInfo::stamp`).
+#[tauri::command]
+pub async fn source_stamps(paths: Vec<PathBuf>) -> Result<Vec<Option<crate::cache::SourceStamp>>> {
+    blocking(move || {
+        Ok(paths
+            .iter()
+            .map(|p| crate::sources::Source::current_stamp(p))
+            .collect())
+    })
+    .await
+}

@@ -14,6 +14,9 @@ interface SettingsState {
   /** Look for a new version when the app starts (at most daily). */
   checkUpdates: boolean;
   setCheckUpdates: (on: boolean) => void;
+  /** Bring back the last session's tabs (filters, layouts…) at startup. */
+  restoreSession: boolean;
+  setRestoreSession: (on: boolean) => void;
   setTheme: (theme: ThemePreference) => void;
   setDensity: (density: Density) => void;
   /** Cycles system -> light -> dark -> system. */
@@ -36,6 +39,8 @@ export const useSettings = create<SettingsState>()(
       setHeaderCharts: (headerCharts) => set({ headerCharts }),
       checkUpdates: true,
       setCheckUpdates: (checkUpdates) => set({ checkUpdates }),
+      restoreSession: true,
+      setRestoreSession: (restoreSession) => set({ restoreSession }),
       setTheme: (theme) => set({ theme }),
       setDensity: (density) => set({ density }),
       cycleTheme: () => set((s) => ({ theme: nextTheme[s.theme] })),
@@ -47,6 +52,7 @@ export const useSettings = create<SettingsState>()(
         density: s.density,
         headerCharts: s.headerCharts,
         checkUpdates: s.checkUpdates,
+        restoreSession: s.restoreSession,
       }),
     },
   ),

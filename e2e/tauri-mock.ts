@@ -64,6 +64,11 @@ export interface MockOptions {
    * its own first rows (Arrow IPC, base64).
    */
   folders?: Record<string, { like: string; info: Record<string, unknown>; preview?: string }>;
+  /**
+   * What the last session left (`session_start`). Saved sessions are kept
+   * in the page's sessionStorage, so a reload sees them like a restart.
+   */
+  session?: { workspace?: unknown; unclean?: boolean };
 }
 
 /**
@@ -138,11 +143,13 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       comparison,
       quality,
       folders,
+      session,
     }) => {
       const toBuffer = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
       const log: { cmd: string; args: unknown }[] = [];
       const w = window as unknown as Record<string, unknown>;
       w.__invokes = log;
+      w.__sessionGiven = session;
       let nextCallback = 1;
       let nextView = 1;
       let nextResult = 1;
@@ -333,6 +340,34 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
             }
             case "plugin:event|unlisten":
               return null;
+            // A test changes a file "on disk" by setting window.__diskStamps[path].
+            case "source_stamps":
+              return (args.paths as string[]).map((p) => {
+                const changed = (w.__diskStamps as Record<string, unknown> | undefined)?.[p];
+                if (changed !== undefined) return changed;
+                return (folders[p]?.info as { stamp?: unknown } | undefined)?.stamp ?? null;
+              });
+            case "session_start": {
+              const saved = sessionStorage.getItem("__mockSession");
+              const first = !sessionStorage.getItem("__mockSessionStarted");
+              sessionStorage.setItem("__mockSessionStarted", "1");
+              const given = w.__sessionGiven as { workspace?: unknown; unclean?: boolean };
+              return {
+                workspace: saved ? JSON.parse(saved) : first ? (given.workspace ?? null) : null,
+                unclean: first ? !!given.unclean : false,
+              };
+            }
+            case "session_save":
+              sessionStorage.setItem("__mockSession", JSON.stringify(args.workspace));
+              return null;
+            case "session_clear":
+              sessionStorage.removeItem("__mockSession");
+              return null;
+            case "report_ui_error":
+              ((w.__uiErrors ??= []) as unknown[]).push(args.message);
+              return null;
+            case "diagnostics":
+              return "DataLiq 1.6.0\nDuckDB: v1.5.0";
             case "take_startup_files":
               return startupFiles.splice(0);
             case "get_settings":
@@ -559,6 +594,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       comparison: options.comparison,
       quality: options.quality,
       folders: options.folders ?? {},
+      session: options.session ?? {},
     },
   );
 }
