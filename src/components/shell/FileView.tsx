@@ -392,6 +392,18 @@ export function FileView({
 
   // Cleaning steps, applied to the whole file.
   const setRecipe = useTabs((s) => s.setRecipe);
+  const stepView = useTabs((s) => s.undoView);
+  const stepViewForward = useTabs((s) => s.redoView);
+  const viewUndoable = (tab.viewHistory?.past.length ?? 0) > 0;
+  const viewRedoable = (tab.viewHistory?.future.length ?? 0) > 0;
+  const undoView = useCallback(async () => {
+    const what = await stepView(tab.id);
+    notice(what ? `Undid the change to ${what}` : "Nothing to undo");
+  }, [stepView, tab.id, notice]);
+  const redoView = useCallback(async () => {
+    const what = await stepViewForward(tab.id);
+    notice(what ? `Redid the change to ${what}` : "Nothing to redo");
+  }, [stepViewForward, tab.id, notice]);
   const undoRecipe = useTabs((s) => s.undoRecipe);
   const redoRecipe = useTabs((s) => s.redoRecipe);
   const setRecipeOpen = useTabs((s) => s.setRecipeOpen);
@@ -907,6 +919,22 @@ export function FileView({
           });
         }
       }
+      if (viewUndoable)
+        add({
+          id: "undo-view",
+          title: "Undo filter, sort or column change",
+          group: "Edit",
+          keywords: "back revert previous filters columns layout search",
+          run: () => void undoView(),
+        });
+      if (viewRedoable)
+        add({
+          id: "redo-view",
+          title: "Redo filter, sort or column change",
+          group: "Edit",
+          keywords: "forward again filters columns layout search",
+          run: () => void redoView(),
+        });
       if (canUndo)
         add({
           id: "undo-clean",
@@ -1085,12 +1113,17 @@ export function FileView({
       };
       if (mod && key === "g" && source) afterGrid(() => setGoToOpen(true));
       if (mod && key === "e" && canExport) afterGrid(openExport);
+      // Text being edited has its own undo (a checkbox or button doesn't).
       const typing = (e.target as HTMLElement | null)?.closest?.(
-        "input, textarea, select, [contenteditable]",
+        "input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select, [contenteditable]",
       );
       if (mod && key === "z" && recipeOpen && !typing) {
         e.preventDefault();
         void (e.shiftKey ? redoRecipe(tab.id) : undoRecipe(tab.id));
+      } else if (mod && (key === "z" || key === "y") && !typing) {
+        // The filters, sort, search and columns (the recipe has its own, above).
+        e.preventDefault();
+        void (key === "y" || e.shiftKey ? redoView() : undoView());
       }
       if (mod && key === "f" && searchInput.current) {
         // At once, so the next key typed goes in. If the grid then takes
@@ -1118,7 +1151,17 @@ export function FileView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [source, canExport, openExport, recipeOpen, undoRecipe, redoRecipe, tab.id]);
+  }, [
+    source,
+    canExport,
+    openExport,
+    recipeOpen,
+    undoRecipe,
+    redoRecipe,
+    undoView,
+    redoView,
+    tab.id,
+  ]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">

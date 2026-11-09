@@ -54,6 +54,8 @@ export const MENUS: MenuSpec[] = [
   {
     label: "Edit",
     items: [
+      { command: "undo-view", label: "Undo filter, sort or column change" },
+      { command: "redo-view", label: "Redo filter, sort or column change" },
       { command: "undo-clean", label: "Undo cleaning step" },
       { command: "redo-clean", label: "Redo cleaning step" },
       sep,

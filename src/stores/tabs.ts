@@ -86,6 +86,20 @@ export interface RecipeState {
   error?: string;
 }
 
+/** What undo and redo of the view bring back. */
+export interface ViewSnapshot {
+  view?: ViewSpec;
+  layout?: ColumnLayout;
+}
+
+export interface ViewHistory {
+  past: ViewSnapshot[];
+  future: ViewSnapshot[];
+}
+
+/** Changes of one kind this close together are one undo step (a resize drag). */
+const COALESCE_MS = 800;
+
 /** Earlier and undone recipes. */
 export interface RecipeHistory {
   past: RecipeStep[][];
@@ -132,6 +146,8 @@ export interface Tab {
   qualityOpen?: boolean;
   /** A comparison of two files: its counts (the tab's rows are the differences). */
   compare?: CompareInfo;
+  /** Earlier and undone filters, sorts, searches and column layouts. */
+  viewHistory?: ViewHistory;
   /** The file changed on disk (or is gone) since the tab read it. */
   onDisk?: { status: "changed" | "missing"; stamp: SourceStamp | null };
   /** A change on disk the user chose to keep working without. */
@@ -253,6 +269,12 @@ interface TabsState {
    * as soon as its data is there.
    */
   restore: (saved: SavedTab[], active: number | null) => Promise<void>;
+  /**
+   * Back to the filters, sort, search and columns before the last change
+   * (or forward again). Says what changed back ("the sort"), or null.
+   */
+  undoView: (id: string) => Promise<string | null>;
+  redoView: (id: string) => Promise<string | null>;
   /** The file at `path` changed on disk (or is gone, stamp null). */
   markOnDisk: (path: string, stamp: SourceStamp | null, missing?: boolean) => void;
   /** Keep working with the rows as read: no more notice for this version. */
@@ -266,6 +288,45 @@ let nextResult = 1;
 let nextRecipe = 1;
 
 export const useTabs = create<TabsState>()((set, get) => {
+  // When each tab last changed only column widths (a resize drag).
+  const lastResize = new Map<string, number>();
+  /** Records the tab's view and layout before a change, for undo. */
+  const remember = (id: string, next: ViewSnapshot) => {
+    const tab = find(id);
+    if (!tab) return;
+    const now: ViewSnapshot = { view: tab.view, layout: tab.layout };
+    if (sameSnapshot(now, next)) return;
+    const h = tab.viewHistory ?? { past: [], future: [] };
+    const resizing = widthsOnly(now, next);
+    const last = lastResize.get(id);
+    const at = performance.now();
+    if (resizing) lastResize.set(id, at);
+    else lastResize.delete(id);
+    // Dragging a column wider sends many widths: one step.
+    if (resizing && last !== undefined && at - last < COALESCE_MS && h.past.length > 0) {
+      patch(id, { viewHistory: { past: h.past, future: [] } });
+      return;
+    }
+    patch(id, { viewHistory: { past: [...h.past, now].slice(-MAX_HISTORY), future: [] } });
+  };
+  /** Moves one step through the tab's view history. */
+  const stepView = async (id: string, back: boolean): Promise<string | null> => {
+    const tab = find(id);
+    const h = tab?.viewHistory;
+    const target = back ? h?.past.at(-1) : h?.future[0];
+    if (!tab || !h || !target) return null;
+    const now: ViewSnapshot = { view: tab.view, layout: tab.layout };
+    lastResize.delete(id);
+    patch(id, {
+      view: target.view,
+      layout: target.layout,
+      viewHistory: back
+        ? { past: h.past.slice(0, -1), future: [now, ...h.future] }
+        : { past: [...h.past, now], future: h.future.slice(1) },
+    });
+    if (JSON.stringify(now.view ?? {}) !== JSON.stringify(target.view ?? {})) await applyView(id);
+    return describeChange(now, target);
+  };
   const patch = (id: string, changes: Partial<Tab>) =>
     set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...changes } : t)) }));
   const find = (id: string) => get().tabs.find((t) => t.id === id);
@@ -594,6 +655,7 @@ export const useTabs = create<TabsState>()((set, get) => {
         view: undefined,
         viewState: undefined,
         layout: undefined,
+        viewHistory: undefined,
         recipeState: waitingRecipe(tab),
       });
       await load(id, tab.path, options);
@@ -654,7 +716,10 @@ export const useTabs = create<TabsState>()((set, get) => {
             : t,
         ),
       })),
-    setLayout: (id, layout) => patch(id, { layout }),
+    setLayout: (id, layout) => {
+      remember(id, { view: find(id)?.view, layout });
+      patch(id, { layout });
+    },
     setSqlName: (id, sqlName) => patch(id, { sqlName }),
     setMode: (id, mode) => patch(id, { mode }),
     setChart: (id, chart) => patch(id, { chart }),
@@ -739,8 +804,11 @@ export const useTabs = create<TabsState>()((set, get) => {
       return id;
     },
     setView: async (id, view) => {
-      if (!find(id)) return;
-      patch(id, { view: isIdentity(view) ? undefined : view });
+      const tab = find(id);
+      if (!tab) return;
+      const next = isIdentity(view) ? undefined : view;
+      remember(id, { view: next, layout: tab.layout });
+      patch(id, { view: next });
       await applyView(id);
     },
     cancelView: (id) => {
@@ -804,6 +872,8 @@ export const useTabs = create<TabsState>()((set, get) => {
       set({ tabs, activeId: tabs[active ?? 0]?.id ?? tabs.at(-1)?.id ?? null });
       await Promise.all(tabs.map((t) => load(t.id, t.path, t.options)));
     },
+    undoView: (id) => stepView(id, true),
+    redoView: (id) => stepView(id, false),
     markOnDisk: (path, stamp, missing = false) =>
       set((s) => ({
         tabs: s.tabs.map((t) =>
@@ -830,3 +900,35 @@ export const useTabs = create<TabsState>()((set, get) => {
     },
   };
 });
+
+/** Only column widths differ (a resize). */
+function widthsOnly(a: ViewSnapshot, b: ViewSnapshot): boolean {
+  if (JSON.stringify(a.view ?? {}) !== JSON.stringify(b.view ?? {})) return false;
+  if (!a.layout || !b.layout) return false;
+  return (
+    JSON.stringify({ ...a.layout, widths: {} }) === JSON.stringify({ ...b.layout, widths: {} })
+  );
+}
+
+function sameSnapshot(a: ViewSnapshot, b: ViewSnapshot): boolean {
+  return (
+    JSON.stringify(a.view ?? {}) === JSON.stringify(b.view ?? {}) &&
+    JSON.stringify(a.layout ?? null) === JSON.stringify(b.layout ?? null)
+  );
+}
+
+/** What differs between two snapshots, in words ("the sort"). */
+export function describeChange(a: ViewSnapshot, b: ViewSnapshot): string {
+  const va = a.view ?? {};
+  const vb = b.view ?? {};
+  const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+  const parts: string[] = [];
+  if (!same(va.filters?.length ? va.filters : null, vb.filters?.length ? vb.filters : null))
+    parts.push("the filters");
+  if (!same(va.sort?.length ? va.sort : null, vb.sort?.length ? vb.sort : null))
+    parts.push("the sort");
+  if (!same(va.search || null, vb.search || null)) parts.push("the search");
+  if (!same(a.layout, b.layout) || !same(va.columns, vb.columns)) parts.push("the columns");
+  if (parts.length === 0) return "the view";
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
