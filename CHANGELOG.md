@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-09
+
+Speed on big files: faster opening, instant reopening, a grid that reads ahead, and a timer
+and Stop for every long tool.
+
+### Added
+
+- A timer and Stop for Group by / pivot, Join, Append, Sample, Summarize every column, Count
+  values and the JSON structure, in the status bar and in the tool's dialog.
+- A plain warning while a query is using the disk because its data doesn't fit in memory,
+  with how to speed it up; running out of memory (or of space in the temporary folder) says
+  so in plain words, with the fix.
+- CI time budgets for pivot, split export, convert, JSON structure and unnest.
+
+### Changed
+
+- Files imported before reopen at once, with their data, without reading the file (about
+  7 ms instead of up to a second for a .csv.gz); a check of the file's first and last bytes
+  runs in the background and imports again if it changed.
+- Opening a file sniffs it once instead of once for its info, its first rows and its import
+  (first rows of a 100 MB .csv.gz: 0.70 s → 0.50 s), and the import starts as soon as the
+  file's info is known.
+- The grid reads further ahead in the direction you scroll, and a fast drag no longer queues
+  pages it has already left behind.
+- Typing in the search box stops the search still running for the previous text; views over
+  5 million rows wait a little longer for you to stop typing.
+- Very wide files: the column list draws only the columns in view (tested with 2,000), and
+  header histograms are computed for the columns on screen, the rest as you scroll to them.
+
 ## [1.4.0] - 2026-11-08
 
 Flatten and filter nested JSON from the graph view.
@@ -319,7 +348,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.1.0...v1.2.0

@@ -43,10 +43,12 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 - A whole folder or a pattern such as `logs/*.csv.gz` as one table.
 - Files on the web or in S3 with **Open URL**.
 - Delimiters, headers and column types are detected for you, and you can change them.
+- Files you opened before reopen instantly from the cache, checked for changes in the
+  background.
 
 ###  Explore
 
-- A fast grid that scrolls smoothly through millions of rows.
+- A fast grid that scrolls smoothly through millions of rows and thousands of columns.
 - Filter, sort and search any column.
 - Hide, reorder, pin and rename columns; show or hide them all at once, or find them by name.
 - Select cells to see their count, sum, average, min and max in the status bar.
@@ -59,7 +61,7 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 ###  Analyze
 
 - **SQL panel**: query and join every open file as a table; Explain shows the plan.
-- **Data tools** without SQL: group by / pivot, value counts, samples, append and join
+- **Data tools** without SQL (each with a timer and Stop): group by / pivot, value counts, samples, append and join
   tabs, a summary of every column — each result opens as a tab.
 - **Charts**: bar (grouped or stacked), line, pie, histogram, scatter and box plot, export
   as PNG or SVG.
