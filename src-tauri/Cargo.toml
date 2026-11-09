@@ -1,6 +1,6 @@
 [package]
 name = "dataliq"
-version = "1.4.0"
+version = "1.5.0"
 description = "Open huge tabular files instantly"
 authors = ["DataLiq contributors"]
 license = "MIT"
