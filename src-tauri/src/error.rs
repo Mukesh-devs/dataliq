@@ -18,6 +18,16 @@ pub enum AppError {
     /// Not enough free disk space to import into the cache.
     #[error("Not enough free disk space to import this file: about {} needed, {} free. You can read it directly from the file instead (slower), or free up space.", human(*needed), human(*available))]
     LowDisk { needed: u64, available: u64 },
+    /// Not enough free space where an export, a conversion or a sort writes.
+    #[error("Not enough free disk space to {what}: about {} needed, {} free{where_}. {fix}", human(*needed), human(*available))]
+    NoSpace {
+        what: String,
+        needed: u64,
+        available: u64,
+        /// " on the drive of …" (or empty).
+        where_: String,
+        fix: String,
+    },
     /// A query needed more memory than DuckDB may use (and couldn't spill).
     #[error("This needed more memory than DataLiq may use{}. Raise the memory limit in Settings › Memory and speed, filter the rows first, or choose fewer columns.", limit.map(|l| format!(" ({})", human(l))).unwrap_or_default())]
     OutOfMemory { limit: Option<u64> },
@@ -41,6 +51,7 @@ impl AppError {
             AppError::Io(_) => "io",
             AppError::Settings(_) => "settings",
             AppError::LowDisk { .. } => "low-disk",
+            AppError::NoSpace { .. } => "no-space",
             AppError::OutOfMemory { .. } => "out-of-memory",
             AppError::SpillDiskFull => "spill-full",
             AppError::Internal(_) => "internal",

@@ -205,3 +205,78 @@ fn the_info_carries_the_version_shown_and_a_change_is_seen() {
     std::fs::remove_file(&path).unwrap();
     assert!(dataliq_lib::sources::Source::current_stamp(&path).is_none());
 }
+
+#[test]
+fn a_damaged_cache_entry_is_rebuilt() {
+    let env = env();
+    let path = env.dir.join("d.csv");
+    let mut text = String::from("id,name\n");
+    for i in 0..5000 {
+        text.push_str(&format!("{i},name {i}\n"));
+    }
+    std::fs::write(&path, &text).unwrap();
+    let cache = cache(&env);
+    {
+        let engine = engine(&env);
+        import(&engine, &cache, &env, &path);
+    }
+    // The cached database is damaged (a disk error, a file cut short).
+    let db = std::fs::read_dir(env.dir.join("cache"))
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|e| e == "duckdb"))
+        .unwrap();
+    std::fs::write(&db, b"not a database").unwrap();
+
+    // Opening it: no instant reopen, no error either; it is imported again.
+    let engine = engine(&env);
+    assert!(
+        open::reopen(&engine, &cache, &path, &OpenOptions::default())
+            .unwrap()
+            .is_none()
+    );
+    let info = open::info(&engine, &cache, &path, OpenOptions::default()).unwrap();
+    assert!(info.dataset.is_none());
+    let target = ImportTarget {
+        cache: &cache,
+        temp_dir: env.dir.join("tmp"),
+    };
+    let out = open::import(
+        &engine,
+        &Imports::default(),
+        &target,
+        &path,
+        OpenOptions::default(),
+        "j",
+        &|_| {},
+    )
+    .unwrap();
+    assert!(!out.from_cache);
+    assert_eq!(out.dataset.row_count, 5000);
+}
+
+#[test]
+fn a_damaged_entry_met_by_the_import_itself_is_rebuilt_too() {
+    let env = env();
+    let path = env.dir.join("e.csv");
+    std::fs::write(&path, "a\n1\n2\n").unwrap();
+    let cache = cache(&env);
+    {
+        let engine = engine(&env);
+        import(&engine, &cache, &env, &path);
+    }
+    let db = std::fs::read_dir(env.dir.join("cache"))
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|e| e == "duckdb"))
+        .unwrap();
+    std::fs::write(&db, vec![0u8; 4096]).unwrap();
+    let engine = engine(&env);
+    // Straight to the import (an older UI, the CLI): rebuilt, not an error.
+    assert_eq!(
+        import(&engine, &cache, &env, &path),
+        db.file_stem().unwrap().to_string_lossy()
+    );
+}

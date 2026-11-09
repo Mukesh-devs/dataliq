@@ -6,6 +6,7 @@ pub mod cli;
 pub mod commands;
 pub mod compare;
 pub mod connect;
+pub mod disk;
 pub mod engine;
 pub mod error;
 pub mod export;

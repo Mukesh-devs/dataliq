@@ -73,7 +73,11 @@ pub fn reopen(
     };
     let dataset = match engine.datasets.get(&meta.key) {
         Ok(ds) => ds,
-        Err(_) => import::attach(engine, &meta.key, &cache.db_path(&meta.key), meta.row_count)?,
+        // A damaged entry is deleted: the file opens and imports as new.
+        Err(_) => match import::attach_cached(engine, cache, &meta.key, meta.row_count) {
+            Some(ds) => ds,
+            None => return Ok(None),
+        },
     };
     cache.touch(&meta.key);
     info.path = path.to_path_buf();

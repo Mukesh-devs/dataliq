@@ -70,6 +70,11 @@ pub fn digest_parts(parts: &[SourceStamp]) -> String {
         .collect()
 }
 
+/// A cache key: 32 hex digits (other files in the folder are left alone).
+fn is_key(name: &str) -> bool {
+    name.len() == 32 && name.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 /// Stable cache key for a file version + import options.
 pub fn cache_key(stamp: &SourceStamp, options: &OpenOptions) -> String {
     let mut h = Sha256::new();
@@ -172,7 +177,10 @@ impl Cache {
             enabled: AtomicBool::new(config.enabled),
             max_bytes: AtomicU64::new(config.max_bytes),
         };
-        cache.remove_partials();
+        let swept = cache.sweep();
+        if swept > 0 {
+            tracing::info!("cache: removed {swept} leftover files");
+        }
         Ok(cache)
     }
 
@@ -253,15 +261,54 @@ impl Cache {
         let _ = std::fs::remove_file(p.with_extension("partial.wal"));
     }
 
-    fn remove_partials(&self) {
-        if let Ok(rd) = std::fs::read_dir(&self.dir) {
-            for e in rd.flatten() {
-                let name = e.file_name().to_string_lossy().into_owned();
-                if name.contains(".duckdb.partial") {
-                    let _ = std::fs::remove_file(e.path());
+    /// Removes what no entry uses: imports that never finished (`.partial`
+    /// and their WAL), a database without its JSON or the other way round
+    /// (a crash between the two, an entry dropped while attached), WAL
+    /// files left by a crash, and aliases to entries that are gone. Run at
+    /// start, before anything is attached. Returns the files removed.
+    pub fn sweep(&self) -> usize {
+        let Ok(rd) = std::fs::read_dir(&self.dir) else {
+            return 0;
+        };
+        let names: Vec<String> = rd
+            .flatten()
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        let has = |n: &str| names.iter().any(|x| x == n);
+        let mut removed = 0;
+        for name in &names {
+            // An import that never finished (only DataLiq writes these).
+            if name.contains(".duckdb.partial") {
+                if std::fs::remove_file(self.dir.join(name)).is_ok() {
+                    removed += 1;
                 }
+                continue;
+            }
+            // Otherwise only files named after a cache key: the folder may
+            // be one the user chose, with files of their own.
+            let Some((key, ext)) = name.split_once('.') else {
+                continue;
+            };
+            if !is_key(key) {
+                continue;
+            }
+            let leftover = match ext {
+                // Read-only attaches write no WAL: one is left by a crash.
+                "duckdb.wal" => true,
+                "duckdb" => !has(&format!("{key}.json")),
+                "json" => !has(&format!("{key}.duckdb")),
+                "alias" => {
+                    let target = std::fs::read_to_string(self.dir.join(name)).unwrap_or_default();
+                    !has(&format!("{}.duckdb", target.trim()))
+                }
+                _ => false,
+            };
+            if leftover && std::fs::remove_file(self.dir.join(name)).is_ok() {
+                removed += 1;
             }
         }
+        removed
     }
 
     fn entries(&self) -> Vec<(CacheMeta, u64)> {
@@ -458,6 +505,46 @@ mod tests {
         assert_eq!(cache.info().used_bytes, 2000);
         assert_eq!(cache.clear(&["open".to_string()]), 1);
         assert_eq!(cache.info().entries, 1);
+    }
+
+    #[test]
+    fn leftovers_are_swept_but_other_files_are_left_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = |c: char| c.to_string().repeat(32);
+        let cache = Cache::new(CacheConfig {
+            dir: dir.path().into(),
+            max_bytes: 1 << 30,
+            enabled: true,
+        })
+        .unwrap();
+        fake_entry(&cache, &k('a'), 10, 1);
+        let files = [
+            format!("{}.duckdb", k('b')),     // no JSON: an import cut short
+            format!("{}.json", k('c')),       // no database: dropped while attached
+            format!("{}.duckdb.wal", k('a')), // a crash while attached
+            format!("{}.alias", k('d')),      // points nowhere
+            "mine.duckdb".to_string(),        // the user's own
+            "notes.json".to_string(),
+        ];
+        for f in &files {
+            std::fs::write(dir.path().join(f), b"x").unwrap();
+        }
+        std::fs::write(dir.path().join(format!("{}.alias", k('e'))), k('a')).unwrap();
+        assert_eq!(cache.sweep(), 4);
+        let left: std::collections::BTreeSet<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        let want: std::collections::BTreeSet<String> = [
+            format!("{}.duckdb", k('a')),
+            format!("{}.json", k('a')),
+            format!("{}.alias", k('e')),
+            "mine.duckdb".to_string(),
+            "notes.json".to_string(),
+        ]
+        .into();
+        assert_eq!(left, want);
     }
 
     #[test]

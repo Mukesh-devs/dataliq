@@ -14,6 +14,7 @@ mod convert;
 mod copy_sql;
 mod csv_sources;
 mod databases;
+mod disk_space;
 mod engine_query;
 mod excel_sources;
 mod export;

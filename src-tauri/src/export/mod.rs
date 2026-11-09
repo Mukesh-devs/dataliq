@@ -374,8 +374,53 @@ fn partial_path(path: &Path) -> PathBuf {
     path.with_file_name(name)
 }
 
+/// About how many bytes exporting `req` writes (see [`crate::disk`]).
+pub fn estimated_bytes(engine: &Engine, req: &ExportRequest) -> Result<u64> {
+    let ds = engine.datasets.get(&req.dataset_id)?;
+    let schema = engine.dataset_columns(&req.dataset_id)?;
+    let columns = export_columns(req, &schema);
+    let rows = match &req.options.rows {
+        Some(ranges) if !ranges.is_empty() => {
+            ranges.iter().map(|[a, b]| b.saturating_sub(*a)).sum()
+        }
+        _ => req.total_rows.unwrap_or(ds.row_count).min(ds.row_count),
+    };
+    // The width of the dataset's own rows: reading the view's first rows
+    // could mean sorting all of them.
+    let rel = Relation::of(&ds.source);
+    let mut width = crate::disk::row_text_bytes(engine, &rel.sql, &rel.params, Some(&columns))?;
+    if matches!(req.format, ExportFormat::Json | ExportFormat::Ndjson) {
+        width += crate::disk::json_overhead(&columns);
+    }
+    Ok((rows as f64 * width * crate::disk::format_ratio(req.format)) as u64)
+}
+
 /// Exports `req`, reporting progress, until done or cancelled by `job_id`.
+/// Refuses at once when the drive clearly hasn't room for it.
 pub fn export(
+    engine: &Engine,
+    exports: &Exports,
+    req: &ExportRequest,
+    job_id: &str,
+    on_progress: &(dyn Fn(ExportProgress) + Sync),
+) -> Result<ExportOutcome> {
+    let dir = crate::disk::existing_dir(&req.path).to_path_buf();
+    let what = "export these rows";
+    // An estimate that can't be made (an odd column) lets the export go ahead.
+    if let Ok(needed) = estimated_bytes(engine, req) {
+        crate::disk::ensure_space(
+            &dir,
+            needed,
+            what,
+            "Free up space, choose another folder or a smaller format (Parquet, CSV.gz), \
+             or export fewer rows or columns.",
+        )?;
+    }
+    write_export(engine, exports, req, job_id, on_progress)
+        .map_err(|e| crate::disk::full_while_writing(e, &dir, what))
+}
+
+fn write_export(
     engine: &Engine,
     exports: &Exports,
     req: &ExportRequest,

@@ -60,6 +60,9 @@ fn record() -> serde_json::Value {
         let real_str = real.to_string_lossy().replace('\'', "''");
         let real_display = real.display().to_string();
         info["path"] = (*fake).into();
+        // Where and when the fixture was written is this machine's; the UI
+        // flows that watch for changes give their own.
+        info["stamp"] = serde_json::Value::Null;
         // Mirror `open_file`: Parquet is queried in place, so it has a dataset
         // at once (with a stable id; real ids hash the file's mtime).
         if source.is_queried_in_place() {

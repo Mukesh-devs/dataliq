@@ -98,6 +98,42 @@ pub(crate) fn attach(
     Ok(dataset)
 }
 
+/// Attaches cache entry `key` and checks it holds its rows. A damaged
+/// entry (unreadable file, wrong row count) is detached and deleted:
+/// None, and the caller imports the file again.
+pub(crate) fn attach_cached(
+    engine: &Engine,
+    cache: &Cache,
+    key: &str,
+    row_count: u64,
+) -> Option<Dataset> {
+    let check = || -> Result<Dataset> {
+        let ds = attach(engine, key, &cache.db_path(key), row_count)?;
+        // Kept in the file's metadata: no scan.
+        let rows: i64 = engine.connection()?.query_row(
+            &format!("SELECT count(*) FROM {}.main.data", alias(key)),
+            [],
+            |r| r.get(0),
+        )?;
+        if rows as u64 != row_count {
+            return Err(AppError::Internal(format!(
+                "{rows} rows instead of {row_count}"
+            )));
+        }
+        Ok(ds)
+    };
+    match check() {
+        Ok(ds) => Some(ds),
+        Err(e) => {
+            tracing::warn!("cache entry {key} is damaged ({e}); importing again");
+            engine.datasets.remove(key);
+            let _ = engine.execute_batch(&format!("DETACH DATABASE IF EXISTS {}", alias(key)));
+            cache.remove(key);
+            None
+        }
+    }
+}
+
 /// Closes a dataset: removes it from the registry and detaches its database.
 pub fn close_dataset(engine: &Engine, id: &str) -> Result<()> {
     // Stop a view that is still being written in the background.
@@ -195,16 +231,18 @@ fn import_once(
             elapsed_ms: 0,
         });
     }
-    // Reopen an unchanged file: attach the cached database.
+    // Reopen an unchanged file: attach the cached database (a damaged one
+    // is deleted and the file imported again).
     if caching {
         if let Some(meta) = cache.lookup(&key) {
-            let ds = attach(engine, &key, &cache.db_path(&key), meta.row_count)?;
-            cache.touch(&key);
-            return Ok(ImportOutcome {
-                dataset: ds,
-                from_cache: true,
-                elapsed_ms: started.elapsed().as_millis() as u64,
-            });
+            if let Some(ds) = attach_cached(engine, cache, &key, meta.row_count) {
+                cache.touch(&key);
+                return Ok(ImportOutcome {
+                    dataset: ds,
+                    from_cache: true,
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                });
+            }
         }
     }
 
