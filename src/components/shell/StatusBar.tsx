@@ -18,6 +18,7 @@ import { useNotice } from "../../stores/notice";
 import { useSelection } from "../../stores/selection";
 import { useSettings, type ThemePreference } from "../../stores/settings";
 import { Button, IconButton } from "../ui/Button";
+import { JobsIndicator } from "./JobsIndicator";
 
 const themeIcon: Record<ThemePreference, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
 const themeLabel: Record<ThemePreference, string> = {
@@ -50,6 +51,7 @@ export function StatusBar({ message, action }: StatusBarProps) {
           {action.label}
         </Button>
       )}
+      <JobsIndicator />
       <span className="flex-1" />
       <SelectionStatsStrip />
       <MemoryIndicator />

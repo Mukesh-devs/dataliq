@@ -44,6 +44,7 @@ import {
 import type { Param } from "../../lib/ipc";
 import { filterTarget, statsSpec, type Filter, type ViewSpec } from "../../lib/view";
 import { useAppliedTheme } from "../../stores/appliedTheme";
+import { asJob, toolRequestId } from "../../stores/jobs";
 import { useNotice } from "../../stores/notice";
 import { NOT_LOADED, type RowSource } from "../grid/rowSource";
 import { Button, IconButton } from "../ui/Button";
@@ -169,12 +170,16 @@ export function JsonGraphPanel({
   const statsKey = JSON.stringify(statsSpec(view));
   // The deep count (keys among arrays' items) costs one more pass: on demand.
   const [deep, setDeep] = useState(false);
-  const want = mode === "record" ? `record:${row}` : `structure:${deep}:${statsKey}`;
+  // Bumped by "Read it again" after a stop.
+  const [retry, setRetry] = useState(0);
+  const want = mode === "record" ? `record:${row}` : `structure:${deep}:${statsKey}:${retry}`;
   const [loaded, setLoaded] = useState<{
     key: string;
     value?: Record<string, JsonValue>;
     shape?: JsonShape;
     error?: string;
+    /** The structure was stopped from the status bar. */
+    stopped?: boolean;
   } | null>(null);
 
   // The record: one row of the view, read from the grid's pages.
@@ -209,23 +214,29 @@ export function JsonGraphPanel({
   useEffect(() => {
     if (mode !== "structure" || !datasetId) return;
     let alive = true;
-    const key = `structure:${deep}:${statsKey}`;
-    jsonShape(datasetId, JSON.parse(statsKey) as ViewSpec, `shape:${tabId}`, deep).then(
+    const key = `structure:${deep}:${statsKey}:${retry}`;
+    const requestId = toolRequestId("shape");
+    asJob(`Reading the structure of ${title}`, requestId, () =>
+      jsonShape(datasetId, JSON.parse(statsKey) as ViewSpec, `shape:${tabId}`, deep, requestId),
+    ).then(
       (shape) => alive && setLoaded({ key, shape }),
       (e: unknown) => {
-        if (alive && (e as { kind?: string }).kind !== "cancelled")
-          setLoaded({ key, error: e instanceof Error ? e.message : String(e) });
+        if (!alive) return;
+        // Still wanted, so stopped by the user (a newer ask would have unmounted this one).
+        if ((e as { kind?: string }).kind === "cancelled") setLoaded({ key, stopped: true });
+        else setLoaded({ key, error: e instanceof Error ? e.message : String(e) });
       },
     );
     return () => {
       alive = false;
     };
-  }, [mode, datasetId, statsKey, tabId, deep]);
+  }, [mode, datasetId, statsKey, tabId, deep, title, retry]);
 
   const current = loaded?.key === want ? loaded : null;
   const loading = current === null && (mode === "structure" ? !!datasetId : source.rowCount > 0);
   const value = current?.value ?? null;
   const error = current?.error ?? null;
+  const stopped = !!current?.stopped;
 
   // Paging, collapsing and the selection belong to one record (or structure):
   // kept with its key, so a new one starts fresh.
@@ -535,7 +546,14 @@ export function JsonGraphPanel({
         </p>
       )}
       <div className="flex min-h-0 flex-1">
-        {error ? (
+        {stopped ? (
+          <p className="m-4 flex items-center gap-2 text-fg-muted">
+            Stopped reading the structure.
+            <Button size="sm" variant="ghost" onClick={() => setRetry((n) => n + 1)}>
+              Read it again
+            </Button>
+          </p>
+        ) : error ? (
           <p role="alert" className="m-4 text-fg-muted">
             Couldn’t draw the graph: {error}
           </p>

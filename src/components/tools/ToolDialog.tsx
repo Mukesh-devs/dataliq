@@ -1,6 +1,8 @@
 import * as Popover from "@radix-ui/react-popover";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useTicker } from "../../lib/useTicker";
+import { formatElapsed, useJobs } from "../../stores/jobs";
 import { Button } from "../ui/Button";
 
 interface ToolDialogProps {
@@ -30,22 +32,29 @@ export function ToolDialog({
   children,
   width = "w-96",
 }: ToolDialogProps) {
-  const [running, setRunning] = useState(false);
+  // When Run was pressed (the queries started since then are this run's).
+  const [runningSince, setRunningSince] = useState<number | null>(null);
+  const running = runningSince !== null;
   const [error, setError] = useState<string>();
+  const now = useTicker(running);
   const run = async () => {
     if (blocked || running) return;
-    setRunning(true);
+    setRunningSince(performance.now());
     setError(undefined);
     try {
       await onRun();
       onClose();
     } catch (e) {
-      if ((e as { kind?: string }).kind === "cancelled") return;
+      if ((e as { kind?: string }).kind === "cancelled") {
+        setError("Stopped.");
+        return;
+      }
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setRunning(false);
+      setRunningSince(null);
     }
   };
+  const stop = () => runningSince !== null && useJobs.getState().cancelSince(runningSince);
   return (
     <Popover.Root open onOpenChange={(o) => !o && onClose()}>
       <Popover.Anchor className="absolute top-2 left-1/2" />
@@ -73,9 +82,20 @@ export function ToolDialog({
             )}
             <div className="flex items-center justify-end gap-2">
               {blocked && <span className="mr-auto text-fg-subtle">{blocked}</span>}
-              <Button size="sm" variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
+              {running && (
+                <span className="tabular mr-auto text-fg-subtle" aria-live="off">
+                  Running… {formatElapsed(Math.max(0, now - runningSince))}
+                </span>
+              )}
+              {running ? (
+                <Button size="sm" variant="ghost" onClick={stop}>
+                  Stop
+                </Button>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+              )}
               <Button type="submit" size="sm" variant="primary" disabled={!!blocked || running}>
                 {running && <LoaderCircle className="size-3.5 animate-spin" aria-hidden />}
                 {runLabel}
