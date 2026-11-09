@@ -33,6 +33,7 @@ import { cn } from "../../lib/cn";
 import { useApp } from "../../stores/app";
 import { baseOf, type Tab } from "../../stores/tabs";
 import { Button } from "../ui/Button";
+import { VirtualList } from "../ui/VirtualList";
 
 function Section({
   title,
@@ -169,6 +170,38 @@ const linkButton =
  * The active file's columns: tick to show or hide, in display order. A box
  * on top shows or hides all of them (or all that match the search).
  */
+/** Past this many columns the list renders only the rows in view. */
+const VIRTUAL_FROM = 150;
+const ROW_HEIGHT = 24;
+
+/** The columns' rows: a plain list, or a windowed one for very wide files. */
+function ColumnRows({
+  names,
+  renderRow,
+}: {
+  names: string[];
+  renderRow: (name: string) => ReactNode;
+}) {
+  if (names.length < VIRTUAL_FROM) {
+    return (
+      <ul aria-label="Columns" className="flex flex-col">
+        {names.map((name) => (
+          <li key={name}>{renderRow(name)}</li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <VirtualList
+      aria-label="Columns"
+      count={names.length}
+      rowHeight={ROW_HEIGHT}
+      height={Math.max(240, Math.round(window.innerHeight * 0.55))}
+      renderRow={(i) => renderRow(names[i]!)}
+    />
+  );
+}
+
 function ColumnList({
   tab,
   onLayoutChange,
@@ -265,36 +298,33 @@ function ColumnList({
       {matching.length === 0 ? (
         <p className="px-1.5 text-[12px] text-fg-subtle">No columns match “{query.trim()}”</p>
       ) : (
-        <ul aria-label="Columns" className="flex flex-col">
-          {matching.map((name) => (
-            <li key={name}>
-              <label
-                // At least 24px tall: each checkbox gets a 24px target (WCAG 2.5.8).
-                className="flex min-h-6 items-center gap-2 rounded-[var(--radius)] px-1.5 text-[12px] text-fg-muted hover:bg-hover"
-                title={name}
+        <ColumnRows
+          names={matching}
+          renderRow={(name) => (
+            <label
+              // At least 24px tall: each checkbox gets a 24px target (WCAG 2.5.8).
+              className="flex min-h-6 items-center gap-2 rounded-[var(--radius)] px-1.5 text-[12px] text-fg-muted hover:bg-hover"
+              title={name}
+            >
+              <input
+                type="checkbox"
+                aria-label={`Show ${label(layout, name)}`}
+                checked={!hidden.has(name)}
+                disabled={!change || (!hidden.has(name) && shown === 1)}
+                onChange={(e) => change?.(setHidden(layout, name, !e.target.checked))}
+              />
+              <KindIcon kind={kinds.get(name)} />
+              <span
+                className={hidden.has(name) ? "flex-1 truncate text-fg-subtle" : "flex-1 truncate"}
               >
-                <input
-                  type="checkbox"
-                  aria-label={`Show ${label(layout, name)}`}
-                  checked={!hidden.has(name)}
-                  disabled={!change || (!hidden.has(name) && shown === 1)}
-                  onChange={(e) => change?.(setHidden(layout, name, !e.target.checked))}
-                />
-                <KindIcon kind={kinds.get(name)} />
-                <span
-                  className={
-                    hidden.has(name) ? "flex-1 truncate text-fg-subtle" : "flex-1 truncate"
-                  }
-                >
-                  {label(layout, name)}
-                </span>
-                {layout.pinned.includes(name) && (
-                  <Pin className="size-3 text-fg-subtle" aria-label="Pinned" />
-                )}
-              </label>
-            </li>
-          ))}
-        </ul>
+                {label(layout, name)}
+              </span>
+              {layout.pinned.includes(name) && (
+                <Pin className="size-3 text-fg-subtle" aria-label="Pinned" />
+              )}
+            </label>
+          )}
+        />
       )}
     </div>
   );

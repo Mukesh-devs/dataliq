@@ -291,3 +291,12 @@ export function viewSql(
 ): Promise<string> {
   return call("view_sql", { datasetId, spec, reader, labels });
 }
+
+/** Whether two views differ in their search only (or not at all). */
+export function differsInSearchOnly(a: ViewSpec, b: ViewSpec): boolean {
+  const rest = (v: ViewSpec) => JSON.stringify({ ...v, search: undefined });
+  return rest(a) === rest(b);
+}
+
+/** Rows past which the search waits longer for typing to stop. */
+export const BIG_SEARCH_ROWS = 5_000_000;

@@ -20,6 +20,17 @@ describe("SearchBox", () => {
     expect(onChange).toHaveBeenCalledWith("smith");
   });
 
+  it("says when a new burst of typing starts, once per burst", () => {
+    const onTyping = vi.fn();
+    render(<SearchBox value="" onChange={() => {}} debounceMs={300} onTyping={onTyping} />);
+    fireEvent.change(input(), { target: { value: "s" } });
+    fireEvent.change(input(), { target: { value: "sm" } });
+    expect(onTyping).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(300));
+    fireEvent.change(input(), { target: { value: "smi" } });
+    expect(onTyping).toHaveBeenCalledTimes(2);
+  });
+
   it("Enter searches at once; Escape and × clear", () => {
     const onChange = vi.fn();
     const { rerender } = render(<SearchBox value="" onChange={onChange} />);

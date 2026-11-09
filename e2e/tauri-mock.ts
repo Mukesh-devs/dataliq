@@ -60,9 +60,10 @@ export interface MockOptions {
   quality?: unknown;
   /**
    * Folders, patterns and URLs that open like a recorded file (`like`),
-   * with changes to its info (e.g. `files`, `fileName`).
+   * with changes to its info (e.g. `files`, `fileName`) and, optionally,
+   * its own first rows (Arrow IPC, base64).
    */
-  folders?: Record<string, { like: string; info: Record<string, unknown> }>;
+  folders?: Record<string, { like: string; info: Record<string, unknown>; preview?: string }>;
 }
 
 /**
@@ -182,7 +183,11 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
           const recorded = recordings.files[folder ? folder.like : String(args.path)];
           const file =
             recorded && folder
-              ? { ...recorded, info: { ...(recorded.info as object), ...folder.info } }
+              ? {
+                  ...recorded,
+                  preview: folder.preview ?? recorded.preview,
+                  info: { ...(recorded.info as object), ...folder.info },
+                }
               : recorded;
           switch (cmd) {
             case "run_query": {
