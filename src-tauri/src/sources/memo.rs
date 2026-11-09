@@ -56,6 +56,10 @@ impl<T: Clone> Memo<T> {
         Ok(v)
     }
 
+    pub(crate) fn clear(&self) {
+        self.slots.lock().clear();
+    }
+
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.slots.lock().len()

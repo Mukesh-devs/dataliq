@@ -96,6 +96,19 @@ pub struct FileList {
 /// Files named in [`FileList::names`] (the count is always exact).
 pub const MAX_LISTED_FILES: usize = 500;
 
+// What the sniffer, `DESCRIBE` and inspecting found, per file version (see `memo`).
+static SNIFFED: memo::Memo<(SniffedCsv, usize, String)> = memo::Memo::new();
+static COLUMNS: memo::Memo<Vec<ColumnMeta>> = memo::Memo::new();
+static INSPECTED: memo::Memo<SourceInfo> = memo::Memo::new();
+
+/// Forgets what was sniffed and inspected this session, so the next open
+/// reads files afresh (benchmarks of a first open).
+pub fn forget_inspections() {
+    SNIFFED.clear();
+    COLUMNS.clear();
+    INSPECTED.clear();
+}
+
 /// A file (or a folder or pattern of files) plus the options to read it:
 /// everything needed to build its SQL.
 #[derive(Debug, Clone)]
@@ -432,7 +445,6 @@ impl Source {
     /// Runs DuckDB's CSV sniffer. Returns the settings plus (column count,
     /// first column name).
     fn sniff_raw(&self, engine: &Engine) -> Result<(SniffedCsv, usize, String)> {
-        static SNIFFED: memo::Memo<(SniffedCsv, usize, String)> = memo::Memo::new();
         SNIFFED.get_or_try(self.memo_key("sniff"), || self.sniff_uncached(engine))
     }
 
@@ -627,7 +639,6 @@ impl Source {
 
     /// Column names and DuckDB types, via `DESCRIBE`.
     pub fn columns(&self, engine: &Engine) -> Result<Vec<ColumnMeta>> {
-        static COLUMNS: memo::Memo<Vec<ColumnMeta>> = memo::Memo::new();
         if self.is_excel() {
             return self.columns_uncached(engine);
         }
@@ -668,7 +679,6 @@ impl Source {
 
     /// Detects, sniffs and describes the file.
     pub fn inspect(&self, engine: &Engine) -> Result<SourceInfo> {
-        static INSPECTED: memo::Memo<SourceInfo> = memo::Memo::new();
         INSPECTED.get_or_try(self.memo_key("inspect"), || self.inspect_uncached(engine))
     }
 

@@ -1,7 +1,8 @@
 name: Bench
 
 # Small benchmark suite (100 MB fixtures) with a regression guard: fails when
-# a flow gets more than 30% slower than bench/baseline/<os>.json.
+# a flow gets more than 30% slower than bench/baseline/<os>.json, or takes
+# longer than its time budget in bench/budgets.json.
 # Also runs when the benchmark itself changes, so a new baseline can be recorded.
 on:
   workflow_dispatch:
@@ -11,6 +12,9 @@ on:
     branches: ["**"]
     paths:
       - "bench/**"
+      # The engine, its readers and tools: their time budgets are checked here.
+      - "src-tauri/src/**"
+      - "src-tauri/Cargo.lock"
       - "scripts/bench.mjs"
       - "src-tauri/tests/it/bench_small.rs"
       - ".github/workflows/bench.yml"
