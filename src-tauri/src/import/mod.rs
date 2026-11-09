@@ -77,7 +77,12 @@ fn sql_string(s: &str) -> String {
 }
 
 /// Attaches a finished database read-only and registers it as a dataset.
-fn attach(engine: &Engine, key: &str, db: &std::path::Path, row_count: u64) -> Result<Dataset> {
+pub(crate) fn attach(
+    engine: &Engine,
+    key: &str,
+    db: &std::path::Path,
+    row_count: u64,
+) -> Result<Dataset> {
     let alias = alias(key);
     engine.execute_batch(&format!(
         "ATTACH IF NOT EXISTS {} AS {alias} (READ_ONLY)",
@@ -381,12 +386,23 @@ fn import_once(
     };
 
     if caching {
+        // What a reopen shows without reading the file again (the sniff and
+        // columns are remembered from opening it, so this costs nothing).
+        let info = source
+            .inspect(engine)
+            .ok()
+            .and_then(|i| serde_json::to_value(i).ok());
+        let fingerprint = (!source.is_multi())
+            .then(|| cache::fingerprint(&stamp.path))
+            .flatten();
         let meta = CacheMeta {
             key: key.clone(),
             source: stamp,
             row_count: rows,
             created_ms: cache::now_ms(),
             last_used_ms: cache::now_ms(),
+            info,
+            fingerprint,
         };
         cache.commit(&meta)?;
     } else {

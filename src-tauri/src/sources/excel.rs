@@ -25,7 +25,7 @@ pub struct ExcelOptions {
 }
 
 /// What was detected, for the sheet picker and header row choice.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExcelInfo {
     pub sheets: Vec<String>,

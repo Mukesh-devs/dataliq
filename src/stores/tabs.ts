@@ -262,7 +262,13 @@ export const useTabs = create<TabsState>()((set, get) => {
   const find = (id: string) => get().tabs.find((t) => t.id === id);
 
   /** Imports the full file in the background; the preview stays usable. */
-  const startImport = async (id: string, path: string, options: OpenOptions) => {
+  const startImport = async (
+    id: string,
+    path: string,
+    options: OpenOptions,
+    /** The file's info, when the tab doesn't hold it yet (still loading). */
+    opened?: SourceInfo,
+  ) => {
     const jobId = `job-${nextJob++}`;
     patch(id, { import: { jobId, status: "running", percent: null, elapsedMs: 0 } });
     const isCurrent = () => find(id)?.import?.jobId === jobId;
@@ -273,8 +279,9 @@ export const useTabs = create<TabsState>()((set, get) => {
         void closeDataset(outcome.dataset.id).catch(() => {});
         return;
       }
+      const info = opened ?? tab.info;
       patch(id, {
-        info: tab.info ? { ...tab.info, dataset: outcome.dataset } : tab.info,
+        info: info ? { ...info, dataset: outcome.dataset } : info,
         import: {
           jobId,
           status: "done",
@@ -475,18 +482,37 @@ export const useTabs = create<TabsState>()((set, get) => {
     const started = performance.now();
     const requestId = `${id}:${started}`;
     patch(id, { status: "loading", options, error: undefined, import: undefined });
+    const wanted = () => find(id)?.options === options; // not superseded or closed
     try {
-      const [info, preview] = await Promise.all([
-        openFile(path, options),
-        previewFile(path, options, requestId),
-      ]);
-      const current = find(id);
-      if (!current || current.options !== options) return; // superseded or closed
-      patch(id, { status: "ready", info, preview, previewMs: performance.now() - started });
-      if (!info.dataset) void startImport(id, path, options);
-      // Data available at once (Parquet in place): a kept recipe and view apply now.
-      else void refresh(id);
+      const previewing = previewFile(path, options, requestId);
+      // Awaited below; this keeps a failure from going unhandled meanwhile.
+      previewing.catch(() => {});
+      const info = await openFile(path, options);
+      if (!wanted()) return;
+      // The import starts as soon as the file's info is back, alongside the
+      // preview (it used to wait for both).
+      if (!info.dataset) void startImport(id, path, options, info);
+      const preview = await previewing;
+      if (!wanted()) return;
+      // An import that finished first has put its dataset on the tab's info.
+      const landed = find(id)?.info;
+      patch(id, {
+        status: "ready",
+        info: landed?.dataset ? landed : info,
+        preview,
+        previewMs: performance.now() - started,
+        // Imported before: the data came with the info, from the cache.
+        ...(info.dataset?.cached && {
+          import: { jobId: "cache", status: "done", percent: 100, elapsedMs: 0, fromCache: true },
+        }),
+      });
+      // Data available at once (Parquet in place, or from the cache): a
+      // kept recipe and view apply now.
+      if (info.dataset) void refresh(id);
     } catch (err) {
+      // The preview failed after the import started: stop it (the tab shows the error).
+      const job = find(id)?.import;
+      if (wanted() && job?.status === "running") void cancelImport(job.jobId).catch(() => {});
       const current = find(id);
       if (!current || current.options !== options) return;
       const kind = (err as { kind?: string }).kind;

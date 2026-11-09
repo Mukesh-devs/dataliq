@@ -100,6 +100,44 @@ pub struct CacheMeta {
     pub row_count: u64,
     pub created_ms: u64,
     pub last_used_ms: u64,
+    /// What opening the file showed (columns, detected settings): a reopen
+    /// returns it without reading the file. Entries from before 1.5 have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info: Option<serde_json::Value>,
+    /// A digest of the file's first and last bytes (see [`fingerprint`]),
+    /// checked in the background after a reopen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+}
+
+/// Bytes read from each end of a file for its [`fingerprint`].
+const FINGERPRINT_BYTES: u64 = 64 << 10;
+
+/// A digest of a file's size and its first and last 64 KiB: tells an edit
+/// that kept the size and the time of last change (a copy that kept the
+/// original's time, a tool that restores it) from the file imported.
+pub fn fingerprint(path: &Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path).ok()?;
+    let len = f.metadata().ok()?.len();
+    let mut h = Sha256::new();
+    h.update(len.to_le_bytes());
+    let mut buf = vec![0u8; FINGERPRINT_BYTES.min(len) as usize];
+    f.read_exact(&mut buf).ok()?;
+    h.update(&buf);
+    if len > FINGERPRINT_BYTES {
+        let tail = FINGERPRINT_BYTES.min(len - FINGERPRINT_BYTES);
+        f.seek(SeekFrom::End(-(tail as i64))).ok()?;
+        buf.truncate(tail as usize);
+        f.read_exact(&mut buf).ok()?;
+        h.update(&buf);
+    }
+    Some(
+        h.finalize()[..16]
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -148,6 +186,33 @@ impl Cache {
 
     fn meta_path(&self, key: &str) -> PathBuf {
         self.dir.join(format!("{key}.json"))
+    }
+
+    fn alias_path(&self, key: &str) -> PathBuf {
+        self.dir.join(format!("{key}.alias"))
+    }
+
+    /// Notes that opening with `open_key` (the options as asked, before the
+    /// CSV delimiter was worked out) lands on the entry `key`.
+    pub fn link(&self, open_key: &str, key: &str) {
+        if open_key != key {
+            let _ = std::fs::write(self.alias_path(open_key), key);
+        }
+    }
+
+    /// The entry a file opened with `open_key` was imported into, if any.
+    pub fn lookup_open(&self, open_key: &str) -> Option<CacheMeta> {
+        self.lookup(open_key).or_else(|| {
+            let key = std::fs::read_to_string(self.alias_path(open_key)).ok()?;
+            self.lookup(key.trim())
+        })
+    }
+
+    /// Drops an entry whose file turned out to have changed. Its database
+    /// may still be attached (it is then deleted at the next start).
+    pub fn forget(&self, key: &str) {
+        let _ = std::fs::remove_file(self.meta_path(key));
+        let _ = std::fs::remove_file(self.db_path(key));
     }
 
     /// A complete cache entry for `key`, if any.
@@ -336,6 +401,8 @@ mod tests {
             row_count: 1,
             created_ms: 0,
             last_used_ms,
+            info: None,
+            fingerprint: None,
         }
     }
 
@@ -391,6 +458,48 @@ mod tests {
         assert_eq!(cache.info().used_bytes, 2000);
         assert_eq!(cache.clear(&["open".to_string()]), 1);
         assert_eq!(cache.info().entries, 1);
+    }
+
+    #[test]
+    fn an_open_key_finds_its_entry_through_an_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::new(CacheConfig {
+            dir: dir.path().into(),
+            max_bytes: 1 << 30,
+            enabled: true,
+        })
+        .unwrap();
+        fake_entry(&cache, "real", 10, 1);
+        assert!(cache.lookup_open("asked").is_none());
+        cache.link("asked", "real");
+        assert_eq!(cache.lookup_open("asked").unwrap().key, "real");
+        cache.link("real", "real");
+        assert!(!cache.alias_path("real").exists(), "no alias to itself");
+        cache.forget("real");
+        assert!(
+            cache.lookup_open("asked").is_none(),
+            "a dangling alias finds nothing"
+        );
+    }
+
+    #[test]
+    fn fingerprint_sees_edits_at_either_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("f");
+        let mut bytes = vec![b'a'; 300 << 10];
+        std::fs::write(&p, &bytes).unwrap();
+        let a = fingerprint(&p).unwrap();
+        assert_eq!(fingerprint(&p).unwrap(), a, "stable");
+        bytes[0] = b'b';
+        std::fs::write(&p, &bytes).unwrap();
+        let b = fingerprint(&p).unwrap();
+        assert_ne!(a, b, "first bytes");
+        *bytes.last_mut().unwrap() = b'b';
+        std::fs::write(&p, &bytes).unwrap();
+        assert_ne!(fingerprint(&p).unwrap(), b, "last bytes");
+        std::fs::write(&p, b"tiny").unwrap();
+        assert!(fingerprint(&p).is_some(), "smaller than one block");
+        assert!(fingerprint(&dir.path().join("missing")).is_none());
     }
 
     #[test]

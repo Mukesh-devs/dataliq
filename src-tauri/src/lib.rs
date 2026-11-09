@@ -11,6 +11,7 @@ pub mod error;
 pub mod export;
 pub mod import;
 pub mod mcp;
+pub mod open;
 pub mod quality;
 pub mod recipe;
 pub mod remote;
