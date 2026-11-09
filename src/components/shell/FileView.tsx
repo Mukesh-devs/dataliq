@@ -924,6 +924,7 @@ export function FileView({
           id: "undo-view",
           title: "Undo filter, sort or column change",
           group: "Edit",
+          shortcut: `${modKey}+Z`,
           keywords: "back revert previous filters columns layout search",
           run: () => void undoView(),
         });
@@ -932,6 +933,7 @@ export function FileView({
           id: "redo-view",
           title: "Redo filter, sort or column change",
           group: "Edit",
+          shortcut: `Shift+${modKey}+Z`,
           keywords: "forward again filters columns layout search",
           run: () => void redoView(),
         });

@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-09
+
+Reliability: your work survives restarts and crashes, files changed on disk are noticed,
+and big writes check for room first.
+
+### Added
+
+- Session autosave: the open files with their import settings, filters, sort, search,
+  column layout, recipe and chart, plus the SQL text and panels, come back at the next
+  start, after a restart or a crash (Settings › Appearance can turn it off).
+- After a crash, a notice says your work was kept, with Copy diagnostics. Crashes and
+  unhandled UI errors are kept in a local crash log; Help › Copy diagnostics copies the
+  versions, system, settings, cache, last crashes and the end of the log. Nothing is sent.
+- An open file that changes on disk (or is deleted) is noticed within seconds: Reload reads
+  it again keeping the filters, sort and columns, or keep the rows as read.
+- Free-space checks before exports, conversions and sorts too big for memory: a write that
+  clearly won't fit is refused at once, saying how much is needed and free, and how to fix
+  it; a drive that fills up while writing is said as such.
+- Undo and redo for filters, sort, search and column changes (Ctrl+Z, Shift+Ctrl+Z or
+  Ctrl+Y, and the Edit menu).
+
+### Fixed
+
+- A damaged cache entry (unreadable, or with missing rows) is rebuilt by importing the file
+  again instead of failing; leftovers of interrupted imports and crashes are cleaned up at
+  start (only files the cache wrote).
+- A column layout with parts missing (from a hand-edited workspace) no longer breaks the
+  grid.
+
 ## [1.5.0] - 2026-11-09
 
 Speed on big files: faster opening, instant reopening, a grid that reads ahead, and a timer
@@ -348,7 +377,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...v1.3.0
