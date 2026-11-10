@@ -957,3 +957,140 @@ selection into the app's existing tools rather than new ones:
 Nested values are converted by following the column's Arrow type
 (`arrowJson`), so dates, decimals and bytes inside structs read like the
 grid's; the graph is offered for any file with nested columns.
+
+## D65 — Sniff once per file version; a reopen reads nothing from the file
+
+Opening a file asks for three things side by side: its info (format, CSV
+dialect, columns), its first rows, and the import. Each built its own
+`Source` and sniffed the file, and DuckDB sniffed again inside each read;
+for a `.csv.gz` that is the sample decompressed four or five times
+(0.7 s of a 3.7 s open of 100 MB).
+
+- What `sniff_csv`, `DESCRIBE` and inspecting find is kept for the session,
+  keyed by the files' stamp (path, size, time of last change), the options
+  and whatever else changes the reader (`sources/memo.rs`). Callers that
+  arrive together wait for the first one instead of sniffing in parallel.
+  Errors aren't kept. Nothing is kept for URLs.
+- Passing the sniffed types to `read_csv` (`columns = {…}`,
+  `auto_detect = false`) was measured too: 3–6 % of the import, and it
+  would change the SQL users copy. Not done.
+- A cache entry now stores what opening the file showed (its `SourceInfo`),
+  so `open_file` looks in the cache first: one `stat`, the entry's JSON,
+  `ATTACH`. The first rows come from the cached table. Entries made by
+  older versions have no info and open as before.
+- Size and time of last change can stay the same across an edit (a copy
+  that keeps the original's time, tools that restore it). The entry keeps
+  a digest of the file's size and first and last 64 KiB, compared on a
+  background thread after a reopen; a difference drops the entry and
+  tells the app (`source-changed`). Hashing the whole file would cost as
+  much as importing it.
+- The CSV delimiter can be worked out while opening (one bad row makes
+  the sniffer see one column), so the entry's options differ from the ones
+  asked; an alias file maps one to the other.
+- The UI starts the import as soon as the info is back, alongside the
+  first rows.
+
+## D66 — The grid reads ahead where the user is going
+
+Pages were loaded one on each side of the view. Now the source keeps a
+queue: the visible pages first, then up to four ahead in the scroll
+direction (more the faster the scroll), one behind; a jump (scrollbar
+drag, Go to row) is not a direction. At most four requests are in flight;
+a request still waiting when the view moves on is dropped before it is
+sent, so a drag through 50M rows asks for the pages where it stops, not
+every page it passed. Copy (`load`) bypasses the queue. Requests already
+sent are not cancelled: a page answers in milliseconds, so the cost is
+the wait, not the work.
+
+Very wide files: the sidebar's column list renders only the rows in view
+past 150 columns (fixed 24 px rows, `aria-setsize`/`aria-posinset` keep
+the position for screen readers). Header histograms are one query per
+column set, so they are asked for the columns the grid reports in view
+(the first 30 before it reports); a newer request carries the columns
+still pending, since it cancels the older one.
+
+## D67 — Long tool queries are jobs; memory trouble is its own error
+
+Every tool query (pivot, join, append, sample, summary, value counts, the
+JSON structure) registers as a job with what it does and its request id;
+the status bar shows the newest one with a timer and Stop, which cancels
+the request (`cancel_query`). A tool dialog stops the queries started
+since its Run. The engine already cancelled a tool's older query in the
+same group; Stop makes it a choice.
+
+Out-of-memory and a full temporary folder are error kinds of their own
+(`out-of-memory`, `spill-full`) with the fix in the message. DuckDB adds
+tips naming the temporary folder to every out-of-memory error, so only
+the first line of its message decides which one it is. While a query
+spills (`spilled_bytes` > 0), the memory reading in the status bar turns
+into a warning that says it will still finish, only slower, and how to
+make it faster.
+
+The CI bench gained the tools' flows and `bench/budgets.json`: hard
+ceilings (about three times the slowest runner) that fail on any OS,
+next to the 30 % regression check against each OS's baseline. The Bench
+workflow runs when the engine's code changes. First-open flows forget
+the session memo before each run, so they still measure a first open.
+
+## D68 — The session is a workspace saved as you go; crashes are told by a marker
+
+The session is the workspace format (`session.dataliq` in the app's data
+folder), written atomically a second after the tabs, SQL panel or side
+panels change, so restoring it is the code path workspaces already test.
+It is restored at every start (not only after a crash): closing the app
+is not a reason to lose its tabs. Settings can turn that off. Files named
+on the command line open after it.
+
+A `running` file exists while the app runs and is removed on a normal
+exit; finding it at start means the last run crashed or was killed. Then
+the UI says the work was kept and offers the diagnostics. Panics (with a
+backtrace) and errors the UI didn't handle (only real `Error`s, not
+backend answers) go to `crash.log` next to the app log, cut to its newer
+half past 512 KB. Diagnostics are text for the clipboard (versions,
+system, settings, cache, the last crashes, the end of the log); nothing
+is ever sent.
+
+## D69 — Files changed on disk: the version shown travels with the tab
+
+`SourceInfo` carries the version of the files it describes (size, time of
+last change, a digest per file for folders), taken when they were read
+or, after an instant reopen, the version imported. The UI asks for the
+current versions every 4 s while visible and on focus (`source_stamps`,
+one `stat` per file); the background fingerprint check of D65 reports
+edits that kept both. A change offers Reload, which keeps the filters,
+sort and columns (`reload`), or Keep as is, which stops the notice for
+that version. Polling was chosen over file-system watchers: those differ
+per OS, miss network drives, and a tab may name a pattern of files.
+
+## D70 — Disk checks refuse only what clearly won't fit
+
+Exports, conversions and sorts over 1M rows estimate what they will
+write: the average width as text of the dataset's first 2,000 rows (not
+the view's, which could mean sorting it), times the rows, times the
+format's ratio to text. The ratios are on the low side (Parquet and
+CSV.gz 8–15 % of the text, XLSX 50 %), so an estimate is at most what is
+written (tested at 0.5–1×): a refusal of an export that would have fitted
+costs the user more than a disk that fills (writes go to `.partial` files
+and are removed). A sort is checked against the temporary folder, net of
+half the memory limit. A full drive met while writing is reported for
+the place written, not as DuckDB's full temporary folder.
+
+## D71 — Cache health without a scan
+
+An entry is checked when attached: its row count (from the database's
+metadata, no scan) must match the entry's record. An unreadable or wrong
+entry is detached, deleted and the file imported again, so a damaged
+cache never shows as an error. At start the cache folder is swept of
+unfinished imports, a database without its record or the other way
+round, WAL files from a crash and aliases to nothing — only files named
+after a cache key, since the folder can be one the user chose.
+
+## D72 — Undo for the view is per tab, beside the recipe's
+
+Each tab keeps up to 100 snapshots of its view (filters, sort, search,
+columns) and column layout, taken before each change. A drag that only
+changes widths is one step; quick filter changes are not merged (each is
+something the user did). Undo restores both parts and applies the view
+again. The recipe keeps its own history (its steps change the columns);
+Ctrl+Z goes to it while the recipe panel is open. Ctrl+Z is left to text
+fields when one has the focus.

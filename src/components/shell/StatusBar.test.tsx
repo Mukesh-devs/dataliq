@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useApp } from "../../stores/app";
 import { NOTICE_MS, useNotice } from "../../stores/notice";
 import { useSelection } from "../../stores/selection";
 import { DEFAULT_STATS } from "../../lib/selectionStats";
@@ -108,7 +109,23 @@ describe("StatusBar", () => {
     );
   });
 
-  it("shows DuckDB's memory against its limit, and what spilled to disk", async () => {
+  it("shows DuckDB's memory against its limit", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "engine_memory")
+        return { usedBytes: 950 * 2 ** 20, limitBytes: 2 ** 30, spilledBytes: 0 };
+      throw new Error(`unexpected ${cmd}`);
+    });
+    try {
+      render(<StatusBar message="" />);
+      const memory = await screen.findByRole("img", { name: /DuckDB memory/ });
+      expect(memory).toHaveTextContent(/950(\.0)? MB \/ 1(\.0)? GB/);
+      expect(memory).toHaveClass("text-warning");
+    } finally {
+      clearMocks();
+    }
+  });
+
+  it("warns plainly when a query uses the disk, with how to speed it up", async () => {
     mockIPC((cmd) => {
       if (cmd === "engine_memory")
         return { usedBytes: 900 * 2 ** 20, limitBytes: 2 ** 30, spilledBytes: 3 * 2 ** 30 };
@@ -116,11 +133,16 @@ describe("StatusBar", () => {
     });
     try {
       render(<StatusBar message="" />);
-      const memory = await screen.findByRole("img", { name: /DuckDB memory/ });
-      expect(memory).toHaveTextContent(/900(\.0)? MB \/ 1(\.0)? GB ?· 3(\.0)? GB on disk/);
-      expect(memory).toHaveClass("text-warning");
+      const warning = await screen.findByRole("button", { name: /Using the disk: 3(\.0)? GB/ });
+      expect(warning).toHaveTextContent(/900(\.0)? MB \/ 1(\.0)? GB ?· 3(\.0)? GB on disk/);
+      await userEvent.click(warning);
+      const tip = await screen.findByRole("dialog", { name: "Using the disk" });
+      expect(tip).toHaveTextContent("raise the memory limit in Settings › Memory and speed");
+      await userEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+      expect(useApp.getState().settingsOpen).toBe(true);
     } finally {
       clearMocks();
+      useApp.getState().setSettingsOpen(false);
     }
   });
 

@@ -414,3 +414,27 @@ fn explain_answers_with_a_plan_column() {
         assert!(out.rows >= 1);
     }
 }
+
+#[test]
+fn running_out_of_memory_is_said_plainly_with_a_fix() {
+    let tmp = tempfile::tempdir().unwrap();
+    let engine = Engine::open_in_memory(&EngineConfig {
+        memory_limit_bytes: 64 << 20,
+        temp_dir: tmp.path().join("spill"),
+        threads: Some(2),
+    })
+    .unwrap();
+    // No temporary folder: what doesn't fit can't go to disk.
+    engine.execute_batch("SET temp_directory = ''").unwrap();
+    let err = engine
+        .query(
+            "SELECT list(range || 'some text to take room') FROM range(20000000)",
+            &[],
+            1,
+            &RequestKey::default(),
+        )
+        .err()
+        .expect("runs out of memory");
+    assert_eq!(err.kind(), "out-of-memory", "{err}");
+    assert!(err.to_string().contains("Raise the memory limit"), "{err}");
+}

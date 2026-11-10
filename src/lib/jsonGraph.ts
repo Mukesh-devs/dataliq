@@ -316,8 +316,9 @@ export function jsonShape(
   spec: ViewSpec,
   group?: string,
   deep = false,
+  requestId?: string,
 ): Promise<JsonShape> {
-  return call("json_shape", { datasetId, spec, group, deep });
+  return call("json_shape", { datasetId, spec, group, deep, requestId });
 }
 
 /** A new column name like `base`, not taken (any case): `city`, `city_2`, … */

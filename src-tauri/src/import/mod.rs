@@ -77,7 +77,12 @@ fn sql_string(s: &str) -> String {
 }
 
 /// Attaches a finished database read-only and registers it as a dataset.
-fn attach(engine: &Engine, key: &str, db: &std::path::Path, row_count: u64) -> Result<Dataset> {
+pub(crate) fn attach(
+    engine: &Engine,
+    key: &str,
+    db: &std::path::Path,
+    row_count: u64,
+) -> Result<Dataset> {
     let alias = alias(key);
     engine.execute_batch(&format!(
         "ATTACH IF NOT EXISTS {} AS {alias} (READ_ONLY)",
@@ -91,6 +96,42 @@ fn attach(engine: &Engine, key: &str, db: &std::path::Path, row_count: u64) -> R
     };
     engine.datasets.insert(dataset.clone());
     Ok(dataset)
+}
+
+/// Attaches cache entry `key` and checks it holds its rows. A damaged
+/// entry (unreadable file, wrong row count) is detached and deleted:
+/// None, and the caller imports the file again.
+pub(crate) fn attach_cached(
+    engine: &Engine,
+    cache: &Cache,
+    key: &str,
+    row_count: u64,
+) -> Option<Dataset> {
+    let check = || -> Result<Dataset> {
+        let ds = attach(engine, key, &cache.db_path(key), row_count)?;
+        // Kept in the file's metadata: no scan.
+        let rows: i64 = engine.connection()?.query_row(
+            &format!("SELECT count(*) FROM {}.main.data", alias(key)),
+            [],
+            |r| r.get(0),
+        )?;
+        if rows as u64 != row_count {
+            return Err(AppError::Internal(format!(
+                "{rows} rows instead of {row_count}"
+            )));
+        }
+        Ok(ds)
+    };
+    match check() {
+        Ok(ds) => Some(ds),
+        Err(e) => {
+            tracing::warn!("cache entry {key} is damaged ({e}); importing again");
+            engine.datasets.remove(key);
+            let _ = engine.execute_batch(&format!("DETACH DATABASE IF EXISTS {}", alias(key)));
+            cache.remove(key);
+            None
+        }
+    }
 }
 
 /// Closes a dataset: removes it from the registry and detaches its database.
@@ -190,16 +231,18 @@ fn import_once(
             elapsed_ms: 0,
         });
     }
-    // Reopen an unchanged file: attach the cached database.
+    // Reopen an unchanged file: attach the cached database (a damaged one
+    // is deleted and the file imported again).
     if caching {
         if let Some(meta) = cache.lookup(&key) {
-            let ds = attach(engine, &key, &cache.db_path(&key), meta.row_count)?;
-            cache.touch(&key);
-            return Ok(ImportOutcome {
-                dataset: ds,
-                from_cache: true,
-                elapsed_ms: started.elapsed().as_millis() as u64,
-            });
+            if let Some(ds) = attach_cached(engine, cache, &key, meta.row_count) {
+                cache.touch(&key);
+                return Ok(ImportOutcome {
+                    dataset: ds,
+                    from_cache: true,
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                });
+            }
         }
     }
 
@@ -381,12 +424,23 @@ fn import_once(
     };
 
     if caching {
+        // What a reopen shows without reading the file again (the sniff and
+        // columns are remembered from opening it, so this costs nothing).
+        let info = source
+            .inspect(engine)
+            .ok()
+            .and_then(|i| serde_json::to_value(i).ok());
+        let fingerprint = (!source.is_multi())
+            .then(|| cache::fingerprint(&stamp.path))
+            .flatten();
         let meta = CacheMeta {
             key: key.clone(),
             source: stamp,
             row_count: rows,
             created_ms: cache::now_ms(),
             last_used_ms: cache::now_ms(),
+            info,
+            fingerprint,
         };
         cache.commit(&meta)?;
     } else {

@@ -150,3 +150,16 @@ describe("showing and hiding many columns", () => {
     expect(matchColumns(l, "zzz")).toEqual([]);
   });
 });
+
+describe("reconcile", () => {
+  it("accepts a layout with parts missing (from a hand-edited file)", () => {
+    const partial = { hidden: ["b"] } as unknown as Parameters<typeof reconcile>[0];
+    expect(reconcile(partial, ["a", "b"])).toEqual({
+      order: ["a", "b"],
+      hidden: ["b"],
+      pinned: [],
+      labels: {},
+      widths: {},
+    });
+  });
+});

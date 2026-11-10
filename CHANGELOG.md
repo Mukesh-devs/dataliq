@@ -6,6 +6,64 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-09
+
+Reliability: your work survives restarts and crashes, files changed on disk are noticed,
+and big writes check for room first.
+
+### Added
+
+- Session autosave: the open files with their import settings, filters, sort, search,
+  column layout, recipe and chart, plus the SQL text and panels, come back at the next
+  start, after a restart or a crash (Settings › Appearance can turn it off).
+- After a crash, a notice says your work was kept, with Copy diagnostics. Crashes and
+  unhandled UI errors are kept in a local crash log; Help › Copy diagnostics copies the
+  versions, system, settings, cache, last crashes and the end of the log. Nothing is sent.
+- An open file that changes on disk (or is deleted) is noticed within seconds: Reload reads
+  it again keeping the filters, sort and columns, or keep the rows as read.
+- Free-space checks before exports, conversions and sorts too big for memory: a write that
+  clearly won't fit is refused at once, saying how much is needed and free, and how to fix
+  it; a drive that fills up while writing is said as such.
+- Undo and redo for filters, sort, search and column changes (Ctrl+Z, Shift+Ctrl+Z or
+  Ctrl+Y, and the Edit menu).
+
+### Fixed
+
+- A damaged cache entry (unreadable, or with missing rows) is rebuilt by importing the file
+  again instead of failing; leftovers of interrupted imports and crashes are cleaned up at
+  start (only files the cache wrote).
+- A column layout with parts missing (from a hand-edited workspace) no longer breaks the
+  grid.
+
+## [1.5.0] - 2026-11-09
+
+Speed on big files: faster opening, instant reopening, a grid that reads ahead, and a timer
+and Stop for every long tool.
+
+### Added
+
+- A timer and Stop for Group by / pivot, Join, Append, Sample, Summarize every column, Count
+  values and the JSON structure, in the status bar and in the tool's dialog.
+- A plain warning while a query is using the disk because its data doesn't fit in memory,
+  with how to speed it up; running out of memory (or of space in the temporary folder) says
+  so in plain words, with the fix.
+- CI time budgets for pivot, split export, convert, JSON structure and unnest.
+
+### Changed
+
+- Files imported before reopen at once, with their data, without reading the file (about
+  7 ms instead of up to a second for a .csv.gz); a check of the file's first and last bytes
+  runs in the background and imports again if it changed.
+- Opening a file sniffs it once instead of once for its info, its first rows and its import
+  (first rows of a 100 MB .csv.gz: 0.70 s → 0.50 s), and the import starts as soon as the
+  file's info is known.
+- The grid reads further ahead in the direction you scroll, and a fast drag no longer queues
+  pages it has already left behind.
+- Typing in the search box stops the search still running for the previous text; views over
+  5 million rows wait a little longer for you to stop typing.
+- Very wide files: the column list draws only the columns in view (tested with 2,000), and
+  header histograms are computed for the columns on screen, the rest as you scroll to them.
+
 ## [1.4.0] - 2026-11-08
 
 Flatten and filter nested JSON from the graph view.
@@ -319,7 +377,9 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.1.0...v1.2.0

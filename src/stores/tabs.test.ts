@@ -68,6 +68,46 @@ describe("tabs store: opening files", () => {
     expect(tab?.import).toMatchObject({ status: "done", elapsedMs: 4200, fromCache: false });
   });
 
+  it("starts the import as soon as the info is back, before the preview", async () => {
+    const preview = deferred<unknown>();
+    const job = deferred<unknown>();
+    const calls = mockBackend(() => job.promise, { preview_file: () => preview.promise });
+    const opening = useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    expect(calls.map((c) => c.cmd)).toContain("import_file");
+    // The import finishes before the preview: the tab still gets its data.
+    job.resolve({ dataset, fromCache: false, elapsedMs: 900 });
+    await settle();
+    preview.resolve(ipcBytes({ id: [1], name: ["a"] }));
+    await opening;
+    const [tab] = useTabs.getState().tabs;
+    expect(tab).toMatchObject({ status: "ready", import: { status: "done" } });
+    expect(tab?.info?.dataset).toEqual(dataset);
+    expect(tab?.preview?.numRows).toBe(1);
+  });
+
+  it("a file reopened from the cache needs no import", async () => {
+    const calls = mockBackend(() => Promise.reject(new Error("no import expected")), {
+      open_file: { ...sampleInfo, dataset },
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    const [tab] = useTabs.getState().tabs;
+    expect(calls.map((c) => c.cmd)).not.toContain("import_file");
+    expect(tab?.info?.dataset).toEqual(dataset);
+    expect(tab?.import).toMatchObject({ status: "done", fromCache: true });
+  });
+
+  it("a preview that fails after the import started stops the import", async () => {
+    const job = deferred<unknown>();
+    const calls = mockBackend(() => job.promise, {
+      preview_file: () => Promise.reject({ kind: "query", message: "bad row" }),
+    });
+    await useTabs.getState().openPath("/data/sales.csv.gz");
+    await settle();
+    expect(useTabs.getState().tabs[0]).toMatchObject({ status: "error", error: "bad row" });
+    expect(calls.map((c) => c.cmd)).toContain("cancel_import");
+  });
+
   it("applies progress events to the matching import", async () => {
     const job = deferred<unknown>();
     const calls = mockBackend(() => job.promise);

@@ -69,10 +69,13 @@ import { MAX_COPY_ROWS, readRows } from "../grid/readRows";
 import { NOT_LOADED, PagedRowSource, StaticRowSource, type RowSource } from "../grid/rowSource";
 import { smallFileBytes, useApp } from "../../stores/app";
 import { useSettings } from "../../stores/settings";
+import { chartsFor } from "../../lib/virtual";
 import {
+  BIG_SEARCH_ROWS,
   columnHistograms,
   columnProfile,
   columnValues,
+  differsInSearchOnly,
   statsSpec,
   toggleSort,
   viewSql,
@@ -104,6 +107,7 @@ import {
 } from "../../lib/layout";
 import { FilterBar } from "../filters/FilterBar";
 import { SearchBox } from "../filters/SearchBox";
+import { DiskChangeNotice } from "./DiskChangeNotice";
 import { FilterEditor, type Anchor } from "../filters/FilterEditor";
 import { DatabaseSettings } from "../import/DatabaseSettings";
 import { ExcelSettings } from "../import/ExcelSettings";
@@ -294,26 +298,65 @@ export function FileView({
     };
   }, [profileOpen, profiled, baseId, statsKey, tab.id]);
 
-  // Header histograms for every number, date and boolean column, following
-  // the view's filters and search. The previous ones stay up while new ones load.
+  // Header histograms for the number, date and boolean columns in view,
+  // following the view's filters and search. A very wide file only computes
+  // what is on screen; scrolling sideways adds the rest as they come into
+  // view. The previous ones stay up while new ones load.
   const headerCharts = useSettings((s) => s.headerCharts);
   const chartColumns = useMemo(
     () => columns.filter((c) => CHART_KINDS.has(c.kind)).map((c) => c.name),
     [columns],
   );
   const chartsWanted = headerCharts && baseId !== undefined && chartColumns.length > 0;
-  const [charts, setCharts] = useState<ReadonlyMap<string, Bin[]>>(NO_CHARTS);
+  const [inView, setInView] = useState<ReadonlySet<string> | null>(null);
+  const chartsInView = useMemo(() => chartsFor(chartColumns, inView), [chartColumns, inView]);
+  const chartsKey = `${baseId}\u0000${statsKey}`;
+  const [charts, setCharts] = useState<{ key: string; bins: ReadonlyMap<string, Bin[]> }>({
+    key: "",
+    bins: NO_CHARTS,
+  });
+  // Columns asked for and not answered yet, for the view they were asked for.
+  const chartsPending = useRef<{ key: string; columns: Set<string> }>({
+    key: "",
+    columns: new Set(),
+  });
+  const latestChartsKey = useRef(chartsKey);
   useEffect(() => {
+    latestChartsKey.current = chartsKey;
     if (!chartsWanted || !baseId) return;
-    let alive = true;
-    columnHistograms(baseId, JSON.parse(statsKey) as ViewSpec, chartColumns, `charts:${tab.id}`)
-      .then((list) => alive && setCharts(new Map(list.map((h) => [h.column, h.bins]))))
-      // Headers simply go without charts (cancelled, or the view failed).
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [chartsWanted, baseId, statsKey, chartColumns, tab.id]);
+    const same = charts.key === chartsKey;
+    if (chartsPending.current.key !== chartsKey)
+      chartsPending.current = { key: chartsKey, columns: new Set() };
+    const pending = chartsPending.current.columns;
+    const missing = chartsInView.filter((c) => (!same || !charts.bins.has(c)) && !pending.has(c));
+    if (missing.length === 0) return;
+    // Sideways scrolling settles before asking. A newer ask cancels an older
+    // one (same group), so it carries the columns still pending too.
+    const t = setTimeout(
+      () => {
+        const ask = [...new Set([...pending, ...missing])];
+        for (const c of missing) pending.add(c);
+        columnHistograms(baseId, JSON.parse(statsKey) as ViewSpec, ask, `charts:${tab.id}`)
+          .then((list) => {
+            for (const c of ask) pending.delete(c);
+            if (latestChartsKey.current !== chartsKey) return;
+            setCharts((prev) => {
+              const bins = new Map(prev.key === chartsKey ? prev.bins : []);
+              for (const h of list) bins.set(h.column, h.bins);
+              return { key: chartsKey, bins };
+            });
+          })
+          // Headers simply go without charts (the view failed). A cancelled
+          // ask was replaced by a newer one carrying its columns.
+          .catch((e: unknown) => {
+            if ((e as { kind?: string }).kind !== "cancelled")
+              for (const c of ask) pending.delete(c);
+          });
+      },
+      same ? 120 : 0,
+    );
+    return () => clearTimeout(t);
+  }, [chartsWanted, baseId, statsKey, chartsKey, chartsInView, charts, tab.id]);
 
   const onHeaderMenu = useCallback(
     (name: string, bounds: { x: number; y: number; width: number; height: number }) => {
@@ -339,9 +382,28 @@ export function FileView({
   const [goToOpen, setGoToOpen] = useState(false);
   const notice = useNotice((s) => s.show);
   const cancelView = useTabs((s) => s.cancelView);
+  // Typing again: a scan for the older search term is no longer wanted.
+  const stopStaleSearch = () => {
+    const vs = tab.viewState;
+    if (vs?.status !== "running" || tab.recipeState?.status === "running") return;
+    const shown = vs.dataset ? (vs.spec ?? {}) : {};
+    if (differsInSearchOnly(shown, view)) cancelView(tab.id);
+  };
 
   // Cleaning steps, applied to the whole file.
   const setRecipe = useTabs((s) => s.setRecipe);
+  const stepView = useTabs((s) => s.undoView);
+  const stepViewForward = useTabs((s) => s.redoView);
+  const viewUndoable = (tab.viewHistory?.past.length ?? 0) > 0;
+  const viewRedoable = (tab.viewHistory?.future.length ?? 0) > 0;
+  const undoView = useCallback(async () => {
+    const what = await stepView(tab.id);
+    notice(what ? `Undid the change to ${what}` : "Nothing to undo");
+  }, [stepView, tab.id, notice]);
+  const redoView = useCallback(async () => {
+    const what = await stepViewForward(tab.id);
+    notice(what ? `Redid the change to ${what}` : "Nothing to redo");
+  }, [stepViewForward, tab.id, notice]);
   const undoRecipe = useTabs((s) => s.undoRecipe);
   const redoRecipe = useTabs((s) => s.redoRecipe);
   const setRecipeOpen = useTabs((s) => s.setRecipeOpen);
@@ -857,6 +919,24 @@ export function FileView({
           });
         }
       }
+      if (viewUndoable)
+        add({
+          id: "undo-view",
+          title: "Undo filter, sort or column change",
+          group: "Edit",
+          shortcut: `${modKey}+Z`,
+          keywords: "back revert previous filters columns layout search",
+          run: () => void undoView(),
+        });
+      if (viewRedoable)
+        add({
+          id: "redo-view",
+          title: "Redo filter, sort or column change",
+          group: "Edit",
+          shortcut: `Shift+${modKey}+Z`,
+          keywords: "forward again filters columns layout search",
+          run: () => void redoView(),
+        });
       if (canUndo)
         add({
           id: "undo-clean",
@@ -1035,12 +1115,17 @@ export function FileView({
       };
       if (mod && key === "g" && source) afterGrid(() => setGoToOpen(true));
       if (mod && key === "e" && canExport) afterGrid(openExport);
+      // Text being edited has its own undo (a checkbox or button doesn't).
       const typing = (e.target as HTMLElement | null)?.closest?.(
-        "input, textarea, select, [contenteditable]",
+        "input:not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select, [contenteditable]",
       );
       if (mod && key === "z" && recipeOpen && !typing) {
         e.preventDefault();
         void (e.shiftKey ? redoRecipe(tab.id) : undoRecipe(tab.id));
+      } else if (mod && (key === "z" || key === "y") && !typing) {
+        // The filters, sort, search and columns (the recipe has its own, above).
+        e.preventDefault();
+        void (key === "y" || e.shiftKey ? redoView() : undoView());
       }
       if (mod && key === "f" && searchInput.current) {
         // At once, so the next key typed goes in. If the grid then takes
@@ -1068,10 +1153,25 @@ export function FileView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [source, canExport, openExport, recipeOpen, undoRecipe, redoRecipe, tab.id]);
+  }, [
+    source,
+    canExport,
+    openExport,
+    recipeOpen,
+    undoRecipe,
+    redoRecipe,
+    undoView,
+    redoView,
+    tab.id,
+  ]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      <DiskChangeNotice
+        tab={tab}
+        onReload={onReload}
+        onIgnore={() => useTabs.getState().ignoreOnDisk(tab.id)}
+      />
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="truncate font-medium text-fg" title={tab.path}>
           {tab.title}
@@ -1264,6 +1364,8 @@ export function FileView({
               ref={searchInput}
               value={view.search ?? ""}
               onChange={(search) => onViewChange?.({ ...view, search: search || undefined })}
+              debounceMs={(base.dataset?.rowCount ?? 0) > BIG_SEARCH_ROWS ? 500 : 300}
+              onTyping={stopStaleSearch}
             />
           }
         />
@@ -1446,7 +1548,8 @@ export function FileView({
               filteredColumns={filtered}
               sort={sort}
               highlight={tab.viewState?.dataset ? view.search : undefined}
-              histograms={chartsWanted ? charts : undefined}
+              histograms={chartsWanted ? charts.bins : undefined}
+              onVisibleColumnsChange={(names) => setInView(new Set(names))}
               cellTint={cellTint}
               onSelectionChange={setGridSelection}
               onCellMenu={(column, row, p) =>

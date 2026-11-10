@@ -32,7 +32,7 @@ interface WorkspaceState {
 }
 
 /** What is on screen now, as a workspace. */
-function current(): { workspace: WorkspaceFile; left: number } {
+export function currentWorkspace(): { workspace: WorkspaceFile; left: number } {
   const { tabs, activeId } = useTabs.getState();
   const saved = savedTabs(tabs, activeId);
   const sql = useSql.getState();
@@ -52,7 +52,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   path: null,
   save: async (as = false) => {
     const notice = useNotice.getState().show;
-    const { workspace, left } = current();
+    const { workspace, left } = currentWorkspace();
     let path = as ? null : get().path;
     if (!path) {
       const first = useTabs.getState().tabs[0]?.title;
@@ -90,20 +90,25 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     }
     set({ path });
     useRecent.getState().add(path);
-    if (ws.sql) {
-      const sql = useSql.getState();
-      // The mounted editor shows the text; otherwise it starts with it.
-      if (sql.editor) sql.editor.replace(ws.sql.text);
-      sql.setText(ws.sql.text);
-      if (ws.sql.height) sql.setHeight(ws.sql.height);
-      sql.setOpen(ws.sql.open);
-    }
-    if (ws.panels) {
-      const layout = useLayout.getState();
-      layout.setSidebar(ws.panels.sidebar);
-      layout.setProfile(ws.panels.profile);
-    }
     notice(`Workspace opened: ${baseName(path)} (${plural(ws.tabs.length, "tab")})`);
-    await useTabs.getState().restore(ws.tabs, ws.active ?? null);
+    await applyWorkspace(ws);
   },
 }));
+
+/** Puts a workspace on screen: its SQL text, side panels and tabs. */
+export async function applyWorkspace(ws: WorkspaceFile): Promise<void> {
+  if (ws.sql) {
+    const sql = useSql.getState();
+    // The mounted editor shows the text; otherwise it starts with it.
+    if (sql.editor) sql.editor.replace(ws.sql.text);
+    sql.setText(ws.sql.text);
+    if (ws.sql.height) sql.setHeight(ws.sql.height);
+    sql.setOpen(ws.sql.open);
+  }
+  if (ws.panels) {
+    const layout = useLayout.getState();
+    layout.setSidebar(ws.panels.sidebar);
+    layout.setProfile(ws.panels.profile);
+  }
+  await useTabs.getState().restore(ws.tabs, ws.active ?? null);
+}

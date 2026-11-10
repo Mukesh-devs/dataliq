@@ -27,14 +27,15 @@ export function defaultLayout(columns: string[]): ColumnLayout {
 export function reconcile(layout: ColumnLayout | undefined, columns: string[]): ColumnLayout {
   if (!layout) return defaultLayout(columns);
   const known = new Set(columns);
-  const order = layout.order.filter((c) => known.has(c));
+  // A layout from a file (a workspace, the session) may lack any part.
+  const order = (layout.order ?? []).filter((c) => known.has(c));
   for (const c of columns) if (!order.includes(c)) order.push(c);
-  const keep = <T>(r: Record<string, T>) =>
-    Object.fromEntries(Object.entries(r).filter(([k]) => known.has(k)));
+  const keep = <T>(r: Record<string, T> | undefined) =>
+    Object.fromEntries(Object.entries(r ?? {}).filter(([k]) => known.has(k)));
   return {
     order,
-    hidden: layout.hidden.filter((c) => known.has(c)),
-    pinned: layout.pinned.filter((c) => known.has(c)),
+    hidden: (layout.hidden ?? []).filter((c) => known.has(c)),
+    pinned: (layout.pinned ?? []).filter((c) => known.has(c)),
     labels: keep(layout.labels),
     widths: keep(layout.widths),
     ...(layout.formats && { formats: keep(layout.formats) }),

@@ -9,15 +9,18 @@ import {
   Moon,
   SlidersHorizontal,
   Sun,
+  TriangleAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { engineMemory, type MemoryUsage } from "../../lib/files";
 import { formatBytes } from "../../lib/format";
 import { STAT_LABELS, STAT_ORDER, statItems } from "../../lib/selectionStats";
+import { useApp } from "../../stores/app";
 import { useNotice } from "../../stores/notice";
 import { useSelection } from "../../stores/selection";
 import { useSettings, type ThemePreference } from "../../stores/settings";
 import { Button, IconButton } from "../ui/Button";
+import { JobsIndicator } from "./JobsIndicator";
 
 const themeIcon: Record<ThemePreference, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
 const themeLabel: Record<ThemePreference, string> = {
@@ -50,6 +53,7 @@ export function StatusBar({ message, action }: StatusBarProps) {
           {action.label}
         </Button>
       )}
+      <JobsIndicator />
       <span className="flex-1" />
       <SelectionStatsStrip />
       <MemoryIndicator />
@@ -240,13 +244,8 @@ function MemoryIndicator() {
     `DuckDB memory: ${formatBytes(usedBytes)} in use` +
     (limitBytes !== null ? ` of ${formatBytes(limitBytes)} (Settings › Memory limit)` : "") +
     (spilledBytes > 0 ? `; ${formatBytes(spilledBytes)} spilled to the temporary folder` : "");
-  return (
-    <span
-      role="img"
-      aria-label={detail}
-      title={detail}
-      className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${high ? "font-medium text-warning" : ""}`}
-    >
+  const reading = (
+    <>
       <MemoryStick className="size-3.5" aria-hidden />
       <span className="tabular">
         {formatBytes(usedBytes)}
@@ -254,9 +253,69 @@ function MemoryIndicator() {
           <span className="text-fg-subtle"> / {formatBytes(limitBytes)}</span>
         )}
       </span>
-      {spilledBytes > 0 && (
-        <span className="tabular text-fg-subtle">· {formatBytes(spilledBytes)} on disk</span>
-      )}
+    </>
+  );
+  if (spilledBytes > 0) return <SpillWarning reading={reading} memory={memory} />;
+  return (
+    <span
+      role="img"
+      aria-label={detail}
+      title={detail}
+      className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${high ? "font-medium text-warning" : ""}`}
+    >
+      {reading}
     </span>
+  );
+}
+
+/**
+ * A query is using the disk for data that doesn't fit in memory: say so in
+ * plain words, with what makes it faster.
+ */
+function SpillWarning({ reading, memory }: { reading: ReactNode; memory: MemoryUsage }) {
+  const openSettings = useApp((s) => s.setSettingsOpen);
+  const { spilledBytes, limitBytes } = memory;
+  return (
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label={`Using the disk: ${formatBytes(spilledBytes)} didn't fit in memory`}
+          className="flex shrink-0 items-center gap-1 rounded-[var(--radius)] px-1 font-medium whitespace-nowrap text-warning hover:bg-hover"
+        >
+          <TriangleAlert className="size-3.5" aria-hidden />
+          {reading}
+          <span className="tabular">· {formatBytes(spilledBytes)} on disk</span>
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="top"
+          align="end"
+          sideOffset={6}
+          collisionPadding={8}
+          aria-label="Using the disk"
+          className="z-50 flex w-80 flex-col gap-2 rounded-[var(--radius-lg)] border border-border bg-bg p-3 text-[12px] text-fg-muted shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
+        >
+          <p className="font-semibold text-fg">This query is using the disk</p>
+          <p>
+            {formatBytes(spilledBytes)} didn’t fit in memory
+            {limitBytes !== null && ` (limit ${formatBytes(limitBytes)})`} and went to the temporary
+            folder, so it runs slower. It will still finish.
+          </p>
+          <p>To make it faster:</p>
+          <ul className="list-disc pl-4">
+            <li>raise the memory limit in Settings › Memory and speed,</li>
+            <li>filter the rows or choose fewer columns first,</li>
+            <li>or close tabs you no longer need.</li>
+          </ul>
+          <div className="flex justify-end">
+            <Button size="sm" variant="ghost" onClick={() => openSettings(true)}>
+              Open Settings
+            </Button>
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

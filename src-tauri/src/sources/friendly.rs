@@ -24,8 +24,10 @@ pub(crate) fn group_digits(n: &str) -> String {
 
 /// Maps a raw DuckDB error message to a user-facing [`AppError`].
 pub fn friendly_error(raw: &str) -> AppError {
-    if raw.contains("Interrupted") {
-        return AppError::Cancelled;
+    match crate::error::engine_error(raw.to_string()) {
+        AppError::Query(_) => {}
+        // Cancelled, out of memory, temporary folder full.
+        other => return other,
     }
     let lower = raw.to_lowercase();
     let msg = if lower.starts_with("http error") || lower.contains("http error:") {

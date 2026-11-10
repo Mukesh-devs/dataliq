@@ -144,6 +144,7 @@ impl Engine {
             // A full sort of millions of rows takes a while; its first rows
             // only need one scan (top-N). Write those now, the rest later.
             let rows = self.count(&view.count, &view.params, key)?;
+            self.ensure_sort_space(&base.source, rows)?;
             let head = BuiltView {
                 select: format!("{} LIMIT {MAX_HEAD}", view.select),
                 ..view.clone()
@@ -179,6 +180,40 @@ impl Engine {
             elapsed_ms: started.elapsed().as_millis() as u64,
             materializing,
         })
+    }
+
+    /// A sort too big for memory spills to the temporary folder: refuses
+    /// one that clearly won't fit there (instead of failing half-way).
+    fn ensure_sort_space(&self, base: &DatasetSource, rows: u64) -> Result<()> {
+        /// Below this, a sort fits in memory on any machine DataLiq runs on.
+        const CHECK_FROM: u64 = 1_000_000;
+        /// DuckDB's sorted rows in memory and on disk, relative to CSV text.
+        const SORT_RATIO: f64 = 0.6;
+        if rows < CHECK_FROM {
+            return Ok(());
+        }
+        let rel = Relation::of(base);
+        let Ok(width) = crate::disk::row_text_bytes(self, &rel.sql, &rel.params, None) else {
+            return Ok(());
+        };
+        let needed = (rows as f64 * width * SORT_RATIO) as u64;
+        let memory = self
+            .memory_usage()
+            .ok()
+            .and_then(|m| m.limit_bytes)
+            .unwrap_or(0);
+        // About half the memory limit holds sorted rows; the rest goes to disk.
+        let on_disk = needed.saturating_sub(memory / 2);
+        if on_disk == 0 {
+            return Ok(());
+        }
+        crate::disk::ensure_space(
+            self.temp_dir(),
+            on_disk,
+            "sort these rows",
+            "Free up space on that drive, choose another temporary folder or raise the memory \
+             limit in Settings › Memory and speed, or filter the rows first.",
+        )
     }
 
     /// Finishes a view opened by [`Engine::open_view`] in the background:

@@ -109,6 +109,8 @@ interface DataGridProps {
   source: RowSource;
   /** Called with the first visible row and the number of visible rows. */
   onVisibleRowsChange?: (first: number, count: number) => void;
+  /** Called with the names of the columns in view (pinned ones too) when they change. */
+  onVisibleColumnsChange?: (columns: string[]) => void;
   /** Column order, hidden/pinned columns, names and widths (all columns by default). */
   layout?: ColumnLayout;
   /** Resizing, auto-fit or dragging a header to a new place changes the layout. */
@@ -161,6 +163,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     layout: layoutIn,
     onLayoutChange,
     onVisibleRowsChange,
+    onVisibleColumnsChange,
     onHeaderMenu,
     filteredColumns,
     sort,
@@ -304,6 +307,7 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
     });
   }, [source, shown]);
 
+  const visibleColumnsKey = useRef("");
   const onVisibleRegionChanged = useCallback(
     (range: Rectangle) => {
       visible.current = range;
@@ -319,8 +323,20 @@ export const DataGrid = forwardRef<DataGridHandle, DataGridProps>(function DataG
         editor.current?.updateCells(cells);
       }
       onVisibleRowsChange?.(range.y, range.height);
+      if (onVisibleColumnsChange) {
+        const names: string[] = [];
+        const pinned = pinnedCount(layout);
+        for (let c = 0; c < Math.min(pinned, shown.length); c++) names.push(nameAt(c)!);
+        const end = Math.min(range.x + range.width + 1, shown.length);
+        for (let c = Math.max(pinned, range.x); c < end; c++) names.push(nameAt(c)!);
+        const key = names.join("\u0000");
+        if (key !== visibleColumnsKey.current) {
+          visibleColumnsKey.current = key;
+          onVisibleColumnsChange(names);
+        }
+      }
     },
-    [source, onVisibleRowsChange, shown.length],
+    [source, onVisibleRowsChange, onVisibleColumnsChange, shown.length, layout, nameAt],
   );
 
   // Search matches: painted behind the text of left-aligned text cells.

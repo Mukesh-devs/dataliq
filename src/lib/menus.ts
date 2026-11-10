@@ -54,6 +54,8 @@ export const MENUS: MenuSpec[] = [
   {
     label: "Edit",
     items: [
+      { command: "undo-view", label: "Undo filter, sort or column change" },
+      { command: "redo-view", label: "Redo filter, sort or column change" },
       { command: "undo-clean", label: "Undo cleaning step" },
       { command: "redo-clean", label: "Redo cleaning step" },
       sep,
@@ -136,6 +138,7 @@ export const MENUS: MenuSpec[] = [
       sep,
       { command: "keyboard-shortcuts", label: "Keyboard shortcuts" },
       { command: "check-updates", label: "Check for updates…" },
+      { command: "copy-diagnostics", label: "Copy diagnostics" },
       { command: "about", label: "About DataLiq" },
     ],
   },

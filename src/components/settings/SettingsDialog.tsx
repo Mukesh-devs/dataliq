@@ -129,6 +129,7 @@ interface Draft {
   density: Density;
   headerCharts: boolean;
   checkUpdates: boolean;
+  restoreSession: boolean;
   exportDefaults: ExportDefaults;
 }
 
@@ -153,6 +154,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
           density: ui.density,
           headerCharts: ui.headerCharts,
           checkUpdates: ui.checkUpdates,
+          restoreSession: ui.restoreSession,
           exportDefaults,
         }
       : null,
@@ -181,6 +183,7 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
       ui.setDensity(draft.density);
       ui.setHeaderCharts(draft.headerCharts);
       ui.setCheckUpdates(draft.checkUpdates);
+      ui.setRestoreSession(draft.restoreSession);
       setExportDefaults(draft.exportDefaults);
       void refreshCache();
       notice(
@@ -241,6 +244,14 @@ function SettingsForm({ onDone }: { onDone: () => void }) {
               onChange={(e) => setDraft({ ...draft, headerCharts: e.target.checked })}
             />
             Small histograms under the column names
+          </label>
+          <label className="ml-[14rem] flex items-center gap-2 text-fg">
+            <input
+              type="checkbox"
+              checked={draft.restoreSession}
+              onChange={(e) => setDraft({ ...draft, restoreSession: e.target.checked })}
+            />
+            Reopen the last session’s files at startup
           </label>
         </Section>
 

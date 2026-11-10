@@ -534,3 +534,37 @@ dry run [40731722788](https://github.com/mukesh-dsnl/dataliq/actions/runs/407317
 
 Every installer but the AppImage is under the 40 MB budget; the macOS image holds two complete
 builds (arm64 and x86_64). The release workflow prints every file's size.
+
+## v1.5.0 — opening, reopening and the tools (linux-dev)
+
+Opening a file the way the app does it (`perf_open`: the file's info and its first rows side
+by side, then the full import; then the same file in a new session), dev profile, 4 cores.
+"Before" is 1.4.0; ranges are three runs.
+
+| File | First rows (before → after) | Full data (before → after) | Reopen, data ready (before → after) |
+| --- | --- | --- | --- |
+| 100 MB CSV (908K rows) | 0.17 → 0.11–0.15 s | 1.30 → 1.17–1.48 s | 0.190 → 0.006–0.010 s |
+| 100 MB .csv.gz (2.1M rows) | 0.70 → 0.48–0.53 s | 3.68 → 2.75–3.26 s | 0.993 → 0.006–0.008 s |
+| 100 MB .ndjson.gz (2.1M records) | 0.17 → 0.16–0.18 s | 2.15 → 2.10–2.43 s | 0.168 → 0.006–0.008 s |
+| 1 GB CSV (9.2M rows) | 0.14 → 0.11–0.13 s | 4.78 → 5.5–6.0 s ¹ | 0.191 → 0.008–0.009 s |
+
+The import itself is DuckDB's `CREATE TABLE … AS SELECT` and did not change (`perf_import`:
+100 MB CSV 1.2 s, .csv.gz 3.0 s). What changed is around it: the file is sniffed once per
+version instead of once per command (D65), the import starts as soon as the info is back,
+and a reopen reads nothing from the file. ¹ The 1 GB import varies with the disk (4.6–6.0 s
+across runs before and after); its time is the import's, not the open's.
+
+Grid scroll over 50M rows (`pnpm e2e:perf`, Chromium, mocked backend), with the grid
+reading ahead in the scroll direction (D66): 60 fps throughout; page wait p95 21 ms / max
+21 ms on a fast scroll (was 42 / 51 ms at v0.1.0), p95 23 ms / max 28 ms on a fling (was
+56 / 77 ms).
+
+New flows in the small suite (`pnpm bench`) with their CI budgets (`bench/budgets.json`):
+
+| Flow | linux-dev | Budget |
+| --- | --- | --- |
+| Group by 2 columns with 5 measures, plus a pivot, 1M Parquet rows | 53–57 ms | 1 s |
+| Parquet export split into 100,000-row files, 1M rows | 476–487 ms | 4 s |
+| Convert the 100 MB CSV to Parquet | 550–557 ms | 5 s |
+| JSON structure with keys counted inside arrays, 2.1M records | 23–30 ms | 1.5 s |
+| Unnest an array, 2.1M records (2.8M rows) | 18–22 ms | 1.5 s |

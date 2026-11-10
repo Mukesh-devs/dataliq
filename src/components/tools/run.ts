@@ -3,13 +3,12 @@ import { fetchRows } from "../../lib/files";
 import { sqlResult } from "../../lib/sql";
 import { asSource } from "../../lib/tools";
 import { isIdentity, viewSql } from "../../lib/view";
+import { asJob, toolRequestId } from "../../stores/jobs";
 import { useSql } from "../../stores/sql";
 import { baseOf, useTabs, type Tab } from "../../stores/tabs";
 
 /** Rows of a tool's result shown at once (the rest is paged). */
 const PREVIEW_ROWS = 1_000;
-
-let nextRun = 1;
 
 /** The SQL panel's table name of a tab, if its data is ready. */
 export function tableOf(tab: Tab): string | undefined {
@@ -40,9 +39,13 @@ export function hasView(tab: Tab): boolean {
  * Runs `sql` in the SQL session (where every tab is a table) and opens its
  * rows as a new tab called `title`. Tool queries have their own group, so
  * they never cancel the SQL panel's query (or each other's, but the newest).
+ * While it runs, the status bar shows `what` with a timer and Stop.
  */
-export async function openQueryTab(sql: string, title: string): Promise<void> {
-  const dataset = await sqlResult(sql, `tool-${nextRun++}`, "tools");
-  const preview = await fetchRows(dataset.id, 0, PREVIEW_ROWS);
-  useTabs.getState().openResult({ dataset, preview, sql, title });
+export async function openQueryTab(sql: string, title: string, what = title): Promise<void> {
+  const requestId = toolRequestId("tool");
+  await asJob(what, requestId, async () => {
+    const dataset = await sqlResult(sql, requestId, "tools");
+    const preview = await fetchRows(dataset.id, 0, PREVIEW_ROWS);
+    useTabs.getState().openResult({ dataset, preview, sql, title });
+  });
 }

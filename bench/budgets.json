@@ -1,0 +1,18 @@
+{
+  "_comment": "Hard ceilings in ms for each benchmark flow on any CI runner (scripts/bench.mjs fails above them, whatever the baseline). About 3x the slowest runner's time, so only a real regression trips them.",
+  "first_rows_100k_xlsx": 500,
+  "first_rows_100mb_csv": 1500,
+  "first_rows_100mb_csv_gz": 4000,
+  "first_rows_100mb_ndjson_gz": 1500,
+  "import_100k_xlsx": 8000,
+  "import_100mb_csv": 6000,
+  "import_100mb_csv_gz": 12000,
+  "import_100mb_ndjson_gz": 10000,
+  "page_1m_parquet": 60,
+  "reopen_cached_100mb_csv": 50,
+  "pivot_1m_parquet": 1000,
+  "split_export_1m_parquet": 4000,
+  "convert_100mb_csv_to_parquet": 5000,
+  "json_structure_100mb_ndjson_gz": 1500,
+  "unnest_100mb_ndjson_gz": 1500
+}

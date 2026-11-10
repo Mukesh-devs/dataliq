@@ -57,9 +57,8 @@ export function useDataTools(tab: Tab, rowCount: number | undefined) {
   /** Runs a query-building tool without a dialog, saying what it does. */
   const runQuick = useCallback(
     async (what: string, build: (src: string) => string, title: string) => {
-      notice(`${what}…`);
       try {
-        await openQueryTab(build(await tabSource(tab, true)), title);
+        await openQueryTab(build(await tabSource(tab, true)), title, what);
       } catch (e) {
         if ((e as { kind?: string }).kind === "cancelled") return;
         notice(`Couldn't finish: ${e instanceof Error ? e.message : String(e)}`);
@@ -143,6 +142,7 @@ export function useDataTools(tab: Tab, rowCount: number | undefined) {
           await openQueryTab(
             pivotSql(await tabSource(tab, withView), spec),
             short(`${tab.title} ${by}`),
+            `Grouping ${tab.title} ${by}`,
           );
         }}
       />
@@ -157,6 +157,7 @@ export function useDataTools(tab: Tab, rowCount: number | undefined) {
           openQueryTab(
             sampleSql(await tabSource(tab, withView), spec),
             short(`Sample · ${tab.title}`),
+            `Sampling ${tab.title}`,
           )
         }
       />
@@ -179,6 +180,7 @@ export function useDataTools(tab: Tab, rowCount: number | undefined) {
           await openQueryTab(
             unionSql(parts, sourceColumn),
             short(parts.map((p) => p.label).join(" + ")),
+            `Appending ${parts.length} tabs`,
           );
         }}
       />
@@ -199,7 +201,11 @@ export function useDataTools(tab: Tab, rowCount: number | undefined) {
             leftColumns: columns.map((c) => c.name),
             rightColumns: baseOf(right).columns.map((c) => c.name),
           });
-          await openQueryTab(sql, short(`${tab.title} ⋈ ${right.title}`));
+          await openQueryTab(
+            sql,
+            short(`${tab.title} ⋈ ${right.title}`),
+            `Joining ${tab.title} with ${right.title}`,
+          );
         }}
       />
     );

@@ -43,10 +43,12 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 - A whole folder or a pattern such as `logs/*.csv.gz` as one table.
 - Files on the web or in S3 with **Open URL**.
 - Delimiters, headers and column types are detected for you, and you can change them.
+- Files you opened before reopen instantly from the cache, checked for changes in the
+  background.
 
 ###  Explore
 
-- A fast grid that scrolls smoothly through millions of rows.
+- A fast grid that scrolls smoothly through millions of rows and thousands of columns.
 - Filter, sort and search any column.
 - Hide, reorder, pin and rename columns; show or hide them all at once, or find them by name.
 - Select cells to see their count, sum, average, min and max in the status bar.
@@ -59,7 +61,7 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 ###  Analyze
 
 - **SQL panel**: query and join every open file as a table; Explain shows the plan.
-- **Data tools** without SQL: group by / pivot, value counts, samples, append and join
+- **Data tools** without SQL (each with a timer and Stop): group by / pivot, value counts, samples, append and join
   tabs, a summary of every column — each result opens as a tab.
 - **Charts**: bar (grouped or stacked), line, pie, histogram, scatter and box plot, export
   as PNG or SVG.
@@ -87,6 +89,10 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 ###  Everyday comforts
 
 - **Workspaces** save your open files, filters and charts to reopen later.
+- **Never lose work**: the open files, filters and layouts come back after a restart or a
+  crash; files changed on disk are noticed and reload keeping your filters; undo and redo
+  filters, sorts and column changes.
+- Free-space checks before big exports, conversions and sorts, and a self-repairing cache.
 - A command palette (Ctrl+K) with every action.
 - Light and dark themes, keyboard access to everything, and a sample dataset to try.
 - Updates from signed releases, installed only when you say so.
@@ -173,6 +179,7 @@ Use Cmd on macOS, Ctrl elsewhere.
 | Close tab | Ctrl+W (or Delete on a focused tab) |
 | Next / previous tab | Ctrl+Tab / Ctrl+Shift+Tab (arrows in the tab bar) |
 | Go to row | Ctrl+G |
+| Undo / redo a filter, sort, search or column change | Ctrl+Z / Shift+Ctrl+Z (or Ctrl+Y) |
 | Copy selection (TSV) | Ctrl+C |
 | Copy as CSV / JSON / Markdown / SQL | Shift+Ctrl+C |
 | Sort by a column / add a sort key | Click / Shift+click a header |

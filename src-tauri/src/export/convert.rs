@@ -157,6 +157,13 @@ pub fn convert(
             req.out_dir.display()
         )));
     }
+    let what = "convert these files";
+    crate::disk::ensure_space(
+        &req.out_dir,
+        estimated_bytes(req),
+        what,
+        "Free up space, choose another folder, or convert fewer files at a time.",
+    )?;
     let conn = Arc::new(engine.raw_connection()?);
     conn.execute("SET enable_progress_bar = true", &[])?;
     conn.execute("SET enable_progress_bar_print = false", &[])?;
@@ -221,7 +228,10 @@ pub fn convert(
                     Err(_) if cancelled.load(Ordering::SeqCst) => {
                         return Err(AppError::Cancelled);
                     }
-                    Err(e) => file.error = Some(e.to_string()),
+                    Err(e) => {
+                        let e = crate::disk::full_while_writing(e, &req.out_dir, what);
+                        file.error = Some(e.to_string());
+                    }
                 }
             }
             files.push(file);
@@ -241,6 +251,26 @@ pub fn convert(
         files,
         elapsed_ms: started.elapsed().as_millis() as u64,
     })
+}
+
+/// About how many bytes converting `req.files` writes: each file's size
+/// as text (from its format's usual ratio), then the output's ratio.
+pub fn estimated_bytes(req: &ConvertRequest) -> u64 {
+    let out = crate::disk::format_ratio(req.format);
+    req.files
+        .iter()
+        .map(|f| {
+            let size = std::fs::metadata(f).map(|m| m.len()).unwrap_or(0) as f64;
+            let as_text = match detect::detect(f) {
+                // The low end of how much these hold (a 4th of their text or more).
+                Ok(d) if d.compression != detect::Compression::None => size * 4.0,
+                Ok(d) if d.format == FileFormat::Parquet => size * 4.0,
+                Ok(d) if matches!(d.format, FileFormat::Json | FileFormat::Ndjson) => size / 1.5,
+                _ => size,
+            };
+            (as_text * out) as u64
+        })
+        .sum()
 }
 
 /// One file: read with its detected reader, written to `output` through a

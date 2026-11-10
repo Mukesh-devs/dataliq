@@ -8,14 +8,20 @@ interface SearchBoxProps {
   onChange: (value: string) => void;
   /** Wait this long after typing stops before searching. */
   debounceMs?: number;
+  /**
+   * The first key of a new burst of typing: a search still running for an
+   * older term can stop now rather than when the new term is searched.
+   */
+  onTyping?: () => void;
 }
 
 /**
  * Searches every text column of the file (case-insensitive). Typing is
- * debounced; Enter searches at once; Escape clears.
+ * debounced; Enter searches at once; Escape clears. The search running for
+ * an older term is stopped as soon as typing starts again (`onTyping`).
  */
 export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function SearchBox(
-  { value, onChange, debounceMs = 300 },
+  { value, onChange, debounceMs = 300, onTyping },
   ref,
 ) {
   const [draft, setDraft] = useState(value);
@@ -33,6 +39,7 @@ export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function S
   };
   const type = (next: string) => {
     setDraft(next);
+    if (timer.current === undefined) onTyping?.();
     clearTimeout(timer.current);
     timer.current = setTimeout(() => commit(next), debounceMs);
   };

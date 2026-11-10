@@ -7,6 +7,7 @@ use crate::cache::{Cache, CacheInfo};
 use crate::engine::{Dataset, Engine};
 use crate::error::{AppError, Result};
 use crate::import::{self, ImportOutcome, ImportTarget, Imports};
+use crate::open;
 use crate::sources::{OpenOptions, Source};
 
 /// Shared state for imports.
@@ -37,7 +38,6 @@ pub async fn import_file(
     let engine = Arc::clone(&engine);
     let state = Arc::clone(&state);
     blocking(move || {
-        let source = Source::new(&path, options.unwrap_or_default())?.resolve_dialect(&engine)?;
         let target = ImportTarget {
             cache: &state.cache,
             temp_dir: state.temp_dir.clone(),
@@ -45,7 +45,16 @@ pub async fn import_file(
         let emit = |p| {
             let _ = app.emit("import-progress", p);
         };
-        let out = import::import(&engine, &state.imports, &target, &source, &job_id, &emit);
+        let options = options.unwrap_or_default();
+        let out = open::import(
+            &engine,
+            &state.imports,
+            &target,
+            &path,
+            options,
+            &job_id,
+            &emit,
+        );
         // An import leaves DuckDB holding the file's pages; give them back
         // (the grid reads them again from the cache file as needed).
         if let Err(e) = engine.release_memory() {

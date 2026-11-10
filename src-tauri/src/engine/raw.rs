@@ -195,9 +195,5 @@ impl Drop for RawConnection {
 }
 
 fn error_from(msg: String) -> AppError {
-    if msg.contains("Interrupted") {
-        AppError::Cancelled
-    } else {
-        AppError::Query(msg)
-    }
+    crate::error::engine_error(msg)
 }

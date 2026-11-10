@@ -6,8 +6,10 @@
 //   node scripts/bench.mjs --update   same, then write the results as the baseline
 //
 // Fails when a flow is more than 30% slower than its baseline (and at least
-// MIN_SLOWDOWN_MS slower, so sub-millisecond flows don't trip on noise).
-// Without a baseline for this OS it only reports, so a new runner can record one.
+// MIN_SLOWDOWN_MS slower, so sub-millisecond flows don't trip on noise), or
+// takes longer than its time budget in bench/budgets.json (any OS, with or
+// without a baseline). Without a baseline for this OS it only checks the
+// budgets, so a new runner can record one.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -20,6 +22,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const os =
   { linux: "linux", darwin: "macos", win32: "windows" }[process.platform] ?? process.platform;
 const baselinePath = join(root, "bench", "baseline", `${os}.json`);
+const budgetsPath = join(root, "bench", "budgets.json");
 const outDir = join(root, "target", "bench");
 const outPath = join(outDir, `${os}.json`);
 const update = process.argv.includes("--update");
@@ -36,6 +39,17 @@ run(
 );
 
 const results = JSON.parse(readFileSync(outPath, "utf8"));
+
+// Time budgets: a hard ceiling per flow on every runner.
+const budgets = existsSync(budgetsPath) ? JSON.parse(readFileSync(budgetsPath, "utf8")) : {};
+const over = Object.entries(results).filter(
+  ([flow, ms]) => typeof budgets[flow] === "number" && ms > budgets[flow],
+);
+for (const [flow, ms] of over)
+  console.error(`OVER BUDGET: ${flow} took ${ms} ms (budget ${budgets[flow]} ms)`);
+const unbudgeted = Object.keys(results).filter((f) => typeof budgets[f] !== "number");
+if (unbudgeted.length) console.log(`No time budget for: ${unbudgeted.join(", ")}`);
+
 if (update) {
   mkdirSync(dirname(baselinePath), { recursive: true });
   writeFileSync(baselinePath, `${JSON.stringify(results, null, 2)}\n`);
@@ -44,7 +58,7 @@ if (update) {
 }
 if (!existsSync(baselinePath)) {
   console.log(`No baseline for ${os} (${baselinePath}); results are in ${outPath}.`);
-  process.exit(0);
+  process.exit(over.length ? 1 : 0);
 }
 
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
@@ -67,6 +81,10 @@ for (const [flow, ms] of Object.entries(results)) {
   });
 }
 console.table(rows);
+if (over.length) {
+  console.error(`${over.length} flow(s) took longer than their budget in ${budgetsPath}.`);
+  process.exit(1);
+}
 if (failed) {
   console.error(`A flow got more than ${MAX_SLOWDOWN * 100}% slower than ${baselinePath}.`);
   process.exit(1);

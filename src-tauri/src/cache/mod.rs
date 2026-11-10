@@ -70,6 +70,11 @@ pub fn digest_parts(parts: &[SourceStamp]) -> String {
         .collect()
 }
 
+/// A cache key: 32 hex digits (other files in the folder are left alone).
+fn is_key(name: &str) -> bool {
+    name.len() == 32 && name.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 /// Stable cache key for a file version + import options.
 pub fn cache_key(stamp: &SourceStamp, options: &OpenOptions) -> String {
     let mut h = Sha256::new();
@@ -100,6 +105,44 @@ pub struct CacheMeta {
     pub row_count: u64,
     pub created_ms: u64,
     pub last_used_ms: u64,
+    /// What opening the file showed (columns, detected settings): a reopen
+    /// returns it without reading the file. Entries from before 1.5 have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub info: Option<serde_json::Value>,
+    /// A digest of the file's first and last bytes (see [`fingerprint`]),
+    /// checked in the background after a reopen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+}
+
+/// Bytes read from each end of a file for its [`fingerprint`].
+const FINGERPRINT_BYTES: u64 = 64 << 10;
+
+/// A digest of a file's size and its first and last 64 KiB: tells an edit
+/// that kept the size and the time of last change (a copy that kept the
+/// original's time, a tool that restores it) from the file imported.
+pub fn fingerprint(path: &Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path).ok()?;
+    let len = f.metadata().ok()?.len();
+    let mut h = Sha256::new();
+    h.update(len.to_le_bytes());
+    let mut buf = vec![0u8; FINGERPRINT_BYTES.min(len) as usize];
+    f.read_exact(&mut buf).ok()?;
+    h.update(&buf);
+    if len > FINGERPRINT_BYTES {
+        let tail = FINGERPRINT_BYTES.min(len - FINGERPRINT_BYTES);
+        f.seek(SeekFrom::End(-(tail as i64))).ok()?;
+        buf.truncate(tail as usize);
+        f.read_exact(&mut buf).ok()?;
+        h.update(&buf);
+    }
+    Some(
+        h.finalize()[..16]
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -134,7 +177,10 @@ impl Cache {
             enabled: AtomicBool::new(config.enabled),
             max_bytes: AtomicU64::new(config.max_bytes),
         };
-        cache.remove_partials();
+        let swept = cache.sweep();
+        if swept > 0 {
+            tracing::info!("cache: removed {swept} leftover files");
+        }
         Ok(cache)
     }
 
@@ -148,6 +194,33 @@ impl Cache {
 
     fn meta_path(&self, key: &str) -> PathBuf {
         self.dir.join(format!("{key}.json"))
+    }
+
+    fn alias_path(&self, key: &str) -> PathBuf {
+        self.dir.join(format!("{key}.alias"))
+    }
+
+    /// Notes that opening with `open_key` (the options as asked, before the
+    /// CSV delimiter was worked out) lands on the entry `key`.
+    pub fn link(&self, open_key: &str, key: &str) {
+        if open_key != key {
+            let _ = std::fs::write(self.alias_path(open_key), key);
+        }
+    }
+
+    /// The entry a file opened with `open_key` was imported into, if any.
+    pub fn lookup_open(&self, open_key: &str) -> Option<CacheMeta> {
+        self.lookup(open_key).or_else(|| {
+            let key = std::fs::read_to_string(self.alias_path(open_key)).ok()?;
+            self.lookup(key.trim())
+        })
+    }
+
+    /// Drops an entry whose file turned out to have changed. Its database
+    /// may still be attached (it is then deleted at the next start).
+    pub fn forget(&self, key: &str) {
+        let _ = std::fs::remove_file(self.meta_path(key));
+        let _ = std::fs::remove_file(self.db_path(key));
     }
 
     /// A complete cache entry for `key`, if any.
@@ -188,15 +261,54 @@ impl Cache {
         let _ = std::fs::remove_file(p.with_extension("partial.wal"));
     }
 
-    fn remove_partials(&self) {
-        if let Ok(rd) = std::fs::read_dir(&self.dir) {
-            for e in rd.flatten() {
-                let name = e.file_name().to_string_lossy().into_owned();
-                if name.contains(".duckdb.partial") {
-                    let _ = std::fs::remove_file(e.path());
+    /// Removes what no entry uses: imports that never finished (`.partial`
+    /// and their WAL), a database without its JSON or the other way round
+    /// (a crash between the two, an entry dropped while attached), WAL
+    /// files left by a crash, and aliases to entries that are gone. Run at
+    /// start, before anything is attached. Returns the files removed.
+    pub fn sweep(&self) -> usize {
+        let Ok(rd) = std::fs::read_dir(&self.dir) else {
+            return 0;
+        };
+        let names: Vec<String> = rd
+            .flatten()
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        let has = |n: &str| names.iter().any(|x| x == n);
+        let mut removed = 0;
+        for name in &names {
+            // An import that never finished (only DataLiq writes these).
+            if name.contains(".duckdb.partial") {
+                if std::fs::remove_file(self.dir.join(name)).is_ok() {
+                    removed += 1;
                 }
+                continue;
+            }
+            // Otherwise only files named after a cache key: the folder may
+            // be one the user chose, with files of their own.
+            let Some((key, ext)) = name.split_once('.') else {
+                continue;
+            };
+            if !is_key(key) {
+                continue;
+            }
+            let leftover = match ext {
+                // Read-only attaches write no WAL: one is left by a crash.
+                "duckdb.wal" => true,
+                "duckdb" => !has(&format!("{key}.json")),
+                "json" => !has(&format!("{key}.duckdb")),
+                "alias" => {
+                    let target = std::fs::read_to_string(self.dir.join(name)).unwrap_or_default();
+                    !has(&format!("{}.duckdb", target.trim()))
+                }
+                _ => false,
+            };
+            if leftover && std::fs::remove_file(self.dir.join(name)).is_ok() {
+                removed += 1;
             }
         }
+        removed
     }
 
     fn entries(&self) -> Vec<(CacheMeta, u64)> {
@@ -336,6 +448,8 @@ mod tests {
             row_count: 1,
             created_ms: 0,
             last_used_ms,
+            info: None,
+            fingerprint: None,
         }
     }
 
@@ -391,6 +505,88 @@ mod tests {
         assert_eq!(cache.info().used_bytes, 2000);
         assert_eq!(cache.clear(&["open".to_string()]), 1);
         assert_eq!(cache.info().entries, 1);
+    }
+
+    #[test]
+    fn leftovers_are_swept_but_other_files_are_left_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let k = |c: char| c.to_string().repeat(32);
+        let cache = Cache::new(CacheConfig {
+            dir: dir.path().into(),
+            max_bytes: 1 << 30,
+            enabled: true,
+        })
+        .unwrap();
+        fake_entry(&cache, &k('a'), 10, 1);
+        let files = [
+            format!("{}.duckdb", k('b')),     // no JSON: an import cut short
+            format!("{}.json", k('c')),       // no database: dropped while attached
+            format!("{}.duckdb.wal", k('a')), // a crash while attached
+            format!("{}.alias", k('d')),      // points nowhere
+            "mine.duckdb".to_string(),        // the user's own
+            "notes.json".to_string(),
+        ];
+        for f in &files {
+            std::fs::write(dir.path().join(f), b"x").unwrap();
+        }
+        std::fs::write(dir.path().join(format!("{}.alias", k('e'))), k('a')).unwrap();
+        assert_eq!(cache.sweep(), 4);
+        let left: std::collections::BTreeSet<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        let want: std::collections::BTreeSet<String> = [
+            format!("{}.duckdb", k('a')),
+            format!("{}.json", k('a')),
+            format!("{}.alias", k('e')),
+            "mine.duckdb".to_string(),
+            "notes.json".to_string(),
+        ]
+        .into();
+        assert_eq!(left, want);
+    }
+
+    #[test]
+    fn an_open_key_finds_its_entry_through_an_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::new(CacheConfig {
+            dir: dir.path().into(),
+            max_bytes: 1 << 30,
+            enabled: true,
+        })
+        .unwrap();
+        fake_entry(&cache, "real", 10, 1);
+        assert!(cache.lookup_open("asked").is_none());
+        cache.link("asked", "real");
+        assert_eq!(cache.lookup_open("asked").unwrap().key, "real");
+        cache.link("real", "real");
+        assert!(!cache.alias_path("real").exists(), "no alias to itself");
+        cache.forget("real");
+        assert!(
+            cache.lookup_open("asked").is_none(),
+            "a dangling alias finds nothing"
+        );
+    }
+
+    #[test]
+    fn fingerprint_sees_edits_at_either_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("f");
+        let mut bytes = vec![b'a'; 300 << 10];
+        std::fs::write(&p, &bytes).unwrap();
+        let a = fingerprint(&p).unwrap();
+        assert_eq!(fingerprint(&p).unwrap(), a, "stable");
+        bytes[0] = b'b';
+        std::fs::write(&p, &bytes).unwrap();
+        let b = fingerprint(&p).unwrap();
+        assert_ne!(a, b, "first bytes");
+        *bytes.last_mut().unwrap() = b'b';
+        std::fs::write(&p, &bytes).unwrap();
+        assert_ne!(fingerprint(&p).unwrap(), b, "last bytes");
+        std::fs::write(&p, b"tiny").unwrap();
+        assert!(fingerprint(&p).is_some(), "smaller than one block");
+        assert!(fingerprint(&dir.path().join("missing")).is_none());
     }
 
     #[test]

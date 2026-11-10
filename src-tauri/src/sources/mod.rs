@@ -6,6 +6,7 @@ pub mod detect;
 pub mod excel;
 mod friendly;
 pub mod integrity;
+mod memo;
 pub mod multi;
 
 use std::path::{Path, PathBuf};
@@ -31,7 +32,7 @@ pub struct OpenOptions {
 }
 
 /// CSV settings as detected by DuckDB's sniffer, shown in the Import settings popover.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SniffedCsv {
     pub delimiter: String,
@@ -53,7 +54,7 @@ pub struct ColumnMeta {
 }
 
 /// Everything the UI needs to show a newly opened file.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceInfo {
     pub path: PathBuf,
@@ -65,20 +66,27 @@ pub struct SourceInfo {
     pub sniffed: Option<SniffedCsv>,
     /// Sheets and header row (Excel only).
     pub excel: Option<ExcelInfo>,
-    /// Tables, and the one shown (SQLite and DuckDB files).
+    /// Tables, and the one shown (SQLite and DuckDB files; never cached).
+    #[serde(skip_deserializing)]
     pub database: Option<DatabaseInfo>,
     pub columns: Vec<ColumnMeta>,
     /// The table expression used to read the file, for "Copy as SQL".
     pub reader_sql: String,
-    /// Set once the full data can be paged (after import, or at once for Parquet).
+    /// Set once the full data can be paged (after import, or at once for
+    /// Parquet, or at once from the cache). Not kept with a cache entry.
+    #[serde(skip_deserializing)]
     pub dataset: Option<crate::engine::Dataset>,
     /// A folder or pattern: its files (relative to its folder, at most
     /// [`MAX_LISTED_FILES`]), how many there are, how many were left out.
     pub files: Option<FileList>,
+    /// The version of the files shown (size, last change), to notice when
+    /// they change on disk. None for URLs.
+    #[serde(default)]
+    pub stamp: Option<crate::cache::SourceStamp>,
 }
 
 /// The files a folder or pattern opened together.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileList {
     pub names: Vec<String>,
@@ -91,6 +99,19 @@ pub struct FileList {
 
 /// Files named in [`FileList::names`] (the count is always exact).
 pub const MAX_LISTED_FILES: usize = 500;
+
+// What the sniffer, `DESCRIBE` and inspecting found, per file version (see `memo`).
+static SNIFFED: memo::Memo<(SniffedCsv, usize, String)> = memo::Memo::new();
+static COLUMNS: memo::Memo<Vec<ColumnMeta>> = memo::Memo::new();
+static INSPECTED: memo::Memo<SourceInfo> = memo::Memo::new();
+
+/// Forgets what was sniffed and inspected this session, so the next open
+/// reads files afresh (benchmarks of a first open).
+pub fn forget_inspections() {
+    SNIFFED.clear();
+    COLUMNS.clear();
+    INSPECTED.clear();
+}
 
 /// A file (or a folder or pattern of files) plus the options to read it:
 /// everything needed to build its SQL.
@@ -428,6 +449,30 @@ impl Source {
     /// Runs DuckDB's CSV sniffer. Returns the settings plus (column count,
     /// first column name).
     fn sniff_raw(&self, engine: &Engine) -> Result<(SniffedCsv, usize, String)> {
+        SNIFFED.get_or_try(self.memo_key("sniff"), || self.sniff_uncached(engine))
+    }
+
+    /// What a session-long memo of this source's sniff or columns is kept
+    /// under: the files' version and everything that changes the reader.
+    /// None for files on the web (they may change without notice).
+    fn memo_key(&self, kind: &str) -> Option<String> {
+        if self.is_remote() {
+            return None;
+        }
+        let stamp = self.stamp().ok()?;
+        let key = serde_json::json!({
+            "kind": kind,
+            "stamp": stamp,
+            "first": self.files.first(),
+            "options": self.options,
+            "sameHeader": self.same_header,
+            "fileColumn": self.file_column,
+            "table": self.db.as_ref().map(|d| d.table.clone()),
+        });
+        Some(key.to_string())
+    }
+
+    fn sniff_uncached(&self, engine: &Engine) -> Result<(SniffedCsv, usize, String)> {
         let Detected {
             format,
             compression,
@@ -598,6 +643,13 @@ impl Source {
 
     /// Column names and DuckDB types, via `DESCRIBE`.
     pub fn columns(&self, engine: &Engine) -> Result<Vec<ColumnMeta>> {
+        if self.is_excel() {
+            return self.columns_uncached(engine);
+        }
+        COLUMNS.get_or_try(self.memo_key("columns"), || self.columns_uncached(engine))
+    }
+
+    fn columns_uncached(&self, engine: &Engine) -> Result<Vec<ColumnMeta>> {
         let (reader, params) = self.reader()?;
         let conn = engine.connection()?;
         let mut stmt = conn
@@ -631,6 +683,10 @@ impl Source {
 
     /// Detects, sniffs and describes the file.
     pub fn inspect(&self, engine: &Engine) -> Result<SourceInfo> {
+        INSPECTED.get_or_try(self.memo_key("inspect"), || self.inspect_uncached(engine))
+    }
+
+    fn inspect_uncached(&self, engine: &Engine) -> Result<SourceInfo> {
         let (sniffed, columns, excel, reader_sql) = if self.is_excel() {
             let sheet = self.load_excel(Some(1000))?;
             let columns = sheet
@@ -683,7 +739,25 @@ impl Source {
             reader_sql,
             dataset: None,
             path: self.path.clone(),
+            stamp: if self.is_remote() {
+                None
+            } else {
+                self.stamp().ok()
+            },
         })
+    }
+
+    /// The current version of what `path` names (a file, folder or
+    /// pattern): None when it is gone or can't be read.
+    pub fn current_stamp(path: &Path) -> Option<crate::cache::SourceStamp> {
+        if crate::remote::is_url(path) {
+            return None;
+        }
+        if path.is_file() {
+            // Even emptied, it is still there (and changed).
+            return crate::cache::SourceStamp::of(path).ok();
+        }
+        Source::new(path, OpenOptions::default()).ok()?.stamp().ok()
     }
 
     /// The file's name; for a pattern its last two parts (`logs/*.csv.gz`),

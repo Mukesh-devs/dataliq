@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { describeFilter, filterFamily, isIdentity, sortMark, toggleSort } from "./view";
+import {
+  describeFilter,
+  differsInSearchOnly,
+  filterFamily,
+  isIdentity,
+  sortMark,
+  toggleSort,
+} from "./view";
 
 describe("view helpers", () => {
   it("knows when a view changes nothing", () => {
@@ -87,5 +94,14 @@ describe("filters on nested keys", () => {
     expect(describeFilter({ column: "user", path: ["email"], op: "notNull" })).toMatch(
       /^user\.email /,
     );
+  });
+});
+
+describe("differsInSearchOnly", () => {
+  it("is true when only the search changed", () => {
+    const sort = [{ column: "a", desc: false }];
+    expect(differsInSearchOnly({ sort, search: "x" }, { sort, search: "xy" })).toBe(true);
+    expect(differsInSearchOnly({}, { search: "x" })).toBe(true);
+    expect(differsInSearchOnly({ search: "x" }, { search: "x", sort })).toBe(false);
   });
 });

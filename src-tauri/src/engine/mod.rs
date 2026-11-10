@@ -386,6 +386,11 @@ impl Engine {
     }
 
     /// DuckDB's memory in use, its limit and what it has spilled to disk.
+    /// Where DuckDB writes what doesn't fit in memory.
+    pub fn temp_dir(&self) -> &std::path::Path {
+        &self.temp_dir
+    }
+
     pub fn memory_usage(&self) -> Result<MemoryUsage> {
         let conn = self.connection()?;
         let (used, spilled): (i64, i64) = conn.query_row(

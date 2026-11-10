@@ -43,6 +43,9 @@ import { useRecent } from "../stores/recent";
 import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
 import { useShortcuts } from "./useShortcuts";
+import { useFileWatch } from "./useFileWatch";
+import { CrashNotice } from "../components/shell/CrashNotice";
+import { flushSession, installErrorReporting, useSession } from "../stores/session";
 import { useSqlTables } from "./useSqlTables";
 import { ConvertDialog } from "../components/tools/ConvertDialog";
 import { useConvert } from "../stores/convert";
@@ -194,6 +197,7 @@ export function App() {
   const formatEditor = useSql((s) => s.formatEditor);
   const notice = useNotice((s) => s.show);
   useSqlTables(tabs, activeId);
+  useFileWatch();
   // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
   const [palette, setPalette] = useState<{ query: string } | null>(null);
   const engineVersion = useEngine((s) => s.version);
@@ -223,12 +227,23 @@ export function App() {
     void probeEngine();
     void loadApp();
     if (useSettings.getState().checkUpdates) void useUpdate.getState().autoCheck();
-    // `dataliq file.csv` at startup.
-    void takeStartupFiles()
+    // The last session's tabs, then `dataliq file.csv` at startup.
+    void useSession
+      .getState()
+      .start()
+      .catch(() => {})
+      .then(() => takeStartupFiles())
       .then((paths) => {
         if (paths.length > 0) void openPaths(paths);
       })
       .catch(() => {});
+    const stopReporting = installErrorReporting();
+    const flush = () => flushSession();
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      stopReporting();
+      window.removeEventListener("beforeunload", flush);
+    };
   }, [probeEngine, loadApp, openPaths]);
 
   const openFile = useMemo(
@@ -583,6 +598,13 @@ export function App() {
         run: () => setHelp("shortcuts"),
       },
       {
+        id: "copy-diagnostics",
+        title: "Copy diagnostics",
+        group: "Help",
+        keywords: "bug report crash log support debug version system",
+        run: () => void useSession.getState().copyDiagnostics(),
+      },
+      {
         id: "about",
         title: "About DataLiq",
         group: "Help",
@@ -719,6 +741,7 @@ export function App() {
           />
         )}
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
+          <CrashNotice />
           {active ? (
             <Suspense fallback={null}>
               <FileView
