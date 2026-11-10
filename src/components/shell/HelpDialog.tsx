@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { modKey } from "../../lib/platform";
 import { allCommands, useCommands } from "../../stores/commands";
 import { useEngine } from "../../stores/engine";
-import logo from "../../../assets/icon.svg";
+// The icon whose tile fills its box (the macOS one keeps Apple's margin).
+import logo from "../../../assets/icon-full.svg";
 import { Button } from "../ui/Button";
 import { TipSteps } from "./Tips";
 

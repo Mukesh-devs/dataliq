@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/icon.svg" width="120" alt="DataLiq icon: a database stack with a forward chevron">
+<img src="assets/icon.svg" width="128" alt="DataLiq icon: the letter D made of a table's cells, one of them highlighted">
 
 # DataLiq
 

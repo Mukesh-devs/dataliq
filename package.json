@@ -13,12 +13,13 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run && node --test scripts/release/release.test.mjs",
+    "test": "vitest run && node --test scripts/release/release.test.mjs scripts/icons.test.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:perf": "playwright test -c playwright.perf.config.ts",
     "fixtures": "cargo run -p gen_fixtures --",
     "bench": "node scripts/bench.mjs",
+    "icons": "node scripts/icons.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

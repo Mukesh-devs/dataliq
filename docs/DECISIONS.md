@@ -1094,3 +1094,35 @@ something the user did). Undo restores both parts and applies the view
 again. The recipe keeps its own history (its steps change the columns);
 Ctrl+Z goes to it while the recipe panel is open. Ctrl+Z is left to text
 fields when one has the focus.
+
+## D73 — The icon: a D of table cells, drawn per platform and per size
+
+The first icon (described with the rename, above) put a database stack and a
+chevron on Apple's grid and let `tauri icon` scale that one picture into
+everything. Two things were wrong with it on a desktop: four colours and
+two shapes are a lot at 32 px, and the same padded picture was used on
+Windows and Linux, where icons fill their box, so it looked small in a
+taskbar.
+
+The new one is one shape, as the icons of the tools it sits beside are
+(VS Code's ribbon, Xcode's hammer): the letter D cut into a table's cells,
+a header column of three and a bowl of three rows, in the brand's
+cyan-to-indigo gradient, the top-left cell amber like a selected cell. The
+amber cell is also what tells it from the many blue developer icons at a
+glance. The glyph takes about 60 % of the tile.
+
+`scripts/icons.mjs` (`pnpm icons`) draws it three ways and writes every
+file, each size rasterised from the vectors at that size:
+
+- `assets/icon.svg`, macOS: the 824 px tile in a 1024 px canvas with its
+  shadow (Apple's grid), packed into `icon.icns` by the Tauri CLI.
+- `assets/icon-full.svg`, Windows and Linux: the tile fills the canvas.
+  The PNGs (32 to 512 px, the hicolor sizes and the window icon), the
+  Windows tiles and the larger layers of `icon.ico`; also Help › About.
+- `assets/icon-small.svg`, 16 to 24 px: wider gaps, no edge highlight, so
+  the cells stay apart. The small layers of `icon.ico`.
+
+`icon.ico` holds 16, 20, 24, 32, 40, 48, 64, 96, 128 and 256 px (what
+Explorer, the taskbar and the title bar ask for at 100–200 % scaling), as
+32-bit bitmaps with PNG at 256 px only, the one size the format
+compresses. A test checks the committed SVGs are what the script draws.
