@@ -199,6 +199,20 @@ describe("PagedRowSource: prefetch and dropped requests", () => {
     expect(s.getValue(38_000_000, 0)).toBe(38_000_000);
   });
 
+  it("loads pages again when opened after a dispose (React's development remount)", async () => {
+    const fetchPage = fakeFetch();
+    const s = new PagedRowSource({ rowCount: 10_000, columns, fetchPage });
+    s.open();
+    s.dispose();
+    s.ensure(0, 40);
+    await flush();
+    expect(s.getValue(0, 0)).toBe(NOT_LOADED);
+    s.open();
+    s.ensure(0, 40);
+    await flush();
+    expect(s.getValue(0, 0)).toBe(0);
+  });
+
   it("copying (load) never waits behind the queue", async () => {
     const fetchPage = fakeFetch();
     const s = new PagedRowSource({ rowCount: 10_000, columns, fetchPage, maxInflight: 1 });
