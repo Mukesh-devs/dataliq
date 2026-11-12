@@ -16,6 +16,7 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 ![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
 
+[**Website**](https://mukesh-devs.github.io/dataliq/) ·
 [**⬇ Download**](https://github.com/Mukesh-devs/dataliq/releases/latest) ·
 [**Features**](#features) ·
 [**Installation**](#installation) ·
@@ -25,13 +26,17 @@ second. Browse, filter, chart, clean and export millions of rows on **Windows**,
 
 <br>
 
-![A CSV file open in the grid, with the profile of its unit_price column](docs/screenshots/grid-light.png)
+![A 1 GB CSV file of 9.2 million rows open in the grid, with the profile of its total column and the sum of the selected cells](docs/screenshots/grid-light.png)
 
-| SQL over every open file | Charts of millions of rows |
+| Filter, sort and search | SQL over every open file |
 | --- | --- |
-| ![The SQL panel: a grouped query over the open file and its 20 result rows](docs/screenshots/sql-light.png) | ![A bar chart of the sum of unit_price by category, in the dark theme](docs/screenshots/chart-dark.png) |
+| ![Two filters, a sort and a search narrowing 9.2 million rows to 23,323 in about a second](docs/screenshots/filters-light.png) | ![The SQL panel: a grouped query over 9.2 million rows and its seven result rows, in 79 ms](docs/screenshots/sql-light.png) |
 
-<p align="center"><sub>The screenshots show the built-in sample dataset (Help › Open the sample dataset).</sub></p>
+| Charts of millions of rows | A graph view for JSON |
+| --- | --- |
+| ![A stacked bar chart of the sum of total by month and category, in the dark theme](docs/screenshots/chart-dark.png) | ![A JSON record drawn as connected cards, with a nested value selected](docs/screenshots/json-graph-light.png) |
+
+<p align="center"><sub>Screenshots of the app with a 1 GB CSV of 9.2 million rows and a 2-million-record NDJSON log (generated test files). More on the <a href="https://mukesh-devs.github.io/dataliq/">website</a>.</sub></p>
 
 ## Features
 
