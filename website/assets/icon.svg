@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#272b3a"/>
+      <stop offset="1" stop-color="#0f1117"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="brand" gradientUnits="userSpaceOnUse" x1="268" y1="262" x2="768" y2="762">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="0.55" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cffafe"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(512 512) scale(1.17476) translate(-512 -512)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+    <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#edge)" stroke-width="3"/>
+    <path d="M 295 289 H 373 V 377.67 H 295 Z" fill="url(#amber)" stroke="url(#amber)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 463 289 H 518 A 223 223 0 0 1 696 377.67 H 463 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 295 467.67 H 373 V 556.33 H 295 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 463 467.67 H 736.55 A 223 223 0 0 1 736.55 556.33 H 463 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 295 646.33 H 373 V 735 H 295 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 463 646.33 H 696 A 223 223 0 0 1 518 735 H 463 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -4,7 +4,8 @@
 //   node scripts/icons.mjs          (or `pnpm icons`)
 //
 // Writes the SVG sources in assets/ and, in src-tauri/icons/, the PNGs
-// (Linux, Windows tiles), icon.ico (Windows) and icon.icns (macOS).
+// (Linux, Windows tiles), icon.ico (Windows) and icon.icns (macOS); also the
+// website's copy of the icon and its favicons (website/assets/).
 //
 // Three drawings of one design, as desktop icons are made:
 // - icon.svg, for macOS: Apple's grid, an 824 px tile in a 1024 px canvas
@@ -207,6 +208,18 @@ async function main() {
   };
   for (const [name, size] of Object.entries(pngs))
     writeFileSync(join(icons, name), (await sized(size)).png);
+
+  // The website (website/, GitHub Pages): its logo, favicons and home-screen icons.
+  const site = join(root, "website", "assets");
+  mkdirSync(site, { recursive: true });
+  writeFileSync(join(site, "icon.svg"), svg.full);
+  for (const [name, size] of Object.entries({
+    "favicon-32.png": 32,
+    "apple-touch-icon.png": 180,
+    "icon-192.png": 192,
+    "icon-512.png": 512,
+  }))
+    writeFileSync(join(site, name), (await sized(size)).png);
 
   // Windows: every size Explorer, the taskbar and the title bar ask for.
   const layers = [];
