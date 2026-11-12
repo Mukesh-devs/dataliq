@@ -191,7 +191,10 @@ function useRowSource(tab: Tab): RowSource | null {
     }
     return new StaticRowSource(preview);
   }, [preview, datasetId, rowCount]);
-  useEffect(() => () => source?.dispose(), [source]);
+  useEffect(() => {
+    source?.open?.();
+    return () => source?.dispose();
+  }, [source]);
   return source;
 }
 

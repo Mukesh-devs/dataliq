@@ -68,7 +68,10 @@ export function SqlPanel() {
           : fetchRows(dataset.id, start, count),
     });
   }, [table, dataset]);
-  useEffect(() => () => source?.dispose(), [source]);
+  useEffect(() => {
+    source?.open?.();
+    return () => source?.dispose();
+  }, [source]);
   const openResult = useTabs((s) => s.openResult);
   const markOwned = useSql((s) => s.markOwned);
   const openInTab = () => {

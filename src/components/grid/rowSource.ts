@@ -21,6 +21,12 @@ export interface RowSource {
   subscribe(listener: (start: number, end: number) => void): () => void;
   /** Called with a message when a page fails to load. */
   onError?(listener: (message: string) => void): () => void;
+  /**
+   * The view using the source is on screen (again): undoes `dispose`. In
+   * development React mounts every component, unmounts it and mounts it
+   * again with the same source, which must then still load its pages.
+   */
+  open?(): void;
   dispose(): void;
 }
 
@@ -36,6 +42,7 @@ export class StaticRowSource implements RowSource {
     return cellValue(this.table, row, col);
   }
   ensure(): void {}
+  open(): void {}
   load(): Promise<void> {
     return Promise.resolve();
   }
@@ -249,6 +256,10 @@ export class PagedRowSource implements RowSource {
   onError(listener: (message: string) => void): () => void {
     this.errorListeners.add(listener);
     return () => this.errorListeners.delete(listener);
+  }
+
+  open(): void {
+    this.disposed = false;
   }
 
   dispose(): void {

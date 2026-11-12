@@ -14,6 +14,19 @@ All notable changes to this project are documented here. The format follows
   Start menu, app launcher), and a simpler drawing at 16–24 px (title bars, file lists).
   Windows gets every size it asks for (16 to 256 px) and Linux a 512 px icon.
 
+## [1.6.1] - 2026-11-12
+
+### Fixed
+
+- Sixteen features' commands were refused by the installed app ("not allowed. Command not
+  found"), although they worked in the tests: the JSON structure graph, statistics of big
+  selections, Convert files, MySQL and PostgreSQL connections, the memory reading in the
+  status bar, session autosave and restore, the crash notice and Copy diagnostics, and
+  noticing files changed on disk. They were missing from the app's list of permitted
+  commands; a test now keeps that list complete.
+- In a development build (`pnpm tauri dev`) the grid stayed empty after a file was
+  imported.
+
 ## [1.6.0] - 2026-11-09
 
 Reliability: your work survives restarts and crashes, files changed on disk are noticed,
@@ -385,7 +398,8 @@ First version: a fast viewer for huge tabular files.
 - Cancelling an import just as it started (or finished) could be ignored and keep the imported data.
 - Imports no longer finish up to 250 ms late waiting for the progress reporter.
 
-[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/mukesh-dsnl/dataliq/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/mukesh-dsnl/dataliq/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/mukesh-dsnl/dataliq/compare/v1.3.0...v1.4.0

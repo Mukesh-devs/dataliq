@@ -231,3 +231,54 @@ pub fn run() {
             _ => {}
         });
 }
+
+#[cfg(test)]
+mod tests {
+    /// The text between `start` and the next `end`.
+    fn between<'a>(text: &'a str, start: &str, end: &str) -> &'a str {
+        let from = text.find(start).expect(start) + start.len();
+        &text[from..from + text[from..].find(end).expect(end)]
+    }
+
+    /// A command the UI calls must be in three lists: the invoke handler
+    /// (here), the app manifest (build.rs) and the main window's capability.
+    /// One missing from the last two is refused at run time ("not allowed.
+    /// Command not found"), and the UI tests, which mock the backend, pass
+    /// all the same.
+    #[test]
+    fn commands_are_permitted() {
+        let mut handlers: Vec<String> = between(include_str!("lib.rs"), "generate_handler![", "])")
+            .lines()
+            .filter_map(|l| l.trim().trim_end_matches(',').rsplit("::").next())
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+            .collect();
+        let mut manifest: Vec<String> = between(include_str!("../build.rs"), ".commands(&[", "])")
+            .split('"')
+            .skip(1)
+            .step_by(2)
+            .map(str::to_string)
+            .collect();
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        let mut allowed: Vec<String> = capability["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|p| p.as_str()?.strip_prefix("allow-"))
+            .map(|p| p.replace('-', "_"))
+            .collect();
+        for list in [&mut handlers, &mut manifest, &mut allowed] {
+            list.sort();
+        }
+        assert!(handlers.len() > 60, "the handler list was not read");
+        assert_eq!(
+            handlers, manifest,
+            "build.rs must list exactly the commands of generate_handler!"
+        );
+        assert_eq!(
+            handlers, allowed,
+            "capabilities/default.json must allow exactly the commands of generate_handler!"
+        );
+    }
+}

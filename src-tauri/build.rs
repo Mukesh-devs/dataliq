@@ -1,12 +1,21 @@
 fn main() {
     // Listing the app's commands makes Tauri generate one permission per command
     // (`allow-<command>`), so capabilities/default.json can grant only what the UI needs.
+    // A command missing here or there is refused at run time ("not allowed"), which
+    // no mocked UI test sees: `commands_are_permitted` in src/lib.rs keeps the three
+    // lists (the handler, this one, the capability) the same.
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "run_query",
             "cancel_query",
             "fetch_rows",
             "open_file",
+            "source_stamps",
+            "session_start",
+            "session_save",
+            "session_clear",
+            "report_ui_error",
+            "diagnostics",
             "preview_file",
             "import_file",
             "cancel_import",
@@ -20,6 +29,7 @@ fn main() {
             "take_startup_files",
             "set_native_menu",
             "sample_dataset",
+            "engine_memory",
             "update_status",
             "check_update",
             "install_update",
@@ -27,6 +37,8 @@ fn main() {
             "column_values",
             "column_profile",
             "column_histograms",
+            "selection_stats",
+            "json_shape",
             "view_sql",
             "register_table",
             "unregister_table",
@@ -39,6 +51,13 @@ fn main() {
             "delete_saved_query",
             "export_view",
             "cancel_export",
+            "list_data_files",
+            "list_connections",
+            "connect_database",
+            "live_tables",
+            "disconnect_database",
+            "forget_connection",
+            "convert_files",
             "chart_data",
             "chart_sql",
             "save_chart_image",

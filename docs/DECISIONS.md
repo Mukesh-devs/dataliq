@@ -1126,3 +1126,25 @@ file, each size rasterised from the vectors at that size:
 Explorer, the taskbar and the title bar ask for at 100–200 % scaling), as
 32-bit bitmaps with PNG at 256 px only, the one size the format
 compresses. A test checks the committed SVGs are what the script draws.
+
+## D74 — The three lists of commands are kept the same by a test
+
+Tauri refuses a command that the app manifest (`build.rs`) and the main
+window's capability (`capabilities/default.json`) don't name, even when it
+is in the invoke handler. Sixteen commands added from 1.1 to 1.6 were in
+the handler only, so the installed app refused them (the JSON structure,
+big selections' statistics, Convert files, live databases, the memory
+reading, the session, diagnostics, file-change checks) while every test
+passed: the UI tests mock the backend, and the Rust tests call the engine
+below the commands. Most failed quietly, as those features treat an error
+as "not available".
+
+`commands_are_permitted` (in `src/lib.rs`) reads the three lists from
+their sources and fails when they differ, so a new command can't be
+forgotten in one of them. The mistake was found by driving the real app
+(WebKitGTK's WebDriver under Xvfb) to take screenshots; a smoke test of
+the real app on CI is the remaining gap (30.3 in the improvement list).
+
+The same run showed the grid empty in development builds: React's
+StrictMode mounts, unmounts and mounts again, which disposed the grid's
+row source for good. The source can be opened again.
