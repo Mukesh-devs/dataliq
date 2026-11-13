@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DataLiq — Open huge CSV, Parquet, JSON and Excel files in seconds</title>
+    <meta
+      name="description"
+      content="DataLiq is a free desktop app for Windows, macOS and Linux that opens multi-gigabyte CSV, Parquet, JSON and Excel files in about a second. Filter, query with SQL, chart, clean and export millions of rows. Fully offline."
+    />
+    <meta name="theme-color" content="#0b1530" />
+    <link rel="canonical" href="https://mukesh-devs.github.io/dataliq/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DataLiq" />
+    <meta property="og:title" content="DataLiq — Open huge data files in seconds" />
+    <meta
+      property="og:description"
+      content="A desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files instantly. Filter, query with SQL, chart, clean and export. Free, open source, fully offline."
+    />
+    <meta property="og:url" content="https://mukesh-devs.github.io/dataliq/" />
+    <meta property="og:image" content="https://mukesh-devs.github.io/dataliq/assets/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The DataLiq window showing a 9-million-row CSV file with a column profile"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />
+
+    <link
+      rel="preload"
+      href="assets/fonts/inter-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="assets/shots/hero-light-1280.webp"
+      imagesrcset="assets/shots/hero-light-1280.webp 1280w, assets/shots/hero-light-2560.webp 2560w"
+      imagesizes="(min-width: 1240px) 1120px, 94vw"
+      fetchpriority="high"
+    />
+    <link rel="preconnect" href="https://api.github.com" crossorigin />
+    <link rel="stylesheet" href="css/site.css" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "DataLiq",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "A desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files in seconds, with filters, SQL, charts, cleaning and export. Fully offline.",
+        "url": "https://mukesh-devs.github.io/dataliq/",
+        "downloadUrl": "https://github.com/Mukesh-devs/dataliq/releases",
+        "license": "https://github.com/Mukesh-devs/dataliq/blob/main/LICENSE",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    <script>
+      // Animations only start hidden when scripts run.
+      document.documentElement.classList.add("js");
+    </script>
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <!-- Icons used more than once. -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-github" viewBox="0 0 24 24">
+        <path
+          fill="currentColor"
+          d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.3-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.06.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
+        />
+      </symbol>
+      <symbol
+        id="i-download"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+      </symbol>
+      <symbol
+        id="i-arrow"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M5 12h14m0 0-6-6m6 6-6 6" />
+      </symbol>
+      <symbol
+        id="i-check"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m5 12.5 4.5 4.5L19 7.5" />
+      </symbol>
+      <symbol id="i-windows" viewBox="0 0 24 24">
+        <path
+          fill="currentColor"
+          d="M3 5.1 10.5 4v7.5H3V5.1Zm8.5-1.25L21 2.5v9h-9.5V3.85ZM3 12.5h7.5V20L3 18.9v-6.4Zm8.5 0H21v9l-9.5-1.35V12.5Z"
+        />
+      </symbol>
+      <symbol id="i-apple" viewBox="0 0 24 24">
+        <path
+          fill="currentColor"
+          d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.800-1.800-3.400-1.800-1.400-.1-2.800.9-3.500.9-.7 0-1.900-.8-3.100-.8-1.600 0-3.100.9-3.900 2.400-1.700 2.900-.4 7.200 1.200 9.500.8 1.100 1.700 2.400 3 2.300 1.200 0 1.700-.8 3.100-.8 1.500 0 1.900.8 3.200.8 1.300 0 2.100-1.200 2.900-2.300.9-1.300 1.300-2.600 1.300-2.700-.1 0-2.800-1.100-2.800-4Zm-2.300-6.700c.6-.8 1.100-1.900 1-3-1 0-2.100.7-2.800 1.500-.6.700-1.200 1.800-1 2.900 1.100.1 2.200-.6 2.800-1.400Z"
+        />
+      </symbol>
+      <symbol
+        id="i-linux"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M9 4.8C9 3.2 10.300 2 12 2s3 1.200 3 2.800c0 2.900 3.500 5.700 3.500 10.200 0 1.300-.4 2.400-1 3.300M9 4.800c0 2.900-3.500 5.700-3.500 10.200 0 1.300.4 2.400 1 3.300"
+        />
+        <path
+          d="M6.500 18.300C5.300 18.800 4 19.600 4 20.500c0 1 1.500 1.500 3.500 1.500s3-.6 4.500-.6 2.500.6 4.500.6 3.500-.5 3.500-1.500c0-.9-1.300-1.700-2.500-2.200"
+        />
+        <path d="M10.200 6.800h.01M13.800 6.800h.01M10.500 9.300c.5.5 1 .7 1.500.7s1-.2 1.500-.7" />
+      </symbol>
+    </svg>
+
+    <header class="nav" data-nav>
+      <div class="container nav__inner">
+        <a class="brand" href="#top" aria-label="DataLiq, home">
+          <img src="assets/icon.svg" width="34" height="34" alt="" />
+          <span>DataLiq</span>
+        </a>
+        <nav class="nav__links" aria-label="Sections">
+          <a href="#tour">Tour</a>
+          <a href="#speed">Performance</a>
+          <a href="#features">Features</a>
+          <a href="#automate">Automation</a>
+          <a href="#download">Download</a>
+        </nav>
+        <div class="nav__actions">
+          <a class="nav__github" href="https://github.com/Mukesh-devs/dataliq" rel="noopener">
+            <svg width="20" height="20" aria-hidden="true"><use href="#i-github" /></svg>
+            <span>GitHub</span>
+          </a>
+          <a class="btn btn--primary btn--sm" href="#download" data-download-primary>
+            <svg width="16" height="16" aria-hidden="true"><use href="#i-download" /></svg>
+            <span data-download-label>Download</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ───────────────────────── Hero ───────────────────────── -->
+      <section class="hero" id="top">
+        <div class="hero__bg" aria-hidden="true">
+          <div class="hero__grid"></div>
+          <svg class="hero__curves" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="curve" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0" stop-color="#3b82f6" stop-opacity="0" />
+                <stop offset=".5" stop-color="#3b82f6" stop-opacity=".35" />
+                <stop offset="1" stop-color="#6366f1" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M-80 520 C 260 300, 520 760, 900 470 S 1420 300, 1560 470"
+              fill="none"
+              stroke="url(#curve)"
+              stroke-width="1.5"
+            />
+            <path
+              d="M-80 600 C 300 380, 560 820, 940 540 S 1440 380, 1560 560"
+              fill="none"
+              stroke="url(#curve)"
+              stroke-width="1"
+            />
+            <path
+              d="M-80 690 C 320 480, 600 880, 980 620 S 1460 470, 1560 650"
+              fill="none"
+              stroke="url(#curve)"
+              stroke-width="1"
+              opacity=".6"
+            />
+            <circle cx="1180" cy="170" r="210" fill="none" stroke="url(#curve)" stroke-width="1" />
+            <circle
+              cx="1180"
+              cy="170"
+              r="300"
+              fill="none"
+              stroke="url(#curve)"
+              stroke-width="1"
+              opacity=".5"
+            />
+          </svg>
+        </div>
+
+        <div class="container hero__copy">
+          <a class="pill" href="#download" data-reveal>
+            <span class="pill__dot"></span>
+            <span data-release-pill>Free and open source</span>
+            <span class="pill__sep" aria-hidden="true">·</span>
+            <span>Windows, macOS and Linux</span>
+          </a>
+          <h1 data-reveal>Open huge data files <span class="grad">in seconds.</span></h1>
+          <p class="lead" data-reveal>
+            DataLiq is a desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files in
+            about a second, then lets you filter, query with SQL, chart, clean and export them.
+            Nothing is uploaded. No account. It works offline.
+          </p>
+          <div class="hero__cta" data-reveal>
+            <a class="btn btn--primary btn--lg" href="#download" data-download-primary>
+              <svg width="20" height="20" aria-hidden="true"><use href="#i-download" /></svg>
+              <span data-download-label>Download DataLiq</span>
+            </a>
+            <a
+              class="btn btn--ghost btn--lg"
+              href="https://github.com/Mukesh-devs/dataliq"
+              rel="noopener"
+            >
+              <svg width="20" height="20" aria-hidden="true"><use href="#i-github" /></svg>
+              View on GitHub
+            </a>
+          </div>
+          <p class="hero__note" data-reveal>
+            <span data-download-note>Free for every use, MIT licensed.</span>
+            <a href="#download">All downloads</a>
+          </p>
+        </div>
+
+        <div class="container hero__stage" data-reveal="rise">
+          <div class="stage" data-parallax-root>
+            <figure class="window window--hero" data-parallax="0.04">
+              <div class="window__bar">
+                <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="window__title">orders.csv — DataLiq</span>
+              </div>
+              <img
+                src="assets/shots/hero-light-1280.webp"
+                srcset="
+                  assets/shots/hero-light-1280.webp 1280w,
+                  assets/shots/hero-light-2560.webp 2560w
+                "
+                sizes="(min-width: 1240px) 1120px, 94vw"
+                width="1280"
+                height="800"
+                alt="DataLiq showing a 1 GB CSV file of 9,221,261 rows in its grid. A side panel profiles the total column with its distribution, and the status bar adds up the selected cells."
+                fetchpriority="high"
+                decoding="async"
+              />
+            </figure>
+
+            <figure
+              class="window window--dark window--float window--float-right"
+              data-parallax="-0.10"
+              aria-hidden="true"
+            >
+              <div class="window__bar">
+                <span class="window__dots"><i></i><i></i><i></i></span>
+                <span class="window__title">Chart</span>
+              </div>
+              <img
+                src="assets/shots/chart-dark-1280.webp"
+                srcset="
+                  assets/shots/chart-dark-1280.webp 1280w,
+                  assets/shots/chart-dark-2560.webp 2560w
+                "
+                sizes="(min-width: 1240px) 520px, 44vw"
+                width="1280"
+                height="800"
+                alt=""
+                loading="eager"
+                decoding="async"
+              />
+            </figure>
+
+            <div class="chip chip--a" data-parallax="-0.16" aria-hidden="true">
+              <span class="chip__k">Rows in this file</span>
+              <span class="chip__v">9,221,261</span>
+            </div>
+            <div class="chip chip--b" data-parallax="-0.20" aria-hidden="true">
+              <span class="chip__k">Profile of 9.2M values</span>
+              <span class="chip__v">482 ms</span>
+            </div>
+          </div>
+          <p class="stage__caption">
+            Real screenshots of DataLiq with a 1&nbsp;GB CSV file. Timings shown are from the app's
+            own status bar.
+          </p>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Formats ───────────────────────── -->
+      <section class="formats" aria-labelledby="formats-title">
+        <div class="container">
+          <h2 class="eyebrow" id="formats-title">Opens what you already have</h2>
+          <ul class="formats__list" data-reveal>
+            <li><b>CSV</b><span>and TSV</span></li>
+            <li><b>Parquet</b><span>read in place</span></li>
+            <li><b>JSON</b><span>and NDJSON</span></li>
+            <li><b>Excel</b><span>.xlsx and .xls</span></li>
+            <li><b>.gz · .zst</b><span>compressed</span></li>
+            <li><b>SQLite</b><span>and DuckDB files</span></li>
+            <li><b>MySQL</b><span>and PostgreSQL</span></li>
+            <li><b>Folders</b><span>as one table</span></li>
+            <li><b>URLs</b><span>and S3</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Tour ───────────────────────── -->
+      <section class="section tour" id="tour" aria-labelledby="tour-title">
+        <div class="container">
+          <header class="section__head" data-reveal>
+            <p class="eyebrow">A tour of the app</p>
+            <h2 id="tour-title">From a raw file to an answer, without leaving the window.</h2>
+            <p class="section__lead">
+              Every screen below is the real application working on real files: 9.2&nbsp;million
+              orders in a CSV and 2&nbsp;million JSON log records.
+            </p>
+          </header>
+
+          <div class="tour__body" data-tour>
+            <div
+              class="tour__tabs"
+              role="tablist"
+              aria-label="Features"
+              aria-orientation="vertical"
+            >
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-explore"
+                aria-controls="tour-panel"
+                aria-selected="true"
+                data-shot="hero-light"
+                data-title="orders.csv — DataLiq"
+              >
+                <span class="tour__name">Explore</span>
+                <span class="tour__text"
+                  >Scroll millions of rows smoothly. Profile any column: nulls, distinct values, a
+                  histogram and the most common values. Select cells to see their sum and
+                  average.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-filter"
+                aria-controls="tour-panel"
+                aria-selected="false"
+                tabindex="-1"
+                data-shot="filters-light"
+                data-title="orders.csv — DataLiq"
+              >
+                <span class="tour__name">Filter, sort and search</span>
+                <span class="tour__text"
+                  >Stack filters as chips, pick values from a list with counts, sort by any column
+                  and search the text. Here, 9.2M rows narrow to 23,323 in about a second.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-sql"
+                aria-controls="tour-panel"
+                aria-selected="false"
+                tabindex="-1"
+                data-shot="sql-light"
+                data-title="SQL — DataLiq"
+              >
+                <span class="tour__name">Query with SQL</span>
+                <span class="tour__text"
+                  >Every open file is a table. Join them, aggregate them, see the plan with Explain,
+                  and open any result as a new tab. This query ran over 9.2M rows in
+                  79&nbsp;ms.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-chart"
+                aria-controls="tour-panel"
+                aria-selected="false"
+                tabindex="-1"
+                data-shot="chart-light"
+                data-title="Chart — DataLiq"
+              >
+                <span class="tour__name">Chart it</span>
+                <span class="tour__text"
+                  >Bar, line, pie, histogram, scatter and box plots, computed by the engine over the
+                  whole file. Export as PNG or SVG, or copy the chart's SQL.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-json"
+                aria-controls="tour-panel"
+                aria-selected="false"
+                tabindex="-1"
+                data-shot="json-record"
+                data-title="web_logs.ndjson.gz — DataLiq"
+              >
+                <span class="tour__name">Understand JSON</span>
+                <span class="tour__text"
+                  >See a record as connected cards. Click a nested value to filter by it, add it as
+                  a column, or unnest an array into rows.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-clean"
+                aria-controls="tour-panel"
+                aria-selected="false"
+                tabindex="-1"
+                data-shot="clean-light"
+                data-title="Clean — DataLiq"
+              >
+                <span class="tour__name">Clean, without touching the file</span>
+                <span class="tour__text"
+                  >Trim, change types, find and replace, fill empty cells, add calculated columns.
+                  Steps are undoable and can be saved as a recipe for the next file.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+              <button
+                class="tour__tab"
+                role="tab"
+                id="tab-export"
+                aria-controls="tour-panel"
+                aria-selected="false"
+                tabindex="-1"
+                data-shot="export-light"
+                data-title="Export — DataLiq"
+              >
+                <span class="tour__name">Export anywhere</span>
+                <span class="tour__text"
+                  >CSV, Parquet, JSON or Excel. One file, a folder per value of a column, or files
+                  of a set size. Or convert a whole folder at once.</span
+                >
+                <span class="tour__bar" aria-hidden="true"><i></i></span>
+              </button>
+            </div>
+
+            <div
+              class="tour__view"
+              id="tour-panel"
+              role="tabpanel"
+              aria-labelledby="tab-explore"
+              tabindex="0"
+            >
+              <figure class="window" data-tour-window>
+                <div class="window__bar">
+                  <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span class="window__title" data-tour-title>orders.csv — DataLiq</span>
+                  <button
+                    class="window__zoom"
+                    type="button"
+                    data-zoom
+                    aria-label="View this screenshot larger"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="tour__frames">
+                  <img
+                    class="is-active"
+                    data-tour-img="hero-light"
+                    src="assets/shots/hero-light-1280.webp"
+                    srcset="
+                      assets/shots/hero-light-1280.webp 1280w,
+                      assets/shots/hero-light-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1100px) 780px, 94vw"
+                    width="1280"
+                    height="800"
+                    alt="The grid with a column profile panel: row count, nulls, distinct values, minimum, maximum, mean, a distribution chart and the most common values."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    data-tour-img="filters-light"
+                    data-src="filters-light"
+                    width="1280"
+                    height="800"
+                    alt="Two filter chips (country equals Germany, category is Computers or Peripherals), a sort by total, and a search for laptop highlighted in the grid. The status bar reads 23,323 of 9,221,261 rows, filtered and sorted in 1.06 seconds."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    data-tour-img="sql-light"
+                    data-src="sql-light"
+                    width="1280"
+                    height="800"
+                    alt="The SQL panel under the grid: a grouped query on the orders table with its seven result rows, returned in 79 milliseconds."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    data-tour-img="chart-light"
+                    data-src="chart-light"
+                    width="1280"
+                    height="800"
+                    alt="A stacked bar chart of the sum of total by month, split by seven product categories, over five years."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    data-tour-img="json-record"
+                    data-src="json-record"
+                    width="1280"
+                    height="800"
+                    alt="A JSON record drawn as cards: the record's keys, with its nested http object and tags array branching off. A details panel offers to filter by the selected value or add it as a column."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    data-tour-img="clean-light"
+                    data-src="clean-light"
+                    width="1280"
+                    height="800"
+                    alt="The Clean panel listing five steps (trim spaces, upper case, fill empty cells, round dates to the month, a calculated column) beside the grid showing the new columns."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    data-tour-img="export-light"
+                    data-src="export-light"
+                    width="1280"
+                    height="800"
+                    alt="The Export dialog: format buttons from CSV to Excel, with Parquet chosen, and the option to write a folder per value of the country column."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Speed ───────────────────────── -->
+      <section class="section speed" id="speed" aria-labelledby="speed-title">
+        <div class="speed__glow" aria-hidden="true"></div>
+        <div class="container">
+          <header class="section__head section__head--light" data-reveal>
+            <p class="eyebrow eyebrow--light">Built for big files</p>
+            <h2 id="speed-title">
+              The file that freezes your spreadsheet opens here before you let go of the mouse.
+            </h2>
+            <p class="section__lead">
+              DataLiq reads only what is on screen, runs on the DuckDB engine, and keeps a cache on
+              disk so the second open is instant. Queries that outgrow memory spill to disk instead
+              of crashing.
+            </p>
+          </header>
+
+          <dl class="stats" data-reveal>
+            <div class="stat">
+              <dt>First rows of a 5&nbsp;GB CSV</dt>
+              <dd><span data-count="0.28" data-decimals="2">0.28</span><small>s</small></dd>
+            </div>
+            <div class="stat">
+              <dt>Full import of that file, 46 million rows</dt>
+              <dd><span data-count="40">40</span><small>s</small></dd>
+            </div>
+            <div class="stat">
+              <dt>Reopening a file you opened before</dt>
+              <dd><span data-count="2">2</span><small>ms</small></dd>
+            </div>
+            <div class="stat">
+              <dt>Opening a 50-million-row Parquet file</dt>
+              <dd><span data-count="0.05" data-decimals="2">0.05</span><small>s</small></dd>
+            </div>
+          </dl>
+
+          <div class="speed__more" data-reveal>
+            <ul class="bars" aria-label="More measurements on 50 million rows">
+              <li>
+                <span>Filter 50M rows, first rows</span>
+                <span class="bars__track"><i style="--w: 30%"></i></span>
+                <b>0.1 – 0.9 s</b>
+              </li>
+              <li>
+                <span>Sort 50M rows, first and last rows</span>
+                <span class="bars__track"><i style="--w: 34%"></i></span>
+                <b>0.8 – 1.0 s</b>
+              </li>
+              <li>
+                <span>Chart of 50M rows</span>
+                <span class="bars__track"><i style="--w: 64%"></i></span>
+                <b>0.1 – 1.9 s</b>
+              </li>
+              <li>
+                <span>Column profile of 50M rows</span>
+                <span class="bars__track"><i style="--w: 90%"></i></span>
+                <b>0.7 – 2.7 s</b>
+              </li>
+            </ul>
+            <p class="speed__foot">
+              Measured on a 4-core Linux machine.
+              <a
+                href="https://github.com/Mukesh-devs/dataliq/blob/main/docs/BENCHMARKS.md"
+                rel="noopener"
+                >Every number, on Windows, macOS and Linux</a
+              >
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Deep dives ───────────────────────── -->
+      <section class="section dives" id="features" aria-labelledby="features-title">
+        <div class="container">
+          <header class="section__head" data-reveal>
+            <p class="eyebrow">Made for real work</p>
+            <h2 id="features-title">The tools you reach for, already in the window.</h2>
+          </header>
+
+          <article class="dive">
+            <div class="dive__copy" data-reveal>
+              <h3>See the shape of a JSON file before you read a line of it.</h3>
+              <p>
+                The structure view reads every record and draws one map: each key with its type, how
+                often it appears, and how long arrays are. On this 2-million-record log, it shows
+                that <code>user_id</code> is present in 80% of records.
+              </p>
+              <ul class="ticks">
+                <li>
+                  <svg aria-hidden="true"><use href="#i-check" /></svg>One record as connected
+                  cards, or the structure of all of them
+                </li>
+                <li>
+                  <svg aria-hidden="true"><use href="#i-check" /></svg>Copy any value's JSON path,
+                  or the SQL that reads it
+                </li>
+                <li>
+                  <svg aria-hidden="true"><use href="#i-check" /></svg>Also for nested Parquet
+                  columns
+                </li>
+              </ul>
+            </div>
+            <div class="dive__media" data-reveal="rise">
+              <div class="stack">
+                <figure class="window stack__front">
+                  <div class="window__bar">
+                    <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
+                    ><span class="window__title">Structure — web_logs.ndjson.gz</span>
+                  </div>
+                  <img
+                    src="assets/shots/json-structure-crop.webp"
+                    width="1840"
+                    height="1150"
+                    alt="The structure of 2,072,884 JSON records as a graph: the top-level keys with their types, user_id present in 80% of records, the nested http object, and the tags array with its average and maximum length."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </figure>
+                <figure class="window stack__float">
+                  <div class="window__bar">
+                    <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
+                    ><span class="window__title">Record 2 of 2,072,884</span>
+                  </div>
+                  <img
+                    src="assets/shots/json-record-crop.webp"
+                    width="1344"
+                    height="840"
+                    alt="One record drawn as cards: its eight keys, with the http object and the tags array branching off."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </figure>
+              </div>
+            </div>
+          </article>
+
+          <article class="dive dive--flip">
+            <div class="dive__copy" data-reveal>
+              <h3>Group, pivot, join and append. No SQL needed.</h3>
+              <p>
+                Pick the columns, pick the calculations, and get the result as a new tab you can
+                filter, chart and export like any file. Each long-running tool shows a timer and a
+                Stop button.
+              </p>
+              <ul class="ticks">
+                <li>
+                  <svg aria-hidden="true"><use href="#i-check" /></svg>Count, sum, average, median,
+                  95th percentile and more
+                </li>
+                <li>
+                  <svg aria-hidden="true"><use href="#i-check" /></svg>Join two open files, or stack
+                  several into one
+                </li>
+                <li>
+                  <svg aria-hidden="true"><use href="#i-check" /></svg>Random samples and a summary
+                  of every column
+                </li>
+              </ul>
+            </div>
+            <div class="dive__media" data-reveal="rise">
+              <figure class="window">
+                <div class="window__bar">
+                  <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
+                  ><span class="window__title">Group by / pivot — DataLiq</span>
+                </div>
+                <img
+                  src="assets/shots/pivot-dialog-crop.webp"
+                  width="1488"
+                  height="930"
+                  alt="The Group by / pivot dialog over the grid: one row per country, with a count, a sum and an average of total, spread across columns by category."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </figure>
+            </div>
+          </article>
+
+          <article class="dive dive--wide">
+            <div class="dive__copy dive__copy--center" data-reveal>
+              <h3>Light when you want it. Dark when you need it.</h3>
+              <p>
+                Both themes meet WCAG 2.2 AA contrast, and everything is reachable from the
+                keyboard. Drag the handle.
+              </p>
+            </div>
+            <div class="compare" data-compare data-reveal="rise">
+              <figure class="window compare__window">
+                <div class="window__bar">
+                  <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
+                  ><span class="window__title">orders.csv — DataLiq</span>
+                </div>
+                <div class="compare__stage">
+                  <img
+                    data-lazy="hero-dark"
+                    width="1280"
+                    height="800"
+                    alt="DataLiq in its dark theme."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    class="compare__top"
+                    data-lazy="hero-light"
+                    width="1280"
+                    height="800"
+                    alt="DataLiq in its light theme."
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span class="compare__handle" aria-hidden="true"><i></i></span>
+                  <input
+                    class="compare__range"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value="52"
+                    aria-label="How much of the window shows the light theme"
+                  />
+                </div>
+              </figure>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Bento ───────────────────────── -->
+      <section class="section bento-wrap" aria-labelledby="more-title">
+        <div class="container">
+          <header class="section__head" data-reveal>
+            <p class="eyebrow">And the details that save your day</p>
+            <h2 id="more-title">Small things, done properly.</h2>
+          </header>
+
+          <div class="bento">
+            <article class="tile tile--shot tile--a" data-reveal>
+              <div class="tile__copy">
+                <h3>Find problems before they find you</h3>
+                <p>
+                  One click checks the whole file for empty columns, mixed types, stray spaces,
+                  mixed date formats, outliers and duplicates, and shows you the rows.
+                </p>
+              </div>
+              <div class="tile__shot tile__shot--quality">
+                <img
+                  data-lazy="quality-light"
+                  width="1280"
+                  height="800"
+                  alt="The Data quality panel reporting one warning in 9,221,261 rows: the note column is mostly empty."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            </article>
+
+            <article class="tile tile--b" data-reveal>
+              <h3>Never lose your place</h3>
+              <p>
+                Open files, filters, layouts and recipes come back after a restart or a crash. Undo
+                and redo any filter, sort or column change.
+              </p>
+              <div class="keys" aria-hidden="true"><kbd>Ctrl</kbd><kbd>Z</kbd></div>
+            </article>
+
+            <article class="tile tile--c" data-reveal>
+              <h3>Compare two files</h3>
+              <p>
+                See which rows were added, removed or changed between two versions of a file, cell
+                by cell.
+              </p>
+              <div class="diff" aria-hidden="true">
+                <span class="diff__add">+ added rows</span
+                ><span class="diff__del">− removed rows</span
+                ><span class="diff__chg">~ changed cells</span>
+              </div>
+            </article>
+
+            <article class="tile tile--shot tile--d" data-reveal>
+              <div class="tile__copy">
+                <h3>Every action, one shortcut away</h3>
+                <p>
+                  The command palette lists everything the app can do. Workspaces save your open
+                  files, filters and charts to reopen later.
+                </p>
+              </div>
+              <div class="tile__shot tile__shot--palette">
+                <img
+                  src="assets/shots/palette-crop.webp"
+                  width="1224"
+                  height="766"
+                  alt="The command palette open over the grid, listing commands such as New workspace, Open folder as one table and Open URL, with their shortcuts."
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            </article>
+
+            <article class="tile tile--e" data-reveal>
+              <h3>Columns your way</h3>
+              <p>
+                Hide, reorder, pin and rename. Highlight cells with rules and colour scales. Save
+                filters as presets for files with the same columns.
+              </p>
+            </article>
+
+            <article class="tile tile--f" data-reveal>
+              <h3>Copy as anything</h3>
+              <p>
+                A selection becomes CSV, an Excel-friendly paste, JSON, a Markdown table or SQL
+                <code>INSERT</code> statements.
+              </p>
+            </article>
+
+            <article class="tile tile--g" data-reveal>
+              <h3>Knows when a file changes</h3>
+              <p>
+                If the file is edited on disk while it is open, DataLiq offers to reload it and
+                keeps your filters, sort and columns.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Automate ───────────────────────── -->
+      <section class="section automate" id="automate" aria-labelledby="automate-title">
+        <div class="container automate__grid">
+          <div class="automate__copy" data-reveal>
+            <p class="eyebrow">Automation</p>
+            <h2 id="automate-title">Run it without the window. Or hand it to your AI assistant.</h2>
+            <p>
+              Save your cleaning steps as a recipe and apply them from the command line: reports on
+              a schedule, with no window.
+            </p>
+            <p>
+              Or turn on the built-in <abbr title="Model Context Protocol">MCP</abbr> server and let
+              Claude Desktop, Claude Code or any MCP client list, describe and query the folders you
+              choose. It is read-only, limited to those folders, and every call is logged. It is off
+              until you turn it on in Settings.
+            </p>
+          </div>
+          <div class="automate__code" data-reveal="rise">
+            <figure class="term">
+              <div class="term__bar">
+                <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>Terminal</span>
+              </div>
+              <pre><code><span class="c"># Apply a saved recipe and write a report</span>
+<span class="p">$</span> dataliq run monthly.json <span class="f">--in</span> orders.csv.gz <span class="f">--out</span> report.xlsx
+
+<span class="c"># Open files in the running app</span>
+<span class="p">$</span> dataliq orders.csv web_logs.ndjson.gz
+
+<span class="c"># Start the MCP server for AI assistants</span>
+<span class="p">$</span> dataliq mcp</code></pre>
+            </figure>
+            <figure class="term term--light">
+              <div class="term__bar">
+                <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>What an assistant can do</span>
+              </div>
+              <ul class="tools">
+                <li><code>list_files</code><span>The data files in the folders you share</span></li>
+                <li>
+                  <code>describe_file</code><span>Row count, columns and types, first rows</span>
+                </li>
+                <li>
+                  <code>profile_column</code
+                  ><span>Nulls, distinct values, ranges, common values</span>
+                </li>
+                <li><code>query</code><span>One read-only SQL query at a time</span></li>
+                <li>
+                  <code>open_in_dataliq</code><span>Show a file in the app, as a new tab</span>
+                </li>
+              </ul>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Privacy ───────────────────────── -->
+      <section class="privacy" aria-labelledby="privacy-title">
+        <div class="container privacy__inner" data-reveal>
+          <div>
+            <h2 id="privacy-title">Your data stays on your computer.</h2>
+            <p>
+              No account, no telemetry, no upload. The only network requests are the URLs and
+              databases you open yourself, DuckDB extensions the first time one is needed, and an
+              optional daily check for a new version.
+            </p>
+          </div>
+          <ul class="privacy__list">
+            <li>
+              <svg aria-hidden="true"><use href="#i-check" /></svg>Works fully offline
+            </li>
+            <li>
+              <svg aria-hidden="true"><use href="#i-check" /></svg>Your files are never modified
+            </li>
+            <li>
+              <svg aria-hidden="true"><use href="#i-check" /></svg>Open source under the MIT licence
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── Download ───────────────────────── -->
+      <section class="section download" id="download" aria-labelledby="download-title">
+        <div class="container">
+          <header class="section__head" data-reveal>
+            <img class="download__icon" src="assets/icon.svg" width="72" height="72" alt="" />
+            <p class="eyebrow">Download</p>
+            <h2 id="download-title">Get DataLiq <span data-release-version></span></h2>
+            <p class="section__lead" data-release-meta aria-live="polite">
+              Installers for Windows, macOS and Linux are published on GitHub Releases.
+            </p>
+          </header>
+
+          <div class="os" data-release-os>
+            <article class="os__card" data-os="windows">
+              <header>
+                <svg aria-hidden="true"><use href="#i-windows" /></svg>
+                <h3>Windows</h3>
+              </header>
+              <div class="os__list" data-os-list>
+                <span class="skeleton"></span><span class="skeleton"></span>
+              </div>
+            </article>
+            <article class="os__card" data-os="macos">
+              <header>
+                <svg aria-hidden="true"><use href="#i-apple" /></svg>
+                <h3>macOS</h3>
+              </header>
+              <div class="os__list" data-os-list>
+                <span class="skeleton"></span><span class="skeleton"></span>
+              </div>
+            </article>
+            <article class="os__card" data-os="linux">
+              <header>
+                <svg aria-hidden="true"><use href="#i-linux" /></svg>
+                <h3>Linux</h3>
+              </header>
+              <div class="os__list" data-os-list>
+                <span class="skeleton"></span><span class="skeleton"></span
+                ><span class="skeleton"></span>
+              </div>
+            </article>
+          </div>
+
+          <p class="download__links" data-reveal>
+            <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
+              >All releases</a
+            >
+            <a href="#" data-release-checksums hidden rel="noopener">SHA-256 checksums</a>
+            <a href="https://github.com/Mukesh-devs/dataliq#building-from-source" rel="noopener"
+              >Build from source</a
+            >
+          </p>
+          <noscript>
+            <p class="download__links">
+              <a href="https://github.com/Mukesh-devs/dataliq/releases/latest"
+                >Download the latest release from GitHub</a
+              >
+            </p>
+          </noscript>
+
+          <details class="notes" data-release-notes hidden>
+            <summary>
+              <span>What's new in <span data-release-name>this release</span></span>
+            </summary>
+            <div class="notes__body" data-release-body></div>
+            <p class="notes__more">
+              <a
+                href="https://github.com/Mukesh-devs/dataliq/releases"
+                data-release-link
+                rel="noopener"
+                >Read it on GitHub</a
+              >
+            </p>
+          </details>
+
+          <div class="faq" data-reveal>
+            <details>
+              <summary>Is it really free?</summary>
+              <p>
+                Yes. DataLiq is open source under the MIT licence, free for personal and commercial
+                use, with no paid tier.
+              </p>
+            </details>
+            <details>
+              <summary>How big a file can it open?</summary>
+              <p>
+                Files larger than your memory are fine: a 5&nbsp;GB CSV with 46 million rows and a
+                50-million-row Parquet file are part of its benchmarks. Parquet is read in place;
+                other formats are imported once into a cache on disk.
+              </p>
+            </details>
+            <details>
+              <summary>Does it change my files?</summary>
+              <p>
+                Never. Filters, cleaning steps and edits to the layout are applied to a view of the
+                data. You write a new file when you export.
+              </p>
+            </details>
+            <details>
+              <summary>macOS or Windows warns me about the app. Why?</summary>
+              <p>
+                The installers are built on GitHub from the public source, and each release lists
+                SHA-256 checksums. If your system says the app can't be verified, open it once with
+                right-click › Open on macOS, or More info › Run anyway on Windows.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <a class="brand brand--light" href="#top" aria-label="DataLiq, back to top">
+          <img src="assets/icon.svg" width="30" height="30" alt="" />
+          <span>DataLiq</span>
+        </a>
+        <nav class="footer__links" aria-label="Project">
+          <a href="https://github.com/Mukesh-devs/dataliq" rel="noopener">GitHub</a>
+          <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener">Releases</a>
+          <a href="https://github.com/Mukesh-devs/dataliq/blob/main/CHANGELOG.md" rel="noopener"
+            >Changelog</a
+          >
+          <a href="https://github.com/Mukesh-devs/dataliq/issues" rel="noopener">Report an issue</a>
+          <a href="https://github.com/Mukesh-devs/dataliq/blob/main/LICENSE" rel="noopener"
+            >MIT licence</a
+          >
+        </nav>
+        <p class="footer__fine">
+          A desktop app for Windows, macOS and Linux. Built with DuckDB and Tauri.
+        </p>
+      </div>
+    </footer>
+
+    <dialog class="lightbox" data-lightbox aria-label="Screenshot, larger">
+      <form method="dialog"><button class="lightbox__close" aria-label="Close">×</button></form>
+      <img alt="" />
+    </dialog>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

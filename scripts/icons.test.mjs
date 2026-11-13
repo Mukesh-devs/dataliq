@@ -16,6 +16,12 @@ test("the committed SVGs are what the script draws", () => {
     ["icon-small.svg", "small"],
   ])
     assert.equal(read("assets", file).toString(), icon({ variant }), `${file}: run pnpm icons`);
+  // The website shows the same icon, not a copy that has drifted.
+  assert.equal(
+    read("website", "assets", "icon.svg").toString(),
+    icon({ variant: "full" }),
+    "website/assets/icon.svg: run pnpm icons",
+  );
 });
 
 test("the macOS drawing keeps Apple's margin; the others fill the canvas", () => {

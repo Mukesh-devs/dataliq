@@ -1148,3 +1148,36 @@ the real app on CI is the remaining gap (30.3 in the improvement list).
 The same run showed the grid empty in development builds: React's
 StrictMode mounts, unmounts and mounts again, which disposed the grid's
 row source for good. The source can be opened again.
+
+## D75 — The website: static files, real screenshots, releases looked up in the browser
+
+The product site lives in `website/` and is published to GitHub Pages by a
+workflow that uploads the folder as it is. It is plain HTML, CSS and
+JavaScript modules: a page of this size needs no framework, and with no
+build step the folder can be opened and edited by anyone.
+
+- **Screenshots are the real app.** They were taken by driving the app
+  itself (not the UI over a mocked backend) through WebKitGTK's WebDriver
+  under Xvfb at 2× scale, with a 1 GB CSV of 9.2 million rows and a
+  2-million-record NDJSON file. Numbers quoted on the page (rows, timings)
+  are the ones visible in those screenshots, and the benchmark figures are
+  the README's. Driving the real app is also what found the commands
+  missing from the permission lists (D74).
+- **Desktop only in what it shows.** The app is presented in desktop
+  window frames; there are no phone or tablet mock-ups. The page layout
+  still adapts to every screen width, and on a phone the download button
+  says the app is for desktop instead of offering an installer.
+- **Nothing about a release is written in the page.** The latest release
+  comes from the GitHub Releases API in the visitor's browser: its version,
+  date, files and notes. Files are matched to systems by name (the names in
+  `docs/RELEASING.md`), only links to GitHub are offered, and the notes
+  (asked for as HTML rendered by GitHub, since a release body can be
+  Markdown or pasted HTML) are rebuilt from an allow-list of tags. A
+  release without a build for a system, no release at all, a rate limit and
+  no network each have their own message. A test fails if a version or a
+  download link is ever typed into the page.
+- **Privacy matches the app's.** Fonts and images are served from the
+  site; the one outside request is the GitHub API call.
+- **It works without scripts and without motion**: content and a download
+  link are in the HTML, animations start hidden only when scripts run, and
+  `prefers-reduced-motion` turns them off.

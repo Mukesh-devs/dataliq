@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A website for DataLiq (`website/`, published with GitHub Pages): what the app does, shown
+  with real screenshots, and downloads for Windows, macOS and Linux that always point at the
+  latest release.
+
 ### Changed
 
 - A new app icon: the letter D made of a table's cells, one highlighted, on a dark tile.

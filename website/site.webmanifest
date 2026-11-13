@@ -1,0 +1,13 @@
+{
+  "name": "DataLiq",
+  "short_name": "DataLiq",
+  "description": "Open huge CSV, Parquet, JSON and Excel files in seconds.",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#ffffff",
+  "theme_color": "#0b1530",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
