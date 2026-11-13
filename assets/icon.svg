@@ -1,33 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- DataLiq: a database stack (data) with a forward chevron (fast), on a
-       dark tile sized to Apple's icon grid (824 px tile in a 1024 px canvas). -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2b2e3b"/>
-      <stop offset="1" stop-color="#121319"/>
+      <stop offset="0" stop-color="#272b3a"/>
+      <stop offset="1" stop-color="#0f1117"/>
     </linearGradient>
     <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
     </linearGradient>
-    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#22d3ee"/>
-      <stop offset="0.5" stop-color="#3b82f6"/>
-      <stop offset="1" stop-color="#8b5cf6"/>
+    <linearGradient id="brand" gradientUnits="userSpaceOnUse" x1="268" y1="262" x2="768" y2="762">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="0.55" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#6366f1"/>
     </linearGradient>
-    <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#fde047"/>
       <stop offset="1" stop-color="#f59e0b"/>
     </linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cffafe"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
   </defs>
-  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
-  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#edge)" stroke-width="3"/>
-  <g fill="url(#brand)">
-    <path d="M 250 330 C 250 270, 610 270, 610 330 V 400 C 610 460, 250 460, 250 400 Z"/>
-    <path d="M 250 470 C 300 510, 560 510, 610 470 V 540 C 610 600, 250 600, 250 540 Z"/>
-    <path d="M 250 610 C 300 650, 560 650, 610 610 V 680 C 610 740, 250 740, 250 680 Z"/>
+  <g>
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" filter="url(#shadow)"/>
+    <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#edge)" stroke-width="3"/>
+    <path d="M 295 289 H 373 V 377.67 H 295 Z" fill="url(#amber)" stroke="url(#amber)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 463 289 H 518 A 223 223 0 0 1 696 377.67 H 463 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 295 467.67 H 373 V 556.33 H 295 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 463 467.67 H 736.55 A 223 223 0 0 1 736.55 556.33 H 463 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 295 646.33 H 373 V 735 H 295 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
+    <path d="M 463 646.33 H 696 A 223 223 0 0 1 518 735 H 463 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="54" stroke-linejoin="round"/>
   </g>
-  <ellipse cx="430" cy="330" rx="180" ry="44" fill="#ffffff" fill-opacity="0.25"/>
-  <path d="M 660 380 L 800 512 L 660 644" fill="none" stroke="url(#bolt)" stroke-width="64"
-        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

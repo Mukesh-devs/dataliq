@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- A new app icon: the letter D made of a table's cells, one highlighted, on a dark tile.
+  It is drawn for each place it shows: Apple's icon grid on macOS (the size of the icons
+  around it in the Dock and Launchpad), filling the tile on Windows and Linux (taskbar,
+  Start menu, app launcher), and a simpler drawing at 16–24 px (title bars, file lists).
+  Windows gets every size it asks for (16 to 256 px) and Linux a 512 px icon.
+
 ## [1.6.1] - 2026-11-12
 
 ### Fixed

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#272b3a"/>
+      <stop offset="1" stop-color="#0f1117"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="brand" gradientUnits="userSpaceOnUse" x1="238" y1="232" x2="798" y2="792">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="0.55" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde047"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cffafe"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(512 512) scale(1.24272) translate(-512 -512)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+    
+    <path d="M 254 248 H 372 V 365.33 H 254 Z" fill="url(#amber)" stroke="url(#amber)" stroke-width="32" stroke-linejoin="round"/>
+    <path d="M 460 248 H 518 A 264 264 0 0 1 737.51 365.33 H 460 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="32" stroke-linejoin="round"/>
+    <path d="M 254 453.33 H 372 V 570.67 H 254 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="32" stroke-linejoin="round"/>
+    <path d="M 460 453.33 H 775.4 A 264 264 0 0 1 775.4 570.67 H 460 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="32" stroke-linejoin="round"/>
+    <path d="M 254 658.67 H 372 V 776 H 254 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="32" stroke-linejoin="round"/>
+    <path d="M 460 658.67 H 737.51 A 264 264 0 0 1 518 776 H 460 Z" fill="url(#brand)" stroke="url(#brand)" stroke-width="32" stroke-linejoin="round"/>
+  </g>
+</svg>
