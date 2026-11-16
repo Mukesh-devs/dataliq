@@ -3,6 +3,8 @@ import {
   Box,
   Braces,
   Calendar,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Columns3,
   Database,
@@ -15,7 +17,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { describeColumns, type ColumnKind } from "../../lib/arrow";
 import {
   invertHidden,
@@ -31,6 +33,7 @@ import {
 import { formatBytes } from "../../lib/format";
 import { cn } from "../../lib/cn";
 import { useApp } from "../../stores/app";
+import { useSettings, type SidebarSection } from "../../stores/settings";
 import { baseOf, type Tab } from "../../stores/tabs";
 import { Button } from "../ui/Button";
 import { VirtualList } from "../ui/VirtualList";
@@ -39,18 +42,55 @@ function Section({
   title,
   icon,
   children,
+  id,
 }: {
   title: string;
   icon: ReactNode;
   children: ReactNode;
+  /** Makes the section fold away from its title. */
+  id?: SidebarSection;
 }) {
+  const collapsed = useSettings((s) => (id ? !!s.collapsed[id] : false));
+  const toggle = useSettings((s) => s.toggleSection);
+  const bodyId = useId();
+  const heading = "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase";
+  const Chevron = collapsed ? ChevronRight : ChevronDown;
   return (
-    <section className="flex flex-col gap-1 px-2 py-2">
-      <h2 className="flex items-center gap-1.5 px-1.5 text-[11px] font-semibold tracking-wide text-fg-subtle uppercase">
-        {icon}
-        {title}
-      </h2>
-      {children}
+    <section className="group/section flex flex-col gap-1 px-2 py-2">
+      {id ? (
+        <h2>
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            aria-controls={bodyId}
+            title={collapsed ? `Show ${title.toLowerCase()}` : `Hide ${title.toLowerCase()}`}
+            onClick={() => toggle(id)}
+            className={cn(
+              heading,
+              "w-full rounded-[var(--radius-sm)] px-1.5 text-fg-subtle hover:text-fg focus-visible:text-fg",
+            )}
+          >
+            {icon}
+            <span className="flex-1 text-left">{title}</span>
+            {/* The arrow shows when the pointer is near (or the keyboard is on it). */}
+            <Chevron
+              data-testid={`${id}-chevron`}
+              className="size-3.5 opacity-0 transition-opacity duration-[var(--duration)] group-hover/section:opacity-100 group-focus-within/section:opacity-100"
+              aria-hidden
+            />
+          </button>
+        </h2>
+      ) : (
+        <h2 className={cn(heading, "px-1.5 text-fg-subtle")}>
+          {icon}
+          {title}
+        </h2>
+      )}
+      {!collapsed && (
+        <div id={bodyId} className="flex flex-col gap-1">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -70,7 +110,7 @@ export function Sidebar({ tabs, active, onSelect, onLayoutChange }: SidebarProps
       aria-label="Sidebar"
       className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface"
     >
-      <Section title="Files" icon={<Files className="size-3.5" aria-hidden />}>
+      <Section id="files" title="Files" icon={<Files className="size-3.5" aria-hidden />}>
         {tabs.length === 0 ? (
           <p className="px-1.5 text-fg-subtle">No files open</p>
         ) : (
@@ -98,7 +138,7 @@ export function Sidebar({ tabs, active, onSelect, onLayoutChange }: SidebarProps
           </ul>
         )}
       </Section>
-      <Section title="Columns" icon={<Columns3 className="size-3.5" aria-hidden />}>
+      <Section id="columns" title="Columns" icon={<Columns3 className="size-3.5" aria-hidden />}>
         {active?.preview ? (
           <ColumnList key={active.id} tab={active} onLayoutChange={onLayoutChange} />
         ) : (
