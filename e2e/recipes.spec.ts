@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { gridCell, mockTauri } from "./tauri-mock";
+import { fileShown, gridCell, mockTauri } from "./tauri-mock";
 
 type Step = Record<string, unknown> & { op: string; enabled?: boolean };
 
@@ -74,6 +74,7 @@ async function open(page: Page) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("contentinfo").getByRole("status")).toContainText("1,000 rows");
+  await fileShown(page);
 }
 
 const panel = (page: Page) => page.getByRole("complementary", { name: "Cleaning steps" });

@@ -34,6 +34,7 @@ test("open, sort, filter, search, query and set up the app with the keyboard onl
     views: () => 12,
   });
   await page.goto("/");
+  await expect(page.getByTestId("drop-zone")).toBeVisible();
 
   // Tab reaches the start screen's buttons in order, with a visible ring.
   await page.keyboard.press("Tab");

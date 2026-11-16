@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { emitEvent, gridHeader, mockTauri } from "./tauri-mock";
+import { emitEvent, fileShown, gridHeader, mockTauri } from "./tauri-mock";
 
 interface Spec {
   filters?: unknown[];
@@ -36,6 +36,7 @@ async function open(page: Page) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("status")).toContainText("1,000 rows");
+  await fileShown(page);
   return (await page.getByTestId("data-grid").boundingBox())!;
 }
 

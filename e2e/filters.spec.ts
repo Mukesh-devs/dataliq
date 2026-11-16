@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { gridCell, mockTauri } from "./tauri-mock";
+import { fileShown, gridCell, mockTauri } from "./tauri-mock";
 
 interface Spec {
   filters?: { column: string; op: string; [k: string]: unknown }[];
@@ -43,6 +43,7 @@ async function openImported(page: Page) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("status")).toContainText("1,000 rows");
+  await fileShown(page);
 }
 
 test("add, edit and remove filters; the grid and status follow", async ({ page }) => {

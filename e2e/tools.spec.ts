@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { mockTauri } from "./tauri-mock";
+import { fileShown, mockTauri } from "./tauri-mock";
 
 const ipc = (cols: Parameters<typeof tableFromArrays>[0]) =>
   Buffer.from(tableToIPC(tableFromArrays(cols), "stream")).toString("base64");
@@ -39,6 +39,7 @@ async function open(page: Page, paths = ["/data/comma.csv"]) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("contentinfo").getByRole("status")).toContainText("1,000 rows");
+  await fileShown(page);
 }
 
 async function palette(page: Page, text: string) {

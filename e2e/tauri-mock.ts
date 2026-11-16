@@ -619,6 +619,15 @@ export function gridHeader(page: Page, text: string) {
     .filter({ hasText: new RegExp(`^${text}$`) });
 }
 
+/**
+ * Waits until the open file's view is on screen. The status bar shows the
+ * file first; the view loads on first use (decision D54), and its commands
+ * (palette, menus) exist from then on.
+ */
+export async function fileShown(page: Page) {
+  await expect(page.getByTestId("data-grid")).toBeVisible();
+}
+
 /** Waits until the page listens for a backend event (its listeners register after the first render). */
 export async function listening(page: Page, event: string) {
   await expect

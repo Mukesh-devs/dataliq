@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { gridHeader, mockTauri } from "./tauri-mock";
+import { fileShown, gridHeader, mockTauri } from "./tauri-mock";
 
 function buildPage(start: number, count: number): string {
   const table = tableFromArrays({
@@ -33,6 +33,7 @@ async function open(page: Page) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("status")).toContainText("1,000 rows");
+  await fileShown(page);
   await expect.poll(() => headers(page)).toEqual(["id", "name", "amount", "joined"]);
   return (await page.getByTestId("data-grid").boundingBox())!;
 }

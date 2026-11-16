@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { mockTauri } from "./tauri-mock";
+import { fileShown, mockTauri } from "./tauri-mock";
 
 function buildPage(start: number, count: number): string {
   const table = tableFromArrays({
@@ -53,6 +53,7 @@ async function open(page: Page) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("status").first()).toContainText("1,000 rows");
+  await fileShown(page);
   return (await page.getByTestId("data-grid").boundingBox())!;
 }
 
