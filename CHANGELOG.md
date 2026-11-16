@@ -20,6 +20,16 @@ All notable changes to this project are documented here. The format follows
   Start menu, app launcher), and a simpler drawing at 16–24 px (title bars, file lists).
   Windows gets every size it asks for (16 to 256 px) and Linux a 512 px icon.
 
+### Fixed
+
+- The app no longer behaves like a web page in places. Reload (F5, Ctrl+R), print (Ctrl+P),
+  back and forward (Alt+← / Alt+→ and the mouse's back and forward buttons), the browser's
+  find bar (Ctrl+F, Ctrl+G, F3) and caret browsing (F7) did nothing useful at best, and a
+  reload emptied the window until the session came back; they are now ignored, while the
+  app's own shortcuts on the same keys (search, Go to row) keep working.
+- Images, icons and links can no longer be dragged out of the window. Files dropped onto
+  the window still open, and text boxes keep their own menu and text dragging.
+
 ## [1.6.1] - 2026-11-12
 
 ### Fixed

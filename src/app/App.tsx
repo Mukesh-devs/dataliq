@@ -42,6 +42,7 @@ import { baseName } from "../lib/files";
 import { useRecent } from "../stores/recent";
 import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
+import { useNativeGuards } from "./useNativeGuards";
 import { useShortcuts } from "./useShortcuts";
 import { useFileWatch } from "./useFileWatch";
 import { CrashNotice } from "../components/shell/CrashNotice";
@@ -668,17 +669,8 @@ export function App() {
     ),
   );
 
-  // The webview's own context menu (reload, print, inspect …) makes no
-  // sense in an app; text fields keep it for cut/copy/paste.
-  useEffect(() => {
-    const onMenu = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest("input, textarea, [contenteditable='true']")) return;
-      e.preventDefault();
-    };
-    window.addEventListener("contextmenu", onMenu);
-    return () => window.removeEventListener("contextmenu", onMenu);
-  }, []);
+  // No browser menu, shortcuts (reload, print, find) or image dragging.
+  useNativeGuards();
 
   // Keep the cache size in the sidebar current as imports finish.
   const importsDone = tabs.filter((t) => t.import?.status === "done").length;
