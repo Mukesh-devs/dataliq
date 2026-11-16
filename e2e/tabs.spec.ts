@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { emitEvent, gridCell, mockTauri } from "./tauri-mock";
+import { emitEvent, gridCell, listening, mockTauri } from "./tauri-mock";
 
 const tab = (page: import("@playwright/test").Page, name: string) =>
   page.getByRole("tab", { name, exact: true });
@@ -58,7 +58,7 @@ test("open three files, switch and close tabs, then reopen from recent files", a
 test("drag and drop opens files and shows a drop target", async ({ page }) => {
   await mockTauri(page);
   await page.goto("/");
-  await expect(page.getByRole("status")).toContainText("DuckDB");
+  await listening(page, "tauri://drag-enter");
   await emitEvent(page, "tauri://drag-enter", {
     paths: ["/data/comma.csv"],
     position: { x: 1, y: 1 },

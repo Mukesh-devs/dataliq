@@ -71,7 +71,7 @@ function viewVerb(tab: Tab): { ed: string; ing: string } {
   return { ed: "filtered", ing: "filtering" };
 }
 
-function statusMessage(tab: Tab | undefined, engineVersion: string | null): string {
+function statusMessage(tab: Tab | undefined): string {
   const parts: string[] = [];
   if (!tab) parts.push("Ready");
   else if (tab.status === "loading") parts.push(`Opening ${tab.title}…`);
@@ -117,7 +117,6 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     if (tab.previewMs !== undefined) parts.push(formatDuration(tab.previewMs));
     if (tab.import?.status === "running") parts.push("importing…");
   }
-  if (engineVersion) parts.push(`DuckDB ${engineVersion}`);
   return parts.join(" · ");
 }
 
@@ -201,7 +200,6 @@ export function App() {
   useFileWatch();
   // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
   const [palette, setPalette] = useState<{ query: string } | null>(null);
-  const engineVersion = useEngine((s) => s.version);
   const exportJob = useExport((s) => s.job);
   const cancelExport = useExport((s) => s.cancel);
   const probeEngine = useEngine((s) => s.probe);
@@ -781,7 +779,7 @@ export function App() {
             ? `Exporting ${baseName(exportJob.path)}…${
                 exportJob.percent != null ? ` ${Math.floor(exportJob.percent)}%` : ""
               }`
-            : statusMessage(active, engineVersion)
+            : statusMessage(active)
         }
         action={
           exportJob

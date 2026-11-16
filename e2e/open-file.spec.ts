@@ -4,7 +4,9 @@ import { gridCell, gridHeader, mockTauri } from "./tauri-mock";
 test("open a CSV from the dialog and see the preview", async ({ page }) => {
   await mockTauri(page, { dialogPaths: ["/data/semicolon.csv"] });
   await page.goto("/");
-  await expect(page.getByRole("status")).toContainText("DuckDB v");
+  await expect(page.getByRole("status")).toContainText("Ready");
+  // The engine's version is in Help › About, not the status bar.
+  await expect(page.getByRole("status")).not.toContainText("DuckDB");
   await page
     .getByRole("main")
     .getByRole("button", { name: /Open file/ })
