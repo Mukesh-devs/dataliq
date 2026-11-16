@@ -59,7 +59,7 @@ test("the menu bar runs the app's commands", async ({ page }) => {
   const help = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(help.getByRole("row", { name: /Open file… Ctrl\+O/ })).toBeVisible();
   await expect(help.getByRole("row", { name: /Save workspace Ctrl\+S/ })).toBeVisible();
-  await help.getByRole("button", { name: "Close" }).click();
+  await help.getByRole("button", { name: "Close", exact: true }).click();
 
   expect(await invokes(page, "set_native_menu")).toEqual([]);
 });

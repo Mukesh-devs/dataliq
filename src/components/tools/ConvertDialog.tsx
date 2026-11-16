@@ -1,4 +1,3 @@
-import * as Popover from "@radix-ui/react-popover";
 import { CircleAlert, CircleCheck, FolderOpen, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,6 +16,7 @@ import { baseName, pickFolder } from "../../lib/files";
 import { formatBytes, formatDuration, plural } from "../../lib/format";
 import { useConvert } from "../../stores/convert";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 import { fieldClass, labelClass } from "./ToolDialog";
 
 let nextJob = 1;
@@ -27,19 +27,16 @@ export function ConvertDialog() {
   const close = useConvert((s) => s.close);
   const [running, setRunning] = useState(false);
   return (
-    <Popover.Root open={open} onOpenChange={(o) => !o && !running && close()}>
-      <Popover.Anchor className="absolute top-2 left-1/2" />
-      <Popover.Portal>
-        <Popover.Content
-          aria-label="Convert files"
-          sideOffset={4}
-          collisionPadding={8}
-          className="z-50 flex max-h-[80vh] w-[32rem] max-w-[92vw] flex-col gap-3 overflow-y-auto rounded-[var(--radius-lg)] border border-border bg-bg p-3 text-[12px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
-        >
-          {open && <ConvertForm onRunning={setRunning} onClose={close} />}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <Modal
+      open={open}
+      onOpenChange={(o) => !o && close()}
+      title="Convert files"
+      width="w-[32rem]"
+      dismissable={!running}
+      className="text-[12px]"
+    >
+      {open && <ConvertForm onRunning={setRunning} onClose={close} />}
+    </Modal>
   );
 }
 
@@ -129,7 +126,6 @@ function ConvertForm({
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-[13px] font-semibold text-fg">Convert files</h2>
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-fg" title={folder ?? undefined}>
           {folder ?? "No folder chosen"}

@@ -1,4 +1,3 @@
-import * as Popover from "@radix-ui/react-popover";
 import { cloneElement, useEffect, useState, type ReactElement } from "react";
 import {
   clearS3Settings,
@@ -9,6 +8,7 @@ import {
   type S3Summary,
 } from "../../lib/remote";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 
 interface OpenUrlProps {
   open: boolean;
@@ -173,65 +173,56 @@ export function OpenUrl({ open, onOpenChange, onOpen, showS3 = false }: OpenUrlP
   const url = text.trim();
   const valid = isUrl(url);
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Anchor className="absolute top-2 left-1/2" />
-      <Popover.Portal>
-        <Popover.Content
-          aria-label="Open URL"
-          sideOffset={4}
-          className="z-50 w-[30rem] rounded-[var(--radius-lg)] border border-border bg-bg p-3 text-[13px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
-        >
-          <form
-            className="flex flex-col gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!valid) return;
-              onOpen(url);
-              onOpenChange(false);
-            }}
+    <Modal open={open} onOpenChange={onOpenChange} title="Open URL" width="w-[30rem]">
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!valid) return;
+          onOpen(url);
+          onOpenChange(false);
+        }}
+      >
+        <label htmlFor="open-url" className="font-medium text-fg">
+          Open a file from the web or S3
+        </label>
+        <input
+          id="open-url"
+          autoFocus
+          className={inputClass}
+          placeholder="https://example.com/data.parquet or s3://bucket/data.csv.gz"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <p className="text-[12px] text-fg-subtle">
+          CSV, TSV, JSON and Parquet, gzipped or not; Parquet is read in place, a page at a time.
+          The first URL downloads DuckDB's httpfs extension (once), so it needs the internet. Files
+          from a URL aren't cached.
+        </p>
+        {url && !valid && (
+          <p role="alert" className="text-[12px] text-danger">
+            Start with https://, http:// or s3://.
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mr-auto"
+            aria-expanded={s3}
+            onClick={() => setS3((v) => !v)}
           >
-            <label htmlFor="open-url" className="font-medium text-fg">
-              Open a file from the web or S3
-            </label>
-            <input
-              id="open-url"
-              autoFocus
-              className={inputClass}
-              placeholder="https://example.com/data.parquet or s3://bucket/data.csv.gz"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            <p className="text-[12px] text-fg-subtle">
-              CSV, TSV, JSON and Parquet, gzipped or not; Parquet is read in place, a page at a
-              time. The first URL downloads DuckDB's httpfs extension (once), so it needs the
-              internet. Files from a URL aren't cached.
-            </p>
-            {url && !valid && (
-              <p role="alert" className="text-[12px] text-danger">
-                Start with https://, http:// or s3://.
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mr-auto"
-                aria-expanded={s3}
-                onClick={() => setS3((v) => !v)}
-              >
-                {s3 ? "Hide S3 settings" : "S3 settings…"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" variant="primary" disabled={!valid}>
-                Open URL
-              </Button>
-            </div>
-          </form>
-          {s3 && <S3Form />}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+            {s3 ? "Hide S3 settings" : "S3 settings…"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" variant="primary" disabled={!valid}>
+            Open URL
+          </Button>
+        </div>
+      </form>
+      {s3 && <S3Form />}
+    </Modal>
   );
 }

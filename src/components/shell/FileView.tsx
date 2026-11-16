@@ -453,10 +453,7 @@ export function FileView({
 
   // Comparing this file with another open one.
   const openCompare = useTabs((s) => s.openCompare);
-  const [comparing, setComparing] = useState<{ anchor: Anchor; others: CompareSide[] } | null>(
-    null,
-  );
-  const compareButton = useRef<HTMLButtonElement>(null);
+  const [comparing, setComparing] = useState<{ others: CompareSide[] } | null>(null);
   const canCompare = tab.status === "ready" && !!baseOf(tab).dataset && !tab.compare;
   const sideOf = (t: Tab): CompareSide => ({
     tabId: t.id,
@@ -464,12 +461,11 @@ export function FileView({
     columns: baseOf(t).columns,
   });
   const startCompare = () => {
-    const r = compareButton.current?.getBoundingClientRect();
     const others = useTabs
       .getState()
       .tabs.filter((t) => t.id !== tab.id && t.status === "ready" && baseOf(t).dataset)
       .map(sideOf);
-    setComparing({ anchor: r ? rectAnchor(r) : gridAnchor(), others });
+    setComparing({ others });
   };
   const runCompare = async (beforeId: string, afterId: string, keys: string[]) => {
     const all = useTabs.getState().tabs;
@@ -874,7 +870,6 @@ export function FileView({
         run: () => setQualityOpen(tab.id, !qualityOpen),
       });
     if (canCompare)
-      // eslint-disable-next-line react-hooks/refs -- measures the button when picked
       add({
         id: "compare",
         title: "Compare with another file…",
@@ -1263,7 +1258,6 @@ export function FileView({
         )}
         {canCompare && (
           <Button
-            ref={compareButton}
             size="sm"
             variant="ghost"
             onClick={startCompare}
@@ -1331,7 +1325,6 @@ export function FileView({
       )}
       {comparing && (
         <CompareDialog
-          anchor={comparing.anchor}
           current={sideOf(tab)}
           others={comparing.others}
           onOpenChange={(o) => !o && setComparing(null)}

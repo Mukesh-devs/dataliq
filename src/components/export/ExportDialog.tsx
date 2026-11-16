@@ -1,4 +1,3 @@
-import * as Popover from "@radix-ui/react-popover";
 import { TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
@@ -15,6 +14,7 @@ import { formatCount, plural } from "../../lib/format";
 import { optionsFor, useExport, type ExportDefaults, type ExportTarget } from "../../stores/export";
 import { useNotice } from "../../stores/notice";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 
 const DELIMITERS: { label: string; value: string }[] = [
   { label: "Comma ,", value: "," },
@@ -46,20 +46,16 @@ export function ExportDialog() {
   const target = useExport((s) => s.target);
   const close = useExport((s) => s.close);
   return (
-    <Popover.Root open={target !== null} onOpenChange={(o) => !o && close()}>
-      <Popover.Anchor className="absolute top-2 left-1/2" />
-      <Popover.Portal>
-        <Popover.Content
-          aria-label="Export"
-          sideOffset={4}
-          collisionPadding={8}
-          className="z-50 w-[min(30rem,calc(100vw-32px))] rounded-[var(--radius-lg)] border border-border bg-bg p-4 text-[13px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
-        >
-          {/* A fresh form for each target. */}
-          {target && <ExportForm key={target.datasetId + target.title} target={target} />}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <Modal
+      open={target !== null}
+      onOpenChange={(o) => !o && close()}
+      title={target ? `Export ${target.title}` : "Export"}
+      label="Export"
+      width="w-[30rem]"
+    >
+      {/* A fresh form for each target. */}
+      {target && <ExportForm key={target.datasetId + target.title} target={target} />}
+    </Modal>
   );
 }
 
@@ -120,7 +116,6 @@ function ExportForm({ target }: { target: ExportTarget }) {
         void run();
       }}
     >
-      <h2 className="font-semibold text-fg">Export {target.title}</h2>
       <div role="radiogroup" aria-label="Format" className="grid grid-cols-4 gap-1">
         {EXPORT_FORMATS.map((f) => (
           <button

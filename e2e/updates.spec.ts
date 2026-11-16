@@ -28,7 +28,7 @@ test("a build without an update key says so", async ({ page }) => {
   await page.goto("/");
   const dialog = await checkFromMenu(page);
   await expect(dialog).toContainText("can't update itself");
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(dialog).toBeHidden();
 });
 
