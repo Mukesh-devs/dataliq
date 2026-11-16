@@ -110,3 +110,32 @@ export function formatBytes(bytes: number): string {
 export function formatDuration(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
 }
+
+/**
+ * When something happened, for lists of recent items: "Today, 10:42",
+ * "Yesterday", "Mon, 11 Nov", or "11 Nov 2025" in another year. In the
+ * local time zone (the user's clock).
+ */
+export function formatWhen(at: number, now: number = Date.now(), locale?: string): string {
+  const day = (t: number) => {
+    const d = new Date(t);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  const then = new Date(at);
+  if (!Number.isFinite(at)) return "";
+  const days = Math.round((day(now) - day(at)) / 86_400_000);
+  if (days === 0) {
+    const time = then.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    return `Today, ${time}`;
+  }
+  if (days === 1) return "Yesterday";
+  if (days > 1 && days < 7) {
+    return then.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+  }
+  const sameYear = then.getFullYear() === new Date(now).getFullYear();
+  return then.toLocaleDateString(locale, {
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}

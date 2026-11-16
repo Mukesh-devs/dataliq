@@ -258,6 +258,7 @@ export function App() {
   const setSettingsOpen = useApp((s) => s.setSettingsOpen);
   const startNewWorkspace = useWorkspace((s) => s.startNew);
   const clearRecent = useRecent((s) => s.clear);
+  const removeRecent = useRecent((s) => s.remove);
   // Open URL, and whether it starts on the S3 settings.
   const [urlOpen, setUrlOpen] = useState<{ s3: boolean } | null>(null);
   const openFolder = useMemo(
@@ -749,9 +750,13 @@ export function App() {
             <EmptyState
               onOpen={() => void openFile()}
               onOpenFolder={() => void openFolder()}
+              onConnectDatabase={() => useConnect.getState().show()}
+              onOpenUrl={() => setUrlOpen({ s3: false })}
               onOpenSample={() => void openSample()}
               recent={recent}
               onOpenRecent={(p) => void openPaths([p])}
+              onRemoveRecent={removeRecent}
+              onClearRecent={clearRecent}
               dragging={dragging}
             />
           )}

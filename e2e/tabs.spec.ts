@@ -47,11 +47,16 @@ test("open three files, switch and close tabs, then reopen from recent files", a
   await expect(page.getByRole("tab")).toHaveCount(0);
 
   // The empty state lists recent files, newest first.
-  const recent = page.getByRole("region", { name: "Recent files" }).getByRole("button");
+  const recent = page.getByRole("region", { name: "Recent files" }).getByRole("listitem");
   await expect(recent).toHaveCount(3);
   await expect(recent.first()).toContainText("comma.csv");
+  await expect(recent.first()).toContainText("/data/comma.csv");
   await expect(recent.nth(1)).toContainText("nulls.csv");
-  await recent.nth(1).click();
+  await recent
+    .nth(1)
+    .getByRole("button", { name: /nulls\.csv/ })
+    .first()
+    .click();
   await expect(tab(page, "nulls.csv")).toBeVisible();
 });
 
