@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { emitEvent, gridCell, listening, mockTauri } from "./tauri-mock";
+import { emitEvent, fileShown, gridCell, listening, mockTauri } from "./tauri-mock";
 
 const tab = (page: import("@playwright/test").Page, name: string) =>
   page.getByRole("tab", { name, exact: true });
@@ -90,4 +90,38 @@ test("files from the command line open at startup and from a second launch", asy
   await emitEvent(page, "open-files", ["/data/semicolon.csv", "/data/nulls.csv"]);
   await expect(page.getByRole("tab")).toHaveCount(3);
   await expect(tab(page, "nulls.csv")).toHaveAttribute("aria-selected", "true");
+});
+
+test("Settings is a tab beside the files", async ({ page }) => {
+  await mockTauri(page, { dialogPaths: ["/data/comma.csv"] });
+  await page.goto("/");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /Open file/ })
+    .click();
+  await fileShown(page);
+
+  await page.keyboard.press("Control+,");
+  await expect(tab(page, "Settings")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "Settings" })).toBeVisible();
+  await expect(page.getByTestId("data-grid")).toBeHidden();
+
+  // Back to the file: Settings stays open behind it.
+  await tab(page, "comma.csv").click();
+  await expect(page.getByTestId("data-grid")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Settings" })).toBeHidden();
+  await expect(tab(page, "Settings")).toHaveAttribute("aria-selected", "false");
+
+  // Ctrl+Tab goes through the files, then Settings.
+  await page.keyboard.press("Control+Tab");
+  await expect(tab(page, "Settings")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Control+Tab");
+  await expect(tab(page, "comma.csv")).toHaveAttribute("aria-selected", "true");
+
+  // Opening Settings again brings the same tab to the front; Ctrl+W closes it.
+  await page.keyboard.press("Control+,");
+  await expect(page.getByRole("tab", { name: "Settings" })).toHaveCount(1);
+  await page.keyboard.press("Control+w");
+  await expect(page.getByRole("tab", { name: "Settings" })).toHaveCount(0);
+  await expect(page.getByTestId("data-grid")).toBeVisible();
 });

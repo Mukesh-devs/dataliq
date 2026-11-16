@@ -134,7 +134,14 @@ interface FileViewProps {
   onLayoutChange?: (layout: ColumnLayout) => void;
   /** Reads the file again, keeping filters and layout. */
   onReload?: () => void;
+  /**
+   * False while another tab (Settings) is in front: the view stays mounted,
+   * hidden, without its shortcuts and commands.
+   */
+  active?: boolean;
 }
+
+const NO_COMMANDS: Command[] = [];
 
 /** The filter editor being shown: a new filter on `column`, or filter `index`. */
 interface Editing {
@@ -206,6 +213,7 @@ export function FileView({
   onViewChange,
   onLayoutChange,
   onReload,
+  active = true,
 }: FileViewProps) {
   const source = useRowSource(tab);
   // The cleaned rows when the tab has a recipe, else the file.
@@ -1094,14 +1102,15 @@ export function FileView({
     qualityOpen,
     setQualityOpen,
   ]);
-  useRegisterCommands("file", commands);
+  useRegisterCommands("file", active ? commands : NO_COMMANDS);
   const tools = useDataTools(tab, viewRows);
-  useRegisterCommands("tools", tools.commands);
+  useRegisterCommands("tools", active ? tools.commands : NO_COMMANDS);
 
   const showSettings =
     isCsv(tab) || (tab.status === "error" && /\.(csv|tsv|txt|tab)/i.test(tab.path));
 
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       const key = e.key.toLowerCase();
@@ -1161,10 +1170,11 @@ export function FileView({
     undoView,
     redoView,
     tab.id,
+    active,
   ]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div hidden={!active} className="relative flex min-h-0 flex-1 flex-col">
       <DiskChangeNotice
         tab={tab}
         onReload={onReload}
