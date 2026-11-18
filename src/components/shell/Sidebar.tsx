@@ -35,10 +35,12 @@ import { cn } from "../../lib/cn";
 import { isMac, modKey } from "../../lib/platform";
 import { columnRef } from "../../lib/sql";
 import { useApp } from "../../stores/app";
+import { SIDEBAR_WIDTH, useLayout } from "../../stores/layout";
 import { useSql } from "../../stores/sql";
 import { useSettings, type SidebarSection } from "../../stores/settings";
 import { baseOf, type Tab } from "../../stores/tabs";
 import { Button } from "../ui/Button";
+import { Resizable } from "../ui/Resizable";
 import { VirtualList } from "../ui/VirtualList";
 import { useColumnDrag } from "./useColumnDrag";
 
@@ -109,49 +111,62 @@ interface SidebarProps {
 }
 
 export function Sidebar({ tabs, active, onSelect, onLayoutChange }: SidebarProps) {
+  const width = useLayout((s) => s.sidebarWidth);
+  const setWidth = useLayout((s) => s.setSidebarWidth);
+  const profileWidth = useLayout((s) => (s.profile ? s.profileWidth : 0));
   return (
-    <aside
-      aria-label="Sidebar"
-      className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface"
+    <Resizable
+      side="left"
+      width={width}
+      defaultWidth={SIDEBAR_WIDTH.default}
+      min={SIDEBAR_WIDTH.min}
+      otherWidth={active ? profileWidth : 0}
+      onWidth={setWidth}
+      label="Resize the sidebar"
     >
-      <Section id="files" title="Files" icon={<Files className="size-3.5" aria-hidden />}>
-        {tabs.length === 0 ? (
-          <p className="px-1.5 text-fg-subtle">No files open</p>
-        ) : (
-          <ul aria-label="Files">
-            {tabs.map((t) => {
-              const current = t.id === active?.id;
-              return (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    title={t.path ?? t.title}
-                    aria-current={current ? "true" : undefined}
-                    disabled={!onSelect}
-                    onClick={() => onSelect?.(t.id)}
-                    className={cn(
-                      "flex min-h-6 w-full items-center truncate rounded-[var(--radius)] px-1.5 text-left",
-                      current ? "bg-hover font-medium text-fg" : "text-fg-muted hover:bg-hover",
-                    )}
-                  >
-                    <span className="truncate">{t.title}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
-      <Section id="columns" title="Columns" icon={<Columns3 className="size-3.5" aria-hidden />}>
-        {active?.preview ? (
-          <ColumnList key={active.id} tab={active} onLayoutChange={onLayoutChange} />
-        ) : (
-          <p className="px-1.5 text-fg-subtle">Open a file to see its columns</p>
-        )}
-      </Section>
-      <div className="flex-1" />
-      <CacheSection />
-    </aside>
+      <aside
+        aria-label="Sidebar"
+        className="flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-border bg-surface"
+      >
+        <Section id="files" title="Files" icon={<Files className="size-3.5" aria-hidden />}>
+          {tabs.length === 0 ? (
+            <p className="px-1.5 text-fg-subtle">No files open</p>
+          ) : (
+            <ul aria-label="Files">
+              {tabs.map((t) => {
+                const current = t.id === active?.id;
+                return (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      title={t.path ?? t.title}
+                      aria-current={current ? "true" : undefined}
+                      disabled={!onSelect}
+                      onClick={() => onSelect?.(t.id)}
+                      className={cn(
+                        "flex min-h-6 w-full items-center truncate rounded-[var(--radius)] px-1.5 text-left",
+                        current ? "bg-hover font-medium text-fg" : "text-fg-muted hover:bg-hover",
+                      )}
+                    >
+                      <span className="truncate">{t.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+        <Section id="columns" title="Columns" icon={<Columns3 className="size-3.5" aria-hidden />}>
+          {active?.preview ? (
+            <ColumnList key={active.id} tab={active} onLayoutChange={onLayoutChange} />
+          ) : (
+            <p className="px-1.5 text-fg-subtle">Open a file to see its columns</p>
+          )}
+        </Section>
+        <div className="flex-1" />
+        <CacheSection />
+      </aside>
+    </Resizable>
   );
 }
 
