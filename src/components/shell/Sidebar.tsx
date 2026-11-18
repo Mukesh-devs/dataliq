@@ -32,11 +32,15 @@ import {
 } from "../../lib/layout";
 import { formatBytes } from "../../lib/format";
 import { cn } from "../../lib/cn";
+import { isMac, modKey } from "../../lib/platform";
+import { columnRef } from "../../lib/sql";
 import { useApp } from "../../stores/app";
+import { useSql } from "../../stores/sql";
 import { useSettings, type SidebarSection } from "../../stores/settings";
 import { baseOf, type Tab } from "../../stores/tabs";
 import { Button } from "../ui/Button";
 import { VirtualList } from "../ui/VirtualList";
+import { useColumnDrag } from "./useColumnDrag";
 
 function Section({
   title,
@@ -272,8 +276,11 @@ function ColumnList({
     ...new Set((tab.view?.filters ?? []).map((f) => f.column).filter((c) => kinds.has(c))),
   ];
   const change = onLayoutChange;
+  const drag = useColumnDrag();
+  const insert = (name: string) => useSql.getState().insertAtCursor(columnRef(name));
   return (
     <div className="flex flex-col gap-1">
+      {drag.ghost}
       {(layout.order.length >= SEARCH_FROM || searching) && (
         <div className="relative mx-1.5">
           <Search
@@ -344,10 +351,27 @@ function ColumnList({
             <label
               // At least 24px tall: each checkbox gets a 24px target (WCAG 2.5.8).
               className="flex min-h-6 items-center gap-2 rounded-[var(--radius)] px-1.5 text-[12px] text-fg-muted hover:bg-hover"
-              title={name}
+              title={`${name}\nDrag into the SQL editor, or ${modKey}+click to insert it at the cursor`}
+              data-column={name}
+              onPointerDown={(e) => drag.start(e, columnRef(name))}
+              onClick={(e) => {
+                // Ending a drag, or Ctrl+click: not a show / hide.
+                if (drag.clickAfterDrag()) e.preventDefault();
+                else if (isMac ? e.metaKey : e.ctrlKey) {
+                  e.preventDefault();
+                  insert(name);
+                }
+              }}
             >
               <input
                 type="checkbox"
+                aria-keyshortcuts={`${isMac ? "Meta" : "Control"}+Enter`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (isMac ? e.metaKey : e.ctrlKey)) {
+                    e.preventDefault();
+                    insert(name);
+                  }
+                }}
                 aria-label={`Show ${label(layout, name)}`}
                 checked={!hidden.has(name)}
                 disabled={!change || (!hidden.has(name) && shown === 1)}

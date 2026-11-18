@@ -14,9 +14,11 @@ import {
 import { PostgreSQL, sql } from "@codemirror/lang-sql";
 import { HighlightStyle, bracketMatching, syntaxHighlighting } from "@codemirror/language";
 import { setDiagnostics } from "@codemirror/lint";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
+  Decoration,
   EditorView,
+  WidgetType,
   drawSelection,
   highlightActiveLine,
   keymap,
@@ -25,6 +27,7 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
+import { padInsert } from "../../lib/sql";
 import type { SqlTable } from "../../stores/sql";
 
 export interface SqlEditorHandle {
@@ -32,10 +35,43 @@ export interface SqlEditorHandle {
   runnable(): { script: string; base: number };
   /** Replaces the whole text (undoable). */
   replace(text: string): void;
-  /** Types `text` at the cursor (over the selection). */
+  /** Types `text` at the cursor (over the selection), spaced from the words around it. */
   insert(text: string): void;
+  /**
+   * While something is dragged over the editor: marks where it would go.
+   * False (and no mark) when the point is outside the editor.
+   */
+  showDropAt(x: number, y: number): boolean;
+  /** Puts `text` where the point is; false when it's outside the editor. */
+  dropAt(text: string, x: number, y: number): boolean;
+  /** Clears the drop mark (the drag ended or left). */
+  endDrop(): void;
   focus(): void;
 }
+
+/** Where a dragged column would be dropped (a thin bar in the text). */
+const setDropMark = StateEffect.define<number | null>();
+class DropMark extends WidgetType {
+  toDOM() {
+    const bar = document.createElement("span");
+    bar.className = "cm-drop-mark";
+    bar.setAttribute("aria-hidden", "true");
+    return bar;
+  }
+}
+const dropMark = StateField.define<number | null>({
+  create: () => null,
+  update(pos, tr) {
+    for (const e of tr.effects) if (e.is(setDropMark)) return e.value;
+    return pos === null ? null : tr.changes.mapPos(pos);
+  },
+  provide: (f) =>
+    EditorView.decorations.from(f, (pos) =>
+      pos === null
+        ? Decoration.none
+        : Decoration.set([Decoration.widget({ widget: new DropMark(), side: 1 }).range(pos)]),
+    ),
+});
 
 interface SqlEditorProps {
   value: string;
@@ -57,6 +93,14 @@ const highlight = HighlightStyle.define([
 ]);
 
 const theme = EditorView.theme({
+  ".cm-drop-mark": {
+    display: "inline-block",
+    width: "2px",
+    height: "1.2em",
+    marginRight: "-2px",
+    verticalAlign: "text-bottom",
+    backgroundColor: "var(--accent)",
+  },
   "&": { height: "100%", fontSize: "12.5px", backgroundColor: "var(--bg)", color: "var(--fg)" },
   ".cm-scroller": { fontFamily: "var(--font-data)", lineHeight: "1.55" },
   ".cm-content": { caretColor: "var(--fg)" },
@@ -98,6 +142,13 @@ function schemaOf(tables: SqlTable[]): Record<string, string[]> {
 const sqlLanguage = (tables: SqlTable[]) =>
   sql({ dialect: PostgreSQL, schema: schemaOf(tables), upperCaseKeywords: true });
 
+/** The text position at a point on screen, or null outside the editor. */
+function dropPos(v: EditorView, x: number, y: number): number | null {
+  const box = v.dom.getBoundingClientRect();
+  if (x < box.left || x > box.right || y < box.top || y > box.bottom) return null;
+  return v.posAtCoords({ x, y }, false);
+}
+
 /** CodeMirror 6 SQL editor: highlighting, completion of tables and columns, Ctrl+Enter to run. */
 export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function SqlEditor(
   { value, onChange, tables, onRun, error },
@@ -128,6 +179,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
           bracketMatching(),
           closeBrackets(),
           autocompletion(),
+          dropMark,
           placeholder("SELECT * FROM … — Ctrl+Enter runs the query (or the selection)"),
           Prec.highest(
             keymap.of([
@@ -218,8 +270,47 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
       insert(text: string) {
         const v = view.current;
         if (!v) return;
-        v.dispatch(v.state.replaceSelection(text));
+        const { from, to } = v.state.selection.main;
+        const doc = v.state.doc;
+        v.dispatch(
+          v.state.replaceSelection(
+            padInsert(
+              doc.sliceString(Math.max(0, from - 1), from),
+              doc.sliceString(to, to + 1),
+              text,
+            ),
+          ),
+        );
         v.focus();
+      },
+      showDropAt(x: number, y: number) {
+        const v = view.current;
+        const pos = v ? dropPos(v, x, y) : null;
+        if (v && v.state.field(dropMark) !== pos) v.dispatch({ effects: setDropMark.of(pos) });
+        return pos !== null;
+      },
+      dropAt(text: string, x: number, y: number) {
+        const v = view.current;
+        const pos = v ? dropPos(v, x, y) : null;
+        if (!v || pos === null) return false;
+        const doc = v.state.doc;
+        const insert = padInsert(
+          doc.sliceString(Math.max(0, pos - 1), pos),
+          doc.sliceString(pos, pos + 1),
+          text,
+        );
+        v.dispatch({
+          changes: { from: pos, insert },
+          selection: { anchor: pos + insert.length },
+          effects: setDropMark.of(null),
+          userEvent: "input.drop",
+        });
+        v.focus();
+        return true;
+      },
+      endDrop() {
+        const v = view.current;
+        if (v && v.state.field(dropMark) !== null) v.dispatch({ effects: setDropMark.of(null) });
       },
       focus() {
         view.current?.focus();

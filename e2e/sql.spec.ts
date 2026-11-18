@@ -274,3 +274,67 @@ test("open the view in the SQL panel as a query over the file's table", async ({
   await page.keyboard.press("Enter");
   await expect(editor(page)).toHaveText(/FROM\s*"comma";/);
 });
+
+test("columns go into the SQL editor from the sidebar: Ctrl+click and drag", async ({ page }) => {
+  await open(page);
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const row = (name: string) => sidebar.locator(`[data-column="${name}"]`);
+
+  // Ctrl+click: the panel opens and the name goes in at the cursor; the
+  // column stays shown (it's not a show / hide).
+  await row("amount").click({ modifiers: ["Control"] });
+  await expect(panel(page)).toBeVisible();
+  await expect(editor(page)).toHaveText("amount");
+  await expect(sidebar.getByLabel("Show amount")).toBeChecked();
+
+  // Typing goes on from there; a second Ctrl+click is spaced from the word before.
+  await editor(page).press("End");
+  await page.keyboard.type(", count(*) FROM comma GROUP BY");
+  await row("name").click({ modifiers: ["Control"] });
+  await expect(editor(page)).toHaveText("amount, count(*) FROM comma GROUP BY name");
+
+  // Drag: the name drops where the pointer is, with a marker on the way.
+  await editor(page).fill("SELECT  FROM comma");
+  const box = (await editor(page).boundingBox())!;
+  const at = await editor(page).evaluate((el) => {
+    // The point between "SELECT " and " FROM" (the line is split in highlighted parts).
+    const walk = document.createTreeWalker(el.querySelector(".cm-line")!, NodeFilter.SHOW_TEXT);
+    let left = 7;
+    let node = walk.nextNode() as Text;
+    while (node.length < left) {
+      left -= node.length;
+      node = walk.nextNode() as Text;
+    }
+    const range = document.createRange();
+    range.setStart(node, left);
+    range.setEnd(node, left);
+    const r = range.getBoundingClientRect();
+    return { x: r.left + 1, y: r.top + r.height / 2 };
+  });
+  const from = (await row("joined").boundingBox())!;
+  await page.mouse.move(from.x + 60, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 90, from.y + 30, { steps: 4 });
+  await expect(page.getByTestId("column-drag")).toContainText("Drop in the SQL editor");
+  await page.mouse.move(at.x, at.y, { steps: 8 });
+  await expect(page.getByTestId("column-drag")).toHaveText("joined");
+  await expect(editor(page).locator(".cm-drop-mark")).toHaveCount(1);
+  await page.mouse.up();
+  await expect(editor(page)).toHaveText("SELECT joined FROM comma");
+  await expect(page.getByTestId("column-drag")).toBeHidden();
+  await expect(editor(page).locator(".cm-drop-mark")).toHaveCount(0);
+  await expect(sidebar.getByLabel("Show joined")).toBeChecked();
+  expect(box.width).toBeGreaterThan(0);
+
+  // Escape stops a drag; nothing goes in.
+  await page.mouse.move(from.x + 60, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at.x, at.y, { steps: 8 });
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(editor(page)).toHaveText("SELECT joined FROM comma");
+
+  // A plain click still shows / hides the column.
+  await row("joined").click();
+  await expect(sidebar.getByLabel("Show joined")).not.toBeChecked();
+});

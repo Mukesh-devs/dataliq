@@ -172,3 +172,34 @@ export function returnsRows(statement: string): boolean {
 export function sqlResult(sql: string, requestId: string, group?: string): Promise<DatasetInfo> {
   return call("sql_result", { sql, requestId, ...(group && { group }) });
 }
+
+/** Words that can't be a bare column name in DuckDB (the common ones). */
+const RESERVED = new Set(
+  (
+    "all analyse analyze and any array as asc asymmetric both case cast check collate column " +
+    "constraint create default deferrable desc describe distinct do else end except false " +
+    "fetch for foreign from grant group having in initially intersect into lateral leading " +
+    "limit not null offset on only or order placing primary qualify references returning " +
+    "select show some summarize symmetric table then to trailing true union unique using " +
+    "variadic when where window with pivot unpivot"
+  ).split(" "),
+);
+
+/** A column's name as SQL: bare when it can be (`amount`), else quoted (`"Order Date"`). */
+export function columnRef(name: string): string {
+  return /^[a-z_][a-z0-9_]*$/.test(name) && !RESERVED.has(name)
+    ? name
+    : `"${name.replace(/"/g, '""')}"`;
+}
+
+/**
+ * `text` with a space before and after where it would otherwise run into the
+ * words around it (`SELECT|FROM` → `SELECT amount FROM`); none next to
+ * spaces, brackets, commas or the ends of the text.
+ */
+export function padInsert(before: string, after: string, text: string): string {
+  const joins = (c: string | undefined) => c !== undefined && c !== "" && !/[\s(),;]/.test(c);
+  const lead = joins(before.slice(-1)) && before.slice(-1) !== "." ? " " : "";
+  const tail = joins(after.slice(0, 1)) && after.slice(0, 1) !== "." ? " " : "";
+  return `${lead}${text}${tail}`;
+}
