@@ -27,6 +27,13 @@ Faster SQL writing and side panels you can size.
 - The SQL editor's table chips (and the new column inserts) add a space when the name would
   otherwise run into the word next to it.
 
+### Fixed
+
+- The Windows installer (`…_x64-setup.exe`) showed the installer tool's own icon on the
+  file, its window and the uninstaller. It now has DataLiq's icon, a header picture next to
+  each page's title and a sidebar picture on the Welcome and Finish pages, drawn by
+  `pnpm icons` from the same design as the app icon.
+
 ## [1.7.0] - 2026-11-16
 
 A friendlier Home page, Settings as a tab, and proper dialogs.
