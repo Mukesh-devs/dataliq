@@ -1239,3 +1239,26 @@ The Home page gained quick actions (open a file or a folder, connect to a
 database, open a URL), its recent files became plain lines with the time
 they were opened (the last five, then Show more), and the sidebar's Files and
 Columns sections fold away.
+
+## D78 — Columns are dragged with pointer events; panel widths last for the session
+
+- **Dragging a column into the SQL editor uses pointer events, not the
+  browser's drag and drop.** On Windows, Tauri's handling of files dropped
+  on the window (which opens them) turns off HTML drag and drop inside the
+  page; turning it off instead would lose file drops. A press on a column
+  in the sidebar becomes a drag after 5 px; a label follows the pointer,
+  and over the editor a marker (a CodeMirror decoration) shows the text
+  position under the pointer (`posAtCoords`). Releasing there inserts the
+  name; Escape cancels. The v1.6.2 rule that nothing is dragged out of the
+  window stays as it is. Ctrl+click (Cmd+click) and Ctrl+Enter on the
+  column's checkbox insert at the cursor, opening the SQL panel if needed,
+  so the keyboard has the same reach.
+- **Names go in as SQL**: bare when DuckDB reads them as written
+  (lower-case letters, digits and `_`, not a reserved word), else quoted.
+  A space is added only where the name would run into a neighbouring word.
+- **Panel widths are kept for the session, not saved**, as asked: a new
+  window starts at 240 px (sidebar) and 288 px (column profile). Each panel
+  has a minimum (180 / 220 px), and the grid keeps at least 360 px; the
+  limit is also applied in CSS (`min()` / `calc()`), so shrinking the
+  window never pushes the grid out of sight. The edge is a `separator`
+  with its value, reachable by Tab and moved by the arrow keys.

@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-18
+
+Faster SQL writing and side panels you can size.
+
+### Added
+
+- Drag a column from the sidebar's Columns list onto the SQL editor: a marker shows where
+  it goes, and its name is put there when you let go (Escape stops the drag). Ctrl+click
+  a column (Cmd+click on macOS), or press Ctrl+Enter on its checkbox, to put it at the
+  editor's cursor. Either opens the SQL panel when it's closed. Names are written bare when
+  they can be (`amount`) and quoted otherwise (`"Order Date"`), with a space where they
+  would run into the word next to them.
+- The sidebar and the column profile can be resized by dragging their inner edge, as in
+  code editors; double-click the edge for the default width, or use the arrow keys on it.
+  The grid between them always keeps room, and a new window starts at the default widths.
+
+### Changed
+
+- The SQL editor's table chips (and the new column inserts) add a space when the name would
+  otherwise run into the word next to it.
+
 ## [1.7.0] - 2026-11-16
 
 A friendlier Home page, Settings as a tab, and proper dialogs.
