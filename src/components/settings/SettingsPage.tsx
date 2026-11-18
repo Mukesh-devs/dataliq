@@ -647,7 +647,9 @@ export function SettingsPage() {
                 <Section id="file-types" title="File types">
                   <Row terms={`file types open with default associations ${types}`}>
                     <p className="text-[12px] text-fg-muted">
-                      The installer registers DataLiq for {types}.{" "}
+                      DataLiq opens {types}. It is the default program for its own files (.parquet,
+                      .duckdb, .dataliq); for the others your current program stays the default and
+                      DataLiq is under Open with.{" "}
                       {isMac
                         ? "To open them with DataLiq by default, use Get Info › Open with › Change All in the Finder."
                         : "To open them with DataLiq by default, choose Open with › DataLiq › Always in your file manager."}

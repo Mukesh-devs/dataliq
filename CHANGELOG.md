@@ -33,6 +33,11 @@ Faster SQL writing and side panels you can size.
   file, its window and the uninstaller. It now has DataLiq's icon, a header picture next to
   each page's title and a sidebar picture on the Welcome and Finish pages, drawn by
   `pnpm icons` from the same design as the app icon.
+- Installing DataLiq on Windows made it the default program, with its icon, for CSV, Excel,
+  JSON and SQLite files. Now it is the default only for its own files (.parquet, .duckdb,
+  .dataliq); for the others the previous program and its icon stay (or come back, for an
+  earlier DataLiq install) and DataLiq is listed under Open with. Uninstalling removes it
+  from Open with. On macOS DataLiq is never picked first for those common types either.
 
 ## [1.7.0] - 2026-11-16
 

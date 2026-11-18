@@ -54,7 +54,8 @@
         "name": "Delimited text data",
         "description": "Comma- or tab-separated data",
         "role": "Viewer",
-        "mimeType": "text/csv"
+        "mimeType": "text/csv",
+        "rank": "Alternate"
       },
       {
         "ext": [
@@ -65,7 +66,8 @@
         "name": "JSON data",
         "description": "JSON or newline-delimited JSON data",
         "role": "Viewer",
-        "mimeType": "application/json"
+        "mimeType": "application/json",
+        "rank": "Alternate"
       },
       {
         "ext": [
@@ -84,7 +86,8 @@
         "name": "Excel workbook",
         "description": "Excel workbook",
         "role": "Viewer",
-        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "rank": "Alternate"
       },
       {
         "ext": [
@@ -95,7 +98,8 @@
         "name": "SQLite database",
         "description": "SQLite database",
         "role": "Viewer",
-        "mimeType": "application/vnd.sqlite3"
+        "mimeType": "application/vnd.sqlite3",
+        "rank": "Alternate"
       },
       {
         "ext": [
@@ -126,7 +130,8 @@
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "headerImage": "icons/nsis-header.bmp",
-        "sidebarImage": "icons/nsis-sidebar.bmp"
+        "sidebarImage": "icons/nsis-sidebar.bmp",
+        "installerHooks": "windows/hooks.nsh"
       }
     },
     "macOS": {
