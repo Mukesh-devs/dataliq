@@ -4,7 +4,8 @@
 //   node scripts/icons.mjs          (or `pnpm icons`)
 //
 // Writes the SVG sources in assets/ and, in src-tauri/icons/, the PNGs
-// (Linux, Windows tiles), icon.ico (Windows) and icon.icns (macOS); also the
+// (Linux, Windows tiles), icon.ico (Windows), icon.icns (macOS) and the
+// Windows installer's header and sidebar pictures (nsis-*.bmp); also the
 // website's copy of the icon and its favicons (website/assets/).
 //
 // Three drawings of one design, as desktop icons are made:
@@ -20,7 +21,7 @@
 // big bitmap). Needs the dev dependencies (Playwright's Chromium, the Tauri
 // CLI for the .icns).
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -153,6 +154,79 @@ export function ico(images) {
   return Buffer.concat([dir, ...entries.map((e) => e.data)]);
 }
 
+/**
+ * The Windows installer's pictures (NSIS): `header` (150 × 57) sits left of
+ * each page's title on its white band; `sidebar` (164 × 314) fills the left
+ * of the Welcome and Finish pages. The icon is the full drawing, nested;
+ * `font` is a data: URL for the wordmark (an SVG drawn as an image loads no
+ * outside files).
+ */
+export function installerArt(kind, font = "") {
+  const tile = icon({ variant: "full" })
+    .replace(/^<svg[^>]*>/, "")
+    .replace(/<\/svg>\s*$/, "");
+  const face = font
+    ? `<style>@font-face{font-family:Brand;src:url(${font}) format("woff2");font-weight:100 900}</style>`
+    : "";
+  const word = 'font-family="Brand, Inter, Segoe UI, sans-serif"';
+  if (kind === "header") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="57" viewBox="0 0 150 57">${face}
+  <rect width="150" height="57" fill="#ffffff"/>
+  <svg x="10" y="10.5" width="36" height="36" viewBox="0 0 1024 1024">${tile}</svg>
+  <text x="54" y="35" ${word} font-size="17" font-weight="650" fill="#0f172a" letter-spacing="-0.2">DataLiq</text>
+</svg>
+`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="164" height="314" viewBox="0 0 164 314">${face}
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#1e2433"/>
+      <stop offset="1" stop-color="#0b0e14"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.32" r="0.6">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="164" height="314" fill="url(#night)"/>
+  <rect width="164" height="314" fill="url(#glow)"/>
+  <path d="M -20 250 C 40 220, 110 280, 190 236" fill="none" stroke="#3b82f6" stroke-opacity="0.22" stroke-width="1.5"/>
+  <path d="M -20 268 C 50 240, 120 300, 190 258" fill="none" stroke="#67e8f9" stroke-opacity="0.14" stroke-width="1.5"/>
+  <svg x="42" y="58" width="80" height="80" viewBox="0 0 1024 1024">${tile}</svg>
+  <text x="82" y="172" text-anchor="middle" ${word} font-size="22" font-weight="650" fill="#ffffff" letter-spacing="-0.3">DataLiq</text>
+  <text x="82" y="192" text-anchor="middle" ${word} font-size="10.5" font-weight="450" fill="#94a3b8">Huge data files, in seconds</text>
+</svg>
+`;
+}
+
+/** A 24-bit .bmp (what NSIS shows) from opaque RGBA pixels. */
+export function bmp(width, height, rgba) {
+  const row = Math.ceil((width * 3) / 4) * 4;
+  const pixels = Buffer.alloc(row * height);
+  for (let y = 0; y < height; y++) {
+    const out = (height - 1 - y) * row; // bottom row first
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      pixels[out + x * 3] = rgba[i + 2];
+      pixels[out + x * 3 + 1] = rgba[i + 1];
+      pixels[out + x * 3 + 2] = rgba[i];
+    }
+  }
+  const header = Buffer.alloc(54);
+  header.write("BM", 0, "ascii");
+  header.writeUInt32LE(54 + pixels.length, 2);
+  header.writeUInt32LE(54, 10);
+  header.writeUInt32LE(40, 14);
+  header.writeInt32LE(width, 18);
+  header.writeInt32LE(height, 22);
+  header.writeUInt16LE(1, 26);
+  header.writeUInt16LE(24, 28);
+  header.writeUInt32LE(pixels.length, 34);
+  header.writeInt32LE(2835, 38); // 72 dpi
+  header.writeInt32LE(2835, 42);
+  return Buffer.concat([header, pixels]);
+}
+
 /** Sizes drawn from the simplified icon. */
 const SMALL_UP_TO = 24;
 
@@ -193,6 +267,28 @@ async function main() {
     return { size, png: Buffer.from(out.png, "base64"), rgba: Buffer.from(out.rgba, "base64") };
   };
   const sized = (size) => draw(size <= SMALL_UP_TO ? "small" : "full", size);
+  /** An SVG at its own size, as raw RGBA. */
+  const drawArt = async (source, width, height) => {
+    const out = await page.evaluate(
+      async ({ source, width, height }) => {
+        const img = new Image();
+        img.src = `data:image/svg+xml;base64,${btoa(source)}`;
+        await img.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const rgba = ctx.getImageData(0, 0, width, height).data;
+        let raw = "";
+        for (let i = 0; i < rgba.length; i += 8192)
+          raw += String.fromCharCode(...rgba.subarray(i, i + 8192));
+        return btoa(raw);
+      },
+      { source, width, height },
+    );
+    return Buffer.from(out, "base64");
+  };
 
   // Linux (hicolor sizes) and the window icon; Windows Store tiles.
   const pngs = {
@@ -225,6 +321,19 @@ async function main() {
   const layers = [];
   for (const size of [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]) layers.push(await sized(size));
   writeFileSync(join(icons, "icon.ico"), ico(layers));
+
+  // The Windows installer's header and sidebar pictures.
+  const font = `data:font/woff2;base64,${readFileSync(
+    join(root, "node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2"),
+  ).toString("base64")}`;
+  for (const [name, kind, width, height] of [
+    ["nsis-header.bmp", "header", 150, 57],
+    ["nsis-sidebar.bmp", "sidebar", 164, 314],
+  ])
+    writeFileSync(
+      join(icons, name),
+      bmp(width, height, await drawArt(installerArt(kind, font), width, height)),
+    );
 
   // macOS: the Tauri CLI packs the .icns from the 1024 px drawing.
   const tmp = mkdtempSync(join(tmpdir(), "dataliq-icon-"));

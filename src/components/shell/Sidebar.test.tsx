@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decodeIpc } from "../../lib/arrow";
 import { defaultLayout, setHidden, setPinned, rename } from "../../lib/layout";
 import { useSettings } from "../../stores/settings";
+import { useSql } from "../../stores/sql";
 import type { Tab } from "../../stores/tabs";
 import { ipcBytes } from "../../test/ipc";
 import { Sidebar } from "./Sidebar";
@@ -159,5 +160,43 @@ describe("Sidebar sections", () => {
   it("keeps the cache section as it is", () => {
     render(<Sidebar tabs={[]} />);
     expect(screen.queryByRole("button", { name: "Cache" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Sidebar columns into SQL", () => {
+  afterEach(() => useSql.setState({ open: false, editor: null }));
+
+  const fakeEditor = () => ({
+    runnable: () => ({ script: "", base: 0 }),
+    replace: vi.fn(),
+    insert: vi.fn(),
+    showDropAt: vi.fn(() => false),
+    dropAt: vi.fn(() => false),
+    endDrop: vi.fn(),
+    focus: vi.fn(),
+  });
+
+  it("Ctrl+click inserts the column at the cursor instead of hiding it", async () => {
+    const editor = fakeEditor();
+    useSql.setState({ open: true, editor });
+    const onLayoutChange = vi.fn();
+    const layout = defaultLayout(["id", "Order Date"]);
+    const t = { ...tab(layout), preview: decodeIpc(ipcBytes({ id: [1], "Order Date": ["x"] })) };
+    render(<Sidebar tabs={[t]} active={t} onLayoutChange={onLayoutChange} />);
+    const user = userEvent.setup();
+    await user.keyboard("{Control>}");
+    await user.click(screen.getByText("Order Date"));
+    await user.keyboard("{/Control}");
+    expect(editor.insert).toHaveBeenCalledWith('"Order Date"');
+    expect(onLayoutChange).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+Enter on a column's checkbox inserts it too", async () => {
+    const editor = fakeEditor();
+    useSql.setState({ open: true, editor });
+    render(<Sidebar tabs={[tab()]} active={tab()} onLayoutChange={() => {}} />);
+    screen.getByLabelText("Show amount").focus();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(editor.insert).toHaveBeenCalledWith("amount");
   });
 });

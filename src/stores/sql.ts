@@ -13,6 +13,11 @@ export interface EditorHandle {
   replace(text: string): void;
   /** Types `text` at the cursor (over the selection). */
   insert(text: string): void;
+  /** Marks where a drag over the editor would drop (false outside it). */
+  showDropAt(x: number, y: number): boolean;
+  /** Drops `text` at a point on screen (false outside the editor). */
+  dropAt(text: string, x: number, y: number): boolean;
+  endDrop(): void;
   focus(): void;
 }
 
@@ -124,6 +129,8 @@ interface SqlState {
   load: (text: string) => void;
   /** Focuses the editor, once it has mounted (its code loads on first use). */
   focusEditor: () => void;
+  /** Types `text` at the editor's cursor, opening the panel first if it's closed. */
+  insertAtCursor: (text: string) => void;
 }
 
 let nextRun = 1;
@@ -181,6 +188,10 @@ export const useSql = create<SqlState>()(
           });
         },
         focusEditor: () => withEditor((editor) => setTimeout(() => editor.focus(), 0)),
+        insertAtCursor: (text) => {
+          if (!get().open) set({ open: true });
+          withEditor((editor) => editor.insert(text));
+        },
         setOpen: (open) => set({ open }),
         setHeight: (height) => set({ height: Math.max(MIN_PANEL_HEIGHT, Math.round(height)) }),
         setText: (text) => set({ text }),

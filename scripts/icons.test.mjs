@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ico, icon } from "./icons.mjs";
+import { bmp, ico, icon, installerArt } from "./icons.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p) => readFileSync(join(root, ...p));
@@ -56,4 +56,37 @@ test("the shipped icon.ico has every Windows size, the .icns is there", () => {
   const sizes = Array.from({ length: file.readUInt16LE(4) }, (_, i) => file[6 + 16 * i] || 256);
   assert.deepEqual(sizes, [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]);
   assert.equal(read("src-tauri", "icons", "icon.icns").subarray(0, 4).toString(), "icns");
+});
+
+test("a .bmp is 24-bit, bottom row first, rows padded to 4 bytes", () => {
+  // 2 × 2: red, green / blue, white.
+  const rgba = Buffer.from([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+  const out = bmp(2, 2, rgba);
+  assert.equal(out.toString("ascii", 0, 2), "BM");
+  assert.equal(out.readUInt16LE(28), 24);
+  assert.equal(out.readInt32LE(18), 2);
+  assert.equal(out.readInt32LE(22), 2);
+  assert.equal(out.length, 54 + 8 * 2);
+  // First stored row is the bottom one (blue, white), in BGR.
+  assert.deepEqual([...out.subarray(54, 60)], [255, 0, 0, 255, 255, 255]);
+  assert.deepEqual([...out.subarray(62, 68)], [0, 0, 255, 0, 255, 0]);
+});
+
+test("the Windows installer has DataLiq's icon and pictures, at NSIS's sizes", () => {
+  const conf = JSON.parse(readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"));
+  const nsis = conf.bundle.windows.nsis;
+  assert.equal(nsis.installerIcon, "icons/icon.ico");
+  assert.equal(nsis.uninstallerIcon, "icons/icon.ico");
+  for (const [key, w, h] of [
+    ["headerImage", 150, 57],
+    ["sidebarImage", 164, 314],
+  ]) {
+    const file = readFileSync(join(root, "src-tauri", nsis[key]));
+    assert.equal(file.toString("ascii", 0, 2), "BM", key);
+    assert.equal(file.readUInt16LE(28), 24, key);
+    assert.equal(file.readInt32LE(18), w, key);
+    assert.equal(file.readInt32LE(22), h, key);
+  }
+  assert.match(installerArt("header"), /width="150" height="57"/);
+  assert.match(installerArt("sidebar"), /width="164" height="314"/);
 });

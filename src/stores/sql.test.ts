@@ -154,6 +154,9 @@ describe("sql store", () => {
       runnable: () => ({ script: "", base: 0 }),
       replace: vi.fn(),
       insert: vi.fn(),
+      showDropAt: vi.fn(() => false),
+      dropAt: vi.fn(() => false),
+      endDrop: vi.fn(),
       focus: vi.fn(),
     });
     // Panel open: straight into the editor.
@@ -182,6 +185,9 @@ describe("sql store", () => {
         runnable: () => ({ script: "", base: 0 }),
         replace: vi.fn(),
         insert: vi.fn(),
+        showDropAt: vi.fn(() => false),
+        dropAt: vi.fn(() => false),
+        endDrop: vi.fn(),
         focus: vi.fn(),
       });
       useSql.setState({ open: true, editor: null });
@@ -234,5 +240,26 @@ describe("sql store", () => {
   it("joins every plan section", () => {
     const t = decodeIpc(ipcBytes({ explain_key: ["a", "b"], explain_value: ["one  ", "two"] }));
     expect(planText(t)).toBe("one\n\ntwo");
+  });
+});
+
+describe("insertAtCursor", () => {
+  it("opens the panel and types once the editor is there", () => {
+    const fake = {
+      runnable: () => ({ script: "", base: 0 }),
+      replace: vi.fn(),
+      insert: vi.fn(),
+      showDropAt: vi.fn(() => false),
+      dropAt: vi.fn(() => false),
+      endDrop: vi.fn(),
+      focus: vi.fn(),
+    };
+    useSql.setState({ open: false, editor: null });
+    useSql.getState().insertAtCursor("amount");
+    expect(useSql.getState().open).toBe(true);
+    expect(fake.insert).not.toHaveBeenCalled();
+    useSql.getState().setEditor(fake);
+    expect(fake.insert).toHaveBeenCalledWith("amount");
+    useSql.setState({ open: false, editor: null });
   });
 });

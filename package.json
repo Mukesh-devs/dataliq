@@ -1,7 +1,7 @@
 {
   "name": "dataliq",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Open huge tabular files instantly. Filter, query with SQL, chart and export without loading them into RAM.",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,7 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run && node --test scripts/release/release.test.mjs scripts/icons.test.mjs scripts/website.test.mjs",
+    "test": "vitest run && node --test scripts/release/release.test.mjs scripts/icons.test.mjs scripts/installer.test.mjs scripts/website.test.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:perf": "playwright test -c playwright.perf.config.ts",

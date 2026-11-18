@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  columnRef,
+  padInsert,
   cleanTableName,
   errorOffset,
   errorText,
@@ -110,5 +112,27 @@ describe("returnsRows", () => {
       "selection_fn()",
     ])
       expect(returnsRows(q), q).toBe(false);
+  });
+});
+
+describe("columns into the editor", () => {
+  it("leaves plain names bare and quotes the rest", () => {
+    expect(columnRef("amount")).toBe("amount");
+    expect(columnRef("order_id")).toBe("order_id");
+    expect(columnRef("Order Date")).toBe('"Order Date"');
+    expect(columnRef("Amount")).toBe('"Amount"');
+    expect(columnRef("2024")).toBe('"2024"');
+    expect(columnRef("order")).toBe('"order"');
+    expect(columnRef('say "hi"')).toBe('"say ""hi"""');
+  });
+
+  it("adds a space only where the name would run into a word", () => {
+    expect(padInsert("SELECT", "", "amount")).toBe(" amount");
+    expect(padInsert("SELECT ", " FROM t", "amount")).toBe("amount");
+    expect(padInsert("SELECT", "FROM t", "amount")).toBe(" amount ");
+    expect(padInsert("count(", ")", "amount")).toBe("amount");
+    expect(padInsert("a,", "", "b")).toBe("b");
+    expect(padInsert("", "", "amount")).toBe("amount");
+    expect(padInsert("orders.", "", "amount")).toBe("amount");
   });
 });

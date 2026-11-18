@@ -86,9 +86,10 @@ import {
   type ViewSpec,
 } from "../../lib/view";
 import { ProfilePanel, ProfilePicker } from "../profile/ProfilePanel";
+import { Resizable } from "../ui/Resizable";
 import { CellMenu, type CellMenuActions } from "../grid/CellMenu";
 import { filterForValue } from "../../lib/cellFilter";
-import { useLayout } from "../../stores/layout";
+import { PROFILE_WIDTH, useLayout } from "../../stores/layout";
 import { useExport } from "../../stores/export";
 import { defaultChart, fitChart } from "../../lib/chart";
 import { Button } from "../ui/Button";
@@ -251,6 +252,10 @@ export function FileView({
   // The right panel; shared by all tabs (each tab keeps its own column).
   const profileOpen = useLayout((s) => s.profile);
   const setProfileOpen = useLayout((s) => s.setProfile);
+  const profileWidth = useLayout((s) => s.profileWidth);
+  const setProfileWidth = useLayout((s) => s.setProfileWidth);
+  const sidebarShown = useLayout((s) => s.sidebar);
+  const sidebarWidth = useLayout((s) => s.sidebarWidth);
   const showProfile = useCallback(
     (column: string) => {
       setProfiled(column);
@@ -1596,22 +1601,34 @@ export function FileView({
               rowCount={source.rowCount}
               onGo={(row) => grid.current?.scrollToRow(row - 1)}
             />
-            {profileOpen && !profiled && (
-              <ProfilePicker
-                columns={visible(layout).map((c) => ({ name: c, label: label(layout, c) }))}
-                onPick={showProfile}
-                onClose={() => setProfileOpen(false)}
-              />
-            )}
-            {profileOpen && profiled && (
-              <ProfilePanel
-                title={label(layout, profiled)}
-                // The previous result stays on screen while the new one loads.
-                profile={profile?.column === profiled ? profile.data : undefined}
-                loading={profile?.key !== profileKey}
-                error={profile?.key === profileKey ? profile.error : undefined}
-                onClose={() => setProfileOpen(false)}
-              />
+            {profileOpen && (
+              <Resizable
+                side="right"
+                width={profileWidth}
+                defaultWidth={PROFILE_WIDTH.default}
+                min={PROFILE_WIDTH.min}
+                otherWidth={sidebarShown ? sidebarWidth : 0}
+                onWidth={setProfileWidth}
+                label="Resize the column profile"
+              >
+                {!profiled && (
+                  <ProfilePicker
+                    columns={visible(layout).map((c) => ({ name: c, label: label(layout, c) }))}
+                    onPick={showProfile}
+                    onClose={() => setProfileOpen(false)}
+                  />
+                )}
+                {profiled && (
+                  <ProfilePanel
+                    title={label(layout, profiled)}
+                    // The previous result stays on screen while the new one loads.
+                    profile={profile?.column === profiled ? profile.data : undefined}
+                    loading={profile?.key !== profileKey}
+                    error={profile?.key === profileKey ? profile.error : undefined}
+                    onClose={() => setProfileOpen(false)}
+                  />
+                )}
+              </Resizable>
             )}
           </div>
         ) : (

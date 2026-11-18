@@ -163,3 +163,55 @@ test("the grid follows a theme change at once", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect.poll(pixel).toBeLessThan(200);
 });
+
+test("drag the sidebar's and the profile's edges to resize them, for this window only", async ({
+  page,
+}) => {
+  await open(page);
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const width = async (el: import("@playwright/test").Locator) => (await el.boundingBox())!.width;
+  expect(await width(sidebar)).toBe(240);
+
+  // Drag the sidebar's edge 120 px to the right.
+  const edge = page.getByRole("separator", { name: "Resize the sidebar" });
+  const box = (await edge.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 120, box.y + 200, { steps: 6 });
+  await page.mouse.up();
+  expect(await width(sidebar)).toBe(360);
+
+  // Not past the room the grid needs (1280 − 360 px for the grid).
+  await page.mouse.move(box.x + 120 + box.width / 2, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(1270, box.y + 200, { steps: 6 });
+  await page.mouse.up();
+  expect(await width(sidebar)).toBe(1280 - 360);
+  await expect(page.getByTestId("data-grid")).toBeVisible();
+
+  // Double-click: the default width again. The keyboard moves it too.
+  await edge.dblclick();
+  expect(await width(sidebar)).toBe(240);
+  await edge.focus();
+  await page.keyboard.press("ArrowRight");
+  expect(await width(sidebar)).toBe(256);
+
+  // The column profile's edge (on its left) works the same way.
+  await page.keyboard.press("Control+Alt+b");
+  const profile = page.getByRole("complementary", { name: /Column profile|Profile of/ });
+  await expect(profile).toBeVisible();
+  expect(await width(profile)).toBe(288);
+  const pedge = (await page
+    .getByRole("separator", { name: "Resize the column profile" })
+    .boundingBox())!;
+  await page.mouse.move(pedge.x + pedge.width / 2, pedge.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(pedge.x + pedge.width / 2 - 100, pedge.y + 200, { steps: 6 });
+  await page.mouse.up();
+  expect(await width(profile)).toBe(388);
+
+  // A new window starts at the default widths.
+  await page.reload();
+  await expect(page.getByRole("complementary", { name: "Sidebar" })).toBeVisible();
+  expect(await width(page.getByRole("complementary", { name: "Sidebar" }))).toBe(240);
+});

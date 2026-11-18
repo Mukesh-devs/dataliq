@@ -1239,3 +1239,60 @@ The Home page gained quick actions (open a file or a folder, connect to a
 database, open a URL), its recent files became plain lines with the time
 they were opened (the last five, then Show more), and the sidebar's Files and
 Columns sections fold away.
+
+## D78 — Columns are dragged with pointer events; panel widths last for the session
+
+- **Dragging a column into the SQL editor uses pointer events, not the
+  browser's drag and drop.** On Windows, Tauri's handling of files dropped
+  on the window (which opens them) turns off HTML drag and drop inside the
+  page; turning it off instead would lose file drops. A press on a column
+  in the sidebar becomes a drag after 5 px; a label follows the pointer,
+  and over the editor a marker (a CodeMirror decoration) shows the text
+  position under the pointer (`posAtCoords`). Releasing there inserts the
+  name; Escape cancels. The v1.6.2 rule that nothing is dragged out of the
+  window stays as it is. Ctrl+click (Cmd+click) and Ctrl+Enter on the
+  column's checkbox insert at the cursor, opening the SQL panel if needed,
+  so the keyboard has the same reach.
+- **Names go in as SQL**: bare when DuckDB reads them as written
+  (lower-case letters, digits and `_`, not a reserved word), else quoted.
+  A space is added only where the name would run into a neighbouring word.
+- **Panel widths are kept for the session, not saved**, as asked: a new
+  window starts at 240 px (sidebar) and 288 px (column profile). Each panel
+  has a minimum (180 / 220 px), and the grid keeps at least 360 px; the
+  limit is also applied in CSS (`min()` / `calc()`), so shrinking the
+  window never pushes the grid out of sight. The edge is a `separator`
+  with its value, reachable by Tab and moved by the arrow keys.
+
+## D79 — DataLiq is the default program only for its own file types
+
+Tauri's Windows installer (NSIS) makes the app the default program for every
+type in `fileAssociations`, so installing DataLiq took CSV, Excel, JSON and
+SQLite files (and their icons) away from Excel and the like. A viewer that
+reads those formats shouldn't claim them; the formats nobody else opens
+(.parquet, .duckdb, .dataliq) are a different matter.
+
+- **Windows**: an installer hook (`src-tauri/windows/hooks.nsh`, Tauri's
+  `installerHooks`) runs after Tauri's own registration. For the common
+  types it puts back the default Tauri saved, or removes this user's default
+  when the saved one is DataLiq's own class (written by an earlier DataLiq
+  install) or empty, so the system-wide default (Office registers it for all
+  users) applies again; it keeps the saved value in step for Tauri's
+  uninstaller, and lists DataLiq under the type's `OpenWithProgids`. The
+  uninstall hook removes that entry and the empty value Tauri's uninstaller
+  writes back (an empty default would hide the system-wide one). Explorer is
+  told to refresh its icons. A checkbox page in the installer was set aside:
+  it means carrying a copy of Tauri's whole installer template (and of the
+  MSI's) through every Tauri upgrade, and keeping the answer across silent
+  updates.
+- **macOS**: the common types have `LSHandlerRank` `Alternate` (listed under
+  Open With, never chosen first); DataLiq's own keep the default rank.
+- **Linux**: nothing to do: installing a package never changes the user's
+  defaults, and file icons come from the file type, not the app.
+- **The MSI** (for managed installs) still registers the types as Tauri's
+  WiX template does; changing it needs a template of our own, left for when
+  it's asked for.
+
+The hook was checked by compiling it with NSIS and running it under Wine
+against the registry states an install leaves (first install, reinstall, no
+previous default, uninstall). `scripts/installer.test.mjs` keeps its list of
+types the same as the config's.

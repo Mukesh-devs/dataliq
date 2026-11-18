@@ -34,7 +34,7 @@ export function ProfilePanel({ title, profile, loading, error, onClose }: Profil
   return (
     <aside
       aria-label={`Profile of ${title}`}
-      className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border bg-surface text-[12px]"
+      className="flex min-w-0 flex-1 flex-col overflow-y-auto border-l border-border bg-surface text-[12px]"
     >
       <header className="flex items-center gap-2 border-b border-border px-3 py-2">
         <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export function ProfilePicker({
   return (
     <aside
       aria-label="Column profile"
-      className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border bg-surface text-[12px]"
+      className="flex min-w-0 flex-1 flex-col overflow-y-auto border-l border-border bg-surface text-[12px]"
     >
       <header className="flex items-center gap-2 border-b border-border px-3 py-2">
         <h2 className="flex-1 text-[13px] font-semibold text-fg">Column profile</h2>
