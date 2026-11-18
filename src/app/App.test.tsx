@@ -1,6 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
+import { useEngine } from "../stores/engine";
 import { useSettings } from "../stores/settings";
 import { App } from "./App";
 
@@ -15,6 +16,13 @@ describe("App shell", () => {
     expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Ready");
+  });
+
+  it("keeps the engine's version out of the status bar", () => {
+    act(() => useEngine.setState({ version: "v1.5.6", error: null }));
+    render(<App />);
+    expect(screen.getByRole("status")).toHaveTextContent("Ready");
+    expect(screen.getByRole("status")).not.toHaveTextContent("DuckDB");
   });
 
   it("shows the empty-state drop zone", () => {

@@ -1181,3 +1181,61 @@ build step the folder can be opened and edited by anyone.
 - **It works without scripts and without motion**: content and a download
   link are in the HTML, animations start hidden only when scripts run, and
   `prefers-reduced-motion` turns them off.
+
+## D76 — The web view's browser habits are switched off in one place
+
+DataLiq's window is a web view, and WebView2 (Windows) keeps its browser
+shortcuts in release builds: F5 and Ctrl+R reload the page (the window empties
+until the session comes back), Ctrl+P prints the screen, Alt+←/→ and the
+mouse's side buttons go back and forward, Ctrl+F and F3 open a find bar over
+the app, F7 offers caret browsing, and images and links can be dragged out like
+pictures from a website. The developer tools (F12) are already off in release
+builds, and zoom keys are off by Tauri's default.
+
+Tauri has no setting for WebView2's browser keys, so `useNativeGuards` handles
+them in the page: one listener on the window, in the bubbling phase, stops the
+browser's default for those keys after the app's own handlers have run. So
+Ctrl+F still focuses the app's search and Ctrl+G still opens Go to row; only the
+browser's reaction is gone. Plain typing, editing keys and AltGr (Ctrl+Alt on
+Windows) are left alone, and on macOS Option+←/→ keeps moving by word. The
+same hook keeps the existing rule for the context menu, and blocks dragging
+except inside text boxes. A file dragged onto the window from the system is not
+a page drag and still opens. The decision is a pure function (`isBrowserKey`)
+with its own tests.
+
+## D77 — Settings is a tab, actions are dialogs, small choices stay popovers
+
+Up to 1.6 every window in the app was the same lightweight popover, pinned to
+the top of the window: Settings, Export, Convert, the data tools, Help. They
+closed on any click outside (losing what was typed), left the app behind
+active, and Settings had grown into one long scrolling list.
+
+- **Settings is a tab**, as in code editors, not a second native window: a
+  second web view would cost another 50–100 MB of memory, its own permissions
+  and keeping two windows' state in step, for little gain. The tab sits after
+  the files' tabs (Ctrl+Tab reaches it, Ctrl+W closes it). The file behind
+  stays mounted so its grid keeps its place, but its shortcuts and commands
+  step back while Settings is in front, so Ctrl+Z or Ctrl+F can't act on a
+  hidden file. Settings apply as they change, like VS Code's: lists and
+  checkboxes at once; typed values on Enter or on leaving the box, since
+  saving every keystroke would send half-typed values (a memory limit of
+  "1") to the backend's checks. A refused value is explained under its
+  setting and the typed text stays to be corrected. The search hides
+  settings that don't match, and a section with none left hides itself
+  (CSS `:has()`), so the list of sections follows.
+- **Actions are dialogs** (`Modal`, on `@radix-ui/react-dialog`): centred,
+  over a dimmed window, with a title bar and a close button. An outside
+  click never closes one; Cancel, the close button and Esc do, and the
+  keyboard stays inside. A conversion or an update install in progress
+  can't be dismissed. Version 1.2.0 of the dialog package is used because it
+  shares its internals (dismissable layers, focus scopes, portals) with the
+  installed popover package; mixed versions would treat a popover opened
+  inside a dialog as an outside click.
+- **Small choices stay popovers**, next to what they belong to: a column's
+  menu, the filter editor, Go to row, the cell menu, the command palette,
+  the import settings of a file.
+
+The Home page gained quick actions (open a file or a folder, connect to a
+database, open a URL), its recent files became plain lines with the time
+they were opened (the last five, then Show more), and the sidebar's Files and
+Columns sections fold away.

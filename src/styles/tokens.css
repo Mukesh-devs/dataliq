@@ -38,6 +38,8 @@
   --accent-fg: #ffffff;
   --accent-soft: rgb(79 70 229 / 0.12);
   --focus-ring: rgb(79 70 229 / 0.85);
+  /* Behind a dialog: dims the window. */
+  --overlay: rgb(15 15 20 / 0.28);
   --danger: #c62020;
   --warning: #a54c09;
   --success: #137538;
@@ -93,6 +95,7 @@
   --accent-fg: #111113;
   --accent-soft: rgb(129 140 248 / 0.16);
   --focus-ring: rgb(129 140 248 / 0.7);
+  --overlay: rgb(0 0 0 / 0.55);
   --danger: #f87171;
   --warning: #fbbf24;
   --success: #4ade80;

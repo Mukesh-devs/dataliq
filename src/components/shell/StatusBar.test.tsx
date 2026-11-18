@@ -139,10 +139,14 @@ describe("StatusBar", () => {
       const tip = await screen.findByRole("dialog", { name: "Using the disk" });
       expect(tip).toHaveTextContent("raise the memory limit in Settings › Memory and speed");
       await userEvent.click(screen.getByRole("button", { name: "Open Settings" }));
-      expect(useApp.getState().settingsOpen).toBe(true);
+      expect(useApp.getState()).toMatchObject({
+        settingsOpen: true,
+        settingsActive: true,
+        settingsSection: "memory",
+      });
     } finally {
       clearMocks();
-      useApp.getState().setSettingsOpen(false);
+      useApp.getState().closeSettings();
     }
   });
 

@@ -1,9 +1,9 @@
-import * as Popover from "@radix-ui/react-popover";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTicker } from "../../lib/useTicker";
 import { formatElapsed, useJobs } from "../../stores/jobs";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 
 interface ToolDialogProps {
   title: string;
@@ -30,7 +30,7 @@ export function ToolDialog({
   runLabel,
   blocked,
   children,
-  width = "w-96",
+  width = "w-[26rem]",
 }: ToolDialogProps) {
   // When Run was pressed (the queries started since then are this run's).
   const [runningSince, setRunningSince] = useState<number | null>(null);
@@ -56,55 +56,50 @@ export function ToolDialog({
   };
   const stop = () => runningSince !== null && useJobs.getState().cancelSince(runningSince);
   return (
-    <Popover.Root open onOpenChange={(o) => !o && onClose()}>
-      <Popover.Anchor className="absolute top-2 left-1/2" />
-      <Popover.Portal>
-        <Popover.Content
-          aria-label={title}
-          sideOffset={4}
-          collisionPadding={8}
-          className={`z-50 flex max-h-[80vh] ${width} max-w-[92vw] flex-col gap-3 overflow-y-auto rounded-[var(--radius-lg)] border border-border bg-bg p-3 text-[12px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]`}
-        >
-          <h2 className="text-[13px] font-semibold text-fg">{title}</h2>
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run();
-            }}
-          >
-            {children}
-            {error && (
-              <p role="alert" className="flex gap-1.5 text-fg-muted">
-                <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />
-                <span className="min-w-0 break-words">{error}</span>
-              </p>
-            )}
-            <div className="flex items-center justify-end gap-2">
-              {blocked && <span className="mr-auto text-fg-subtle">{blocked}</span>}
-              {running && (
-                <span className="tabular mr-auto text-fg-subtle" aria-live="off">
-                  Running… {formatElapsed(Math.max(0, now - runningSince))}
-                </span>
-              )}
-              {running ? (
-                <Button size="sm" variant="ghost" onClick={stop}>
-                  Stop
-                </Button>
-              ) : (
-                <Button size="sm" variant="ghost" onClick={onClose}>
-                  Cancel
-                </Button>
-              )}
-              <Button type="submit" size="sm" variant="primary" disabled={!!blocked || running}>
-                {running && <LoaderCircle className="size-3.5 animate-spin" aria-hidden />}
-                {runLabel}
-              </Button>
-            </div>
-          </form>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={title}
+      width={width}
+      className="text-[12px]"
+    >
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void run();
+        }}
+      >
+        {children}
+        {error && (
+          <p role="alert" className="flex gap-1.5 text-fg-muted">
+            <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden />
+            <span className="min-w-0 break-words">{error}</span>
+          </p>
+        )}
+        <div className="flex items-center justify-end gap-2 pt-1">
+          {blocked && <span className="mr-auto text-fg-subtle">{blocked}</span>}
+          {running && (
+            <span className="tabular mr-auto text-fg-subtle" aria-live="off">
+              Running… {formatElapsed(Math.max(0, now - runningSince))}
+            </span>
+          )}
+          {running ? (
+            <Button variant="ghost" onClick={stop}>
+              Stop
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" variant="primary" disabled={!!blocked || running}>
+            {running && <LoaderCircle className="size-3.5 animate-spin" aria-hidden />}
+            {runLabel}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

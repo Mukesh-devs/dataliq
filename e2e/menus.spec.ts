@@ -59,50 +59,67 @@ test("the menu bar runs the app's commands", async ({ page }) => {
   const help = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(help.getByRole("row", { name: /Open file… Ctrl\+O/ })).toBeVisible();
   await expect(help.getByRole("row", { name: /Save workspace Ctrl\+S/ })).toBeVisible();
-  await help.getByRole("button", { name: "Close" }).click();
+  await help.getByRole("button", { name: "Close", exact: true }).click();
 
   expect(await invokes(page, "set_native_menu")).toEqual([]);
 });
 
-test("settings are saved and applied", async ({ page }) => {
+test("settings apply as they change, in a tab", async ({ page }) => {
   await mockTauri(page, {});
   await page.goto("/");
   await page.keyboard.press("Control+,");
-  const box = page.getByRole("dialog", { name: "Settings" });
-  await expect(box.getByLabel("Memory limit (MB)")).toHaveAttribute("placeholder", "8192");
+  await expect(page.getByRole("tab", { name: "Settings" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const box = page.getByRole("region", { name: "Settings" });
+  const memory = box.getByLabel("Memory limit (MB)");
+  await expect(memory).toHaveAttribute("placeholder", "8192");
   await expect(box.getByText(/half of this computer's 16 GB \(8\.0 GB\)/)).toBeVisible();
 
-  // A value the backend refuses is said in words; the box stays open.
-  await box.getByLabel("Memory limit (MB)").fill("100");
-  await box.getByRole("button", { name: "Save" }).click();
+  // A value the backend refuses is said in words, under the setting.
+  await memory.fill("100");
+  await memory.press("Enter");
   await expect(box.getByRole("alert")).toHaveText(/at least 256 MB/);
+  await memory.fill("4096");
+  await memory.press("Enter");
+  await expect(box.getByRole("alert")).toHaveCount(0);
 
-  await box.getByLabel("Memory limit (MB)").fill("4096");
+  // Typed values save on Enter or on leaving the box; lists at once.
   await box.getByLabel("Worker threads").fill("4");
+  await box.getByLabel("Worker threads").press("Tab");
   await box.getByLabel("Density").selectOption("compact");
-  await box.getByLabel("Size limit (GB)").fill("50");
-  await box.getByLabel("Location").fill("/big/disk/cache");
-  await box.getByLabel("Default format").selectOption("parquet");
-  await box.getByRole("button", { name: "Save" }).click();
-  await expect(box).toBeHidden();
-  await expect(page.getByRole("status")).toContainText("used when DataLiq restarts");
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
-  const saved = await invokes(page, "save_settings");
-  expect(saved.at(-1)).toEqual({
-    settings: {
-      memoryLimitMb: 4096,
-      tempDir: null,
-      threads: 4,
-      cacheEnabled: true,
-      cacheMaxGb: 50,
-      cacheDir: "/big/disk/cache",
-      smallFileMb: 0,
-    },
-  });
+  await box.getByLabel("Size limit (GB)").fill("50");
+  await box.getByLabel("Size limit (GB)").press("Enter");
+  await box.getByLabel("Location").fill("/big/disk/cache");
+  await box.getByLabel("Location").press("Enter");
+  await expect(page.getByRole("status")).toContainText("used when DataLiq restarts");
+  await box.getByLabel("Default format").selectOption("parquet");
+  await expect
+    .poll(async () => (await invokes(page, "save_settings")).at(-1))
+    .toEqual({
+      settings: {
+        memoryLimitMb: 4096,
+        tempDir: null,
+        threads: 4,
+        cacheEnabled: true,
+        cacheMaxGb: 50,
+        cacheDir: "/big/disk/cache",
+        smallFileMb: 0,
+      },
+    });
 
-  // Reopened: what was saved.
+  // The search narrows the settings and the list of sections.
+  await box.getByRole("searchbox", { name: "Search settings" }).fill("threads");
+  await expect(box.getByLabel("Worker threads")).toBeVisible();
+  await expect(box.getByLabel("Density")).toBeHidden();
+  await expect(box.getByRole("navigation").getByRole("button")).toHaveText(["Memory and speed"]);
+
+  // Closed (Ctrl+W) and opened again: what was saved.
+  await page.keyboard.press("Control+w");
+  await expect(page.getByRole("tab", { name: "Settings" })).toHaveCount(0);
   await page.keyboard.press("Control+,");
-  await expect(box.getByLabel("Memory limit (MB)")).toHaveValue("4096");
+  await expect(memory).toHaveValue("4096");
   await expect(box.getByLabel("Default format")).toHaveValue("parquet");
-  await box.getByRole("button", { name: "Cancel" }).click();
 });

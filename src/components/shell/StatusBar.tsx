@@ -273,7 +273,7 @@ function MemoryIndicator() {
  * plain words, with what makes it faster.
  */
 function SpillWarning({ reading, memory }: { reading: ReactNode; memory: MemoryUsage }) {
-  const openSettings = useApp((s) => s.setSettingsOpen);
+  const showSettings = useApp((s) => s.showSettings);
   const { spilledBytes, limitBytes } = memory;
   return (
     <Popover.Root>
@@ -310,7 +310,7 @@ function SpillWarning({ reading, memory }: { reading: ReactNode; memory: MemoryU
             <li>or close tabs you no longer need.</li>
           </ul>
           <div className="flex justify-end">
-            <Button size="sm" variant="ghost" onClick={() => openSettings(true)}>
+            <Button size="sm" variant="ghost" onClick={() => showSettings("memory")}>
               Open Settings
             </Button>
           </div>

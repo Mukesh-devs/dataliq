@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CompareDialog, type CompareSide } from "./CompareDialog";
 
-const anchor = { getBoundingClientRect: () => new DOMRect(10, 10, 100, 30) };
 const col = (name: string) => ({ name, type: "VARCHAR" });
 const v1: CompareSide = { tabId: "t1", title: "orders_v1.csv", columns: [col("id"), col("qty")] };
 const v2: CompareSide = { tabId: "t2", title: "orders_v2.csv", columns: [col("qty"), col("id")] };
@@ -13,7 +12,6 @@ function setup(onCompare = vi.fn(() => Promise.resolve())) {
   const onOpenChange = vi.fn();
   render(
     <CompareDialog
-      anchor={anchor}
       current={v1}
       others={[v2, other]}
       onOpenChange={onOpenChange}

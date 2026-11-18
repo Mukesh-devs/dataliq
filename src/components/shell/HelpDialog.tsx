@@ -1,4 +1,3 @@
-import * as Popover from "@radix-ui/react-popover";
 import { useEffect, useState } from "react";
 import { modKey } from "../../lib/platform";
 import { allCommands, useCommands } from "../../stores/commands";
@@ -6,6 +5,7 @@ import { useEngine } from "../../stores/engine";
 // The icon whose tile fills its box (the macOS one keeps Apple's margin).
 import logo from "../../../assets/icon-full.svg";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 import { TipSteps } from "./Tips";
 
 export type HelpTopic = "about" | "shortcuts" | "tips";
@@ -26,7 +26,6 @@ function Shortcuts() {
     .map((c) => [c.title, c.shortcut!] as [string, string]);
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="font-semibold text-fg">Keyboard shortcuts</h2>
       <table className="w-full text-[12px]">
         <tbody>
           {[...rows, ...GESTURES].map(([what, keys]) => (
@@ -77,28 +76,25 @@ const LABELS: Record<HelpTopic, string> = {
 /** Help › Show getting-started tips, Keyboard shortcuts and About. */
 export function HelpDialog({ topic, onClose }: { topic: HelpTopic | null; onClose: () => void }) {
   return (
-    <Popover.Root open={topic !== null} onOpenChange={(o) => !o && onClose()}>
-      <Popover.Anchor className="absolute top-2 left-1/2" />
-      <Popover.Portal>
-        <Popover.Content
-          aria-label={LABELS[topic ?? "shortcuts"]}
-          sideOffset={4}
-          className="z-50 flex max-h-[calc(100vh-96px)] w-[min(30rem,calc(100vw-32px))] flex-col gap-3 overflow-y-auto rounded-[var(--radius-lg)] border border-border bg-bg p-4 text-[13px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
-        >
-          {topic === "tips" ? (
-            <TipSteps onDone={onClose} />
-          ) : (
-            <>
-              {topic === "about" ? <About /> : <Shortcuts />}
-              <div className="flex justify-end">
-                <Button size="sm" variant="secondary" onClick={onClose}>
-                  Close
-                </Button>
-              </div>
-            </>
-          )}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <Modal
+      open={topic !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={LABELS[topic ?? "shortcuts"]}
+      width="w-[30rem]"
+      className="flex flex-col gap-3"
+    >
+      {topic === "tips" ? (
+        <TipSteps onDone={onClose} />
+      ) : (
+        <>
+          {topic === "about" ? <About /> : <Shortcuts />}
+          <div className="flex justify-end">
+            <Button size="sm" variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }

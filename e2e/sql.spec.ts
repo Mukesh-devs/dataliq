@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
-import { mockTauri } from "./tauri-mock";
+import { fileShown, mockTauri } from "./tauri-mock";
 
 const ipc = (cols: Parameters<typeof tableFromArrays>[0]) =>
   Buffer.from(tableToIPC(tableFromArrays(cols), "stream")).toString("base64");
@@ -49,6 +49,7 @@ async function open(page: Page) {
     .getByRole("button", { name: /Open file/ })
     .click();
   await expect(page.getByRole("status").first()).toContainText("1,000 rows");
+  await fileShown(page);
 }
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "SQL query" });

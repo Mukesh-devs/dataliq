@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { decodeIpc } from "../../lib/arrow";
 import { defaultLayout, setHidden, setPinned, rename } from "../../lib/layout";
+import { useSettings } from "../../stores/settings";
 import type { Tab } from "../../stores/tabs";
 import { ipcBytes } from "../../test/ipc";
 import { Sidebar } from "./Sidebar";
@@ -119,5 +120,44 @@ describe("Sidebar columns", () => {
   it("asks to open a file when nothing is open", () => {
     render(<Sidebar tabs={[]} />);
     expect(screen.getByText("Open a file to see its columns")).toBeInTheDocument();
+  });
+});
+
+describe("Sidebar sections", () => {
+  beforeEach(() => useSettings.setState({ collapsed: {} }));
+
+  it("fold away from their titles and stay folded", async () => {
+    const user = userEvent.setup();
+    render(<Sidebar tabs={[tab()]} active={tab()} />);
+    const columns = screen.getByRole("button", { name: "Columns" });
+    expect(columns).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("list", { name: "Columns" })).toBeInTheDocument();
+
+    await user.click(columns);
+    expect(columns).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list", { name: "Columns" })).not.toBeInTheDocument();
+    // The other section is unaffected.
+    expect(screen.getByRole("list", { name: "Files" })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("dataliq.settings")!).state.collapsed).toEqual({
+      columns: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Files" }));
+    expect(screen.queryByRole("list", { name: "Files" })).not.toBeInTheDocument();
+    await user.click(columns);
+    expect(screen.getByRole("list", { name: "Columns" })).toBeInTheDocument();
+  });
+
+  it("show their arrow only when the pointer is near or the keyboard is on them", () => {
+    render(<Sidebar tabs={[]} />);
+    const arrow = screen.getByTestId("files-chevron");
+    expect(arrow).toHaveClass("opacity-0");
+    expect(arrow.getAttribute("class")).toMatch(/group-hover\/section:opacity-100/);
+    expect(arrow.getAttribute("class")).toMatch(/group-focus-within\/section:opacity-100/);
+  });
+
+  it("keeps the cache section as it is", () => {
+    render(<Sidebar tabs={[]} />);
+    expect(screen.queryByRole("button", { name: "Cache" })).not.toBeInTheDocument();
   });
 });

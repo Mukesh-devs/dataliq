@@ -4,6 +4,8 @@ import { persist } from "zustand/middleware";
 export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 export type Density = "comfortable" | "compact";
+/** The sidebar's sections that fold away. */
+export type SidebarSection = "files" | "columns";
 
 interface SettingsState {
   theme: ThemePreference;
@@ -17,6 +19,9 @@ interface SettingsState {
   /** Bring back the last session's tabs (filters, layouts…) at startup. */
   restoreSession: boolean;
   setRestoreSession: (on: boolean) => void;
+  /** Sidebar sections folded away (their titles stay). */
+  collapsed: Partial<Record<SidebarSection, boolean>>;
+  toggleSection: (section: SidebarSection) => void;
   setTheme: (theme: ThemePreference) => void;
   setDensity: (density: Density) => void;
   /** Cycles system -> light -> dark -> system. */
@@ -41,6 +46,9 @@ export const useSettings = create<SettingsState>()(
       setCheckUpdates: (checkUpdates) => set({ checkUpdates }),
       restoreSession: true,
       setRestoreSession: (restoreSession) => set({ restoreSession }),
+      collapsed: {},
+      toggleSection: (section) =>
+        set((s) => ({ collapsed: { ...s.collapsed, [section]: !s.collapsed[section] } })),
       setTheme: (theme) => set({ theme }),
       setDensity: (density) => set({ density }),
       cycleTheme: () => set((s) => ({ theme: nextTheme[s.theme] })),
@@ -53,6 +61,7 @@ export const useSettings = create<SettingsState>()(
         headerCharts: s.headerCharts,
         checkUpdates: s.checkUpdates,
         restoreSession: s.restoreSession,
+        collapsed: s.collapsed,
       }),
     },
   ),

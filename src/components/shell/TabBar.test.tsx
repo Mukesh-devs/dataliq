@@ -44,3 +44,46 @@ describe("TabBar", () => {
     expect(onClose).toHaveBeenCalledWith("2");
   });
 });
+
+describe("TabBar with Settings open", () => {
+  it("shows a Settings tab after the files', in the arrows' order", async () => {
+    const onSelect = vi.fn();
+    const settings = { active: false, onSelect: vi.fn(), onClose: vi.fn() };
+    render(
+      <TabBar
+        tabs={[tab("1", "a.csv"), tab("2", "b.csv")]}
+        activeId="2"
+        onSelect={onSelect}
+        onClose={() => {}}
+        onOpen={() => {}}
+        settings={settings}
+      />,
+    );
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["a.csv", "b.csv", "Settings"]);
+    screen.getByRole("tab", { name: "b.csv" }).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(settings.onSelect).toHaveBeenCalledOnce();
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    expect(settings.onSelect).toHaveBeenCalledTimes(2);
+    screen.getByRole("tab", { name: "Settings" }).focus();
+    await userEvent.keyboard("{Delete}");
+    expect(settings.onClose).toHaveBeenCalledOnce();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("marks Settings as the selected tab while it's in front", () => {
+    render(
+      <TabBar
+        tabs={[tab("1", "a.csv")]}
+        activeId="1"
+        onSelect={() => {}}
+        onClose={() => {}}
+        onOpen={() => {}}
+        settings={{ active: true, onSelect: () => {}, onClose: () => {} }}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Settings" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "a.csv" })).toHaveAttribute("aria-selected", "false");
+  });
+});

@@ -6,6 +6,51 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-16
+
+A friendlier Home page, Settings as a tab, and proper dialogs.
+
+### Added
+
+- Settings is a tab beside the files (Ctrl+, the menu, the palette, or Open Settings from
+  the memory warning), like in code editors. Its sections are listed on the left, a search
+  box narrows the settings by name, and changes apply as they are made: lists and
+  checkboxes at once, typed values on Enter or on leaving the box (Escape puts the saved
+  value back). A value DataLiq refuses is explained under the setting. Ctrl+Tab reaches
+  it after the files, and Ctrl+W closes it; the file behind keeps its place.
+- Quick actions on the Home page: Open file, Open folder, Connect database and Open URL,
+  with their shortcuts.
+- The sidebar's Files and Columns sections fold away from their titles; a small arrow
+  shows when the pointer is near, and the choice is remembered.
+
+### Changed
+
+- Recent files on the Home page are plain lines: the name in the accent colour, the full
+  path, and when it was opened (Today, 10:42 / Yesterday / Mon, 11 Nov). The last five
+  show first, then Show more; a line can be removed from the list, and the list cleared.
+  The getting-started tips take one line.
+- Export, Convert, Connect to a database, Group by / pivot, Join, Append, Open a sample,
+  Compare, Open URL, Open folder or pattern, Help and Check for updates are proper dialogs:
+  centred over a dimmed window, with a title bar and a close button. They close with
+  Cancel, the close button or Esc, never from a stray click outside, and the keyboard stays
+  inside until they close.
+- The status bar no longer shows the DuckDB version; it's in Help › About and Copy
+  diagnostics.
+
+## [1.6.2] - 2026-11-16
+
+### Fixed
+
+- The app no longer behaves like a web page in places. Reload (F5, Ctrl+R), print (Ctrl+P),
+  back and forward (Alt+← / Alt+→ and the mouse's back and forward buttons), the browser's
+  find bar (Ctrl+F, Ctrl+G, F3) and caret browsing (F7) did nothing useful at best, and a
+  reload emptied the window until the session came back; they are now ignored, while the
+  app's own shortcuts on the same keys (search, Go to row) keep working.
+- Images, icons and links can no longer be dragged out of the window. Files dropped onto
+  the window still open, and text boxes keep their own menu and text dragging.
+
+## [1.6.1] - 2026-11-12
+
 ### Added
 
 - A website for DataLiq (`website/`, published with GitHub Pages): what the app does, shown
@@ -19,8 +64,6 @@ All notable changes to this project are documented here. The format follows
   around it in the Dock and Launchpad), filling the tile on Windows and Linux (taskbar,
   Start menu, app launcher), and a simpler drawing at 16–24 px (title bars, file lists).
   Windows gets every size it asks for (16 to 256 px) and Linux a 512 px icon.
-
-## [1.6.1] - 2026-11-12
 
 ### Fixed
 

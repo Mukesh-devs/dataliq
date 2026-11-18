@@ -7,6 +7,7 @@ import {
   PanelRight,
   Plus,
   Search,
+  Settings,
   Table2,
   X,
 } from "lucide-react";
@@ -27,6 +28,18 @@ interface TabBarProps {
   onTogglePanel?: (panel: "left" | "right" | "bottom") => void;
   /** The menu bar, first in the row (Windows and Linux). */
   menu?: ReactNode;
+  /** The Settings tab, after the files' tabs while it's open. */
+  settings?: { active: boolean; onSelect: () => void; onClose: () => void };
+}
+
+/** The Settings tab's id among the tabs. */
+export const SETTINGS_TAB = "settings";
+
+interface Item {
+  id: string;
+  title: string;
+  path?: string;
+  busy: boolean;
 }
 
 const PANELS = [
@@ -45,7 +58,18 @@ export function TabBar({
   panels,
   onTogglePanel,
   menu,
+  settings,
 }: TabBarProps) {
+  const items: Item[] = tabs.map((tab) => ({
+    id: tab.id,
+    title: tab.title,
+    path: tab.path,
+    busy: tab.status === "loading" || tab.import?.status === "running",
+  }));
+  if (settings) items.push({ id: SETTINGS_TAB, title: "Settings", busy: false });
+  const current = settings?.active ? SETTINGS_TAB : activeId;
+  const select = (id: string) => (id === SETTINGS_TAB ? settings?.onSelect() : onSelect(id));
+  const closeItem = (id: string) => (id === SETTINGS_TAB ? settings?.onClose() : onClose(id));
   return (
     <header className="flex h-[var(--chrome-height)] shrink-0 items-center gap-1 border-b border-border bg-surface pr-2 pl-2">
       {menu && (
@@ -64,42 +88,42 @@ export function TabBar({
           const focused = (e.target as HTMLElement)
             .closest("[data-tab-id]")
             ?.getAttribute("data-tab-id");
-          const i = tabs.findIndex((t) => t.id === (focused ?? activeId));
+          const i = items.findIndex((t) => t.id === (focused ?? current));
           if (i < 0) return;
           const to =
             e.key === "ArrowRight"
-              ? (i + 1) % tabs.length
+              ? (i + 1) % items.length
               : e.key === "ArrowLeft"
-                ? (i - 1 + tabs.length) % tabs.length
+                ? (i - 1 + items.length) % items.length
                 : e.key === "Home"
                   ? 0
                   : e.key === "End"
-                    ? tabs.length - 1
+                    ? items.length - 1
                     : null;
           if (to !== null) {
             e.preventDefault();
-            onSelect(tabs[to]!.id);
+            select(items[to]!.id);
             // React clears currentTarget after the handler.
             const list = e.currentTarget;
             requestAnimationFrame(() =>
               list
-                .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(tabs[to]!.id)}"]`)
+                .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(items[to]!.id)}"]`)
                 ?.focus(),
             );
           } else if (e.key === "Delete") {
             e.preventDefault();
-            onClose(tabs[i]!.id);
+            closeItem(items[i]!.id);
           }
         }}
       >
-        {tabs.map((tab) => {
-          const busy = tab.status === "loading" || tab.import?.status === "running";
+        {items.map((tab) => {
+          const Icon = tab.id === SETTINGS_TAB ? Settings : Table2;
           return (
             <div
               key={tab.id}
               className={cn(
                 "group flex h-7 max-w-56 items-center rounded-[var(--radius)] text-[13px]",
-                tab.id === activeId
+                tab.id === current
                   ? "bg-bg text-fg shadow-[0_0_0_1px_var(--border)]"
                   : "text-fg-muted hover:bg-hover hover:text-fg",
               )}
@@ -107,20 +131,20 @@ export function TabBar({
               <button
                 role="tab"
                 type="button"
-                aria-selected={tab.id === activeId}
+                aria-selected={tab.id === current}
                 aria-keyshortcuts="Delete"
                 data-tab-id={tab.id}
-                tabIndex={tab.id === activeId ? 0 : -1}
+                tabIndex={tab.id === current ? 0 : -1}
                 title={tab.path}
-                onClick={() => onSelect(tab.id)}
+                onClick={() => select(tab.id)}
                 // Middle-click closes, as in browsers.
-                onAuxClick={(e) => e.button === 1 && onClose(tab.id)}
+                onAuxClick={(e) => e.button === 1 && closeItem(tab.id)}
                 className="flex h-full min-w-0 items-center gap-1.5 pr-1 pl-2.5"
               >
-                {busy ? (
+                {tab.busy ? (
                   <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />
                 ) : (
-                  <Table2 className="size-3.5 shrink-0" aria-hidden />
+                  <Icon className="size-3.5 shrink-0" aria-hidden />
                 )}
                 <span className="truncate">{tab.title}</span>
               </button>
@@ -130,7 +154,7 @@ export function TabBar({
                 aria-hidden
                 tabIndex={-1}
                 title={`Close (${modKey}+W)`}
-                onClick={() => onClose(tab.id)}
+                onClick={() => closeItem(tab.id)}
                 className="mr-0.5 flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-fg-subtle opacity-80 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-active hover:text-fg"
               >
                 <X className="size-3" aria-hidden />

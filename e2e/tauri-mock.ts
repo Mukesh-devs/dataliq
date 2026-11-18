@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { tableFromIPC } from "apache-arrow";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -174,6 +174,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       // Lets tests deliver backend events, e.g. drag and drop or forwarded files.
       w.__emit = emit;
+      w.__listening = (event: string) => (listeners[event]?.length ?? 0) > 0;
       w.__TAURI_INTERNALS__ = {
         metadata: {
           currentWindow: { label: "main" },
@@ -616,6 +617,27 @@ export function gridHeader(page: Page, text: string) {
     .getByTestId("data-grid")
     .locator('th[role="columnheader"]')
     .filter({ hasText: new RegExp(`^${text}$`) });
+}
+
+/**
+ * Waits until the open file's view is on screen. The status bar shows the
+ * file first; the view loads on first use (decision D54), and its commands
+ * (palette, menus) exist from then on.
+ */
+export async function fileShown(page: Page) {
+  await expect(page.getByTestId("data-grid")).toBeVisible();
+}
+
+/** Waits until the page listens for a backend event (its listeners register after the first render). */
+export async function listening(page: Page, event: string) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (e) => (window as unknown as { __listening: (e: string) => boolean }).__listening(e),
+        event,
+      ),
+    )
+    .toBe(true);
 }
 
 /** Delivers a backend event (as Tauri would) to the page's listeners. */

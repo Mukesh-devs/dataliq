@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatTime,
   formatValue,
+  formatWhen,
   scaleDecimal,
   toJsonText,
 } from "./format";
@@ -65,5 +66,28 @@ describe("number helpers", () => {
     expect(formatBytes(512)).toBe("512 B");
     expect(formatDuration(210)).toBe("210 ms");
     expect(formatDuration(1400)).toBe("1.40 s");
+  });
+});
+
+describe("formatWhen", () => {
+  // Local times: the function works in the user's time zone.
+  const now = new Date(2026, 10, 16, 18, 30).getTime(); // Mon 16 Nov 2026
+  const at = (d: number, h = 9, m = 15, month = 10, y = 2026) =>
+    new Date(y, month, d, h, m).getTime();
+
+  it("says today with the time, then yesterday", () => {
+    expect(formatWhen(at(16, 10, 42), now, "en-GB")).toBe("Today, 10:42");
+    expect(formatWhen(at(16, 0, 1), now, "en-GB")).toBe("Today, 00:01");
+    expect(formatWhen(at(15, 23, 59), now, "en-GB")).toBe("Yesterday");
+  });
+
+  it("names the weekday this week, the date before, and the year when it differs", () => {
+    expect(formatWhen(at(11), now, "en-GB")).toBe("Wed 11 Nov");
+    expect(formatWhen(at(2), now, "en-GB")).toBe("2 Nov");
+    expect(formatWhen(at(20, 9, 15, 11, 2025), now, "en-GB")).toBe("20 Dec 2025");
+  });
+
+  it("is empty for a missing time", () => {
+    expect(formatWhen(Number.NaN, now)).toBe("");
   });
 });

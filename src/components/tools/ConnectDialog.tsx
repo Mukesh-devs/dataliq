@@ -1,4 +1,3 @@
-import * as Popover from "@radix-ui/react-popover";
 import { CircleAlert, Database, LoaderCircle, Plug, Unplug } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -18,6 +17,7 @@ import { useConnect } from "../../stores/connect";
 import { useNotice } from "../../stores/notice";
 import { useSql } from "../../stores/sql";
 import { Button } from "../ui/Button";
+import { Modal } from "../ui/Modal";
 import { openQueryTab } from "./run";
 import { fieldClass, labelClass } from "./ToolDialog";
 
@@ -29,19 +29,15 @@ export function ConnectDialog() {
   const open = useConnect((s) => s.open);
   const close = useConnect((s) => s.close);
   return (
-    <Popover.Root open={open} onOpenChange={(o) => !o && close()}>
-      <Popover.Anchor className="absolute top-2 left-1/2" />
-      <Popover.Portal>
-        <Popover.Content
-          aria-label="Connect to a database"
-          sideOffset={4}
-          collisionPadding={8}
-          className="z-50 flex max-h-[85vh] w-[30rem] max-w-[92vw] flex-col gap-3 overflow-y-auto rounded-[var(--radius-lg)] border border-border bg-bg p-3 text-[12px] shadow-[0_8px_24px_rgb(0_0_0/0.12)]"
-        >
-          {open && <ConnectForm onClose={close} />}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <Modal
+      open={open}
+      onOpenChange={(o) => !o && close()}
+      title="Connect to a database"
+      width="w-[30rem]"
+      className="text-[12px]"
+    >
+      {open && <ConnectForm onClose={close} />}
+    </Modal>
   );
 }
 
@@ -91,7 +87,6 @@ function ConnectForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-[13px] font-semibold text-fg">Connect to a database</h2>
       {saved.length > 0 && (
         <section aria-label="Saved connections" className="flex flex-col gap-1">
           <span className={labelClass}>Saved</span>

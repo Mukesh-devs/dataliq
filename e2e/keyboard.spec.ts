@@ -34,6 +34,7 @@ test("open, sort, filter, search, query and set up the app with the keyboard onl
     views: () => 12,
   });
   await page.goto("/");
+  await expect(page.getByTestId("drop-zone")).toBeVisible();
 
   // Tab reaches the start screen's buttons in order, with a visible ring.
   await page.keyboard.press("Tab");
@@ -111,11 +112,11 @@ test("open, sort, filter, search, query and set up the app with the keyboard onl
   await expect(page.getByRole("menu")).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // Settings: opens with the keyboard, closes with Escape.
+  // Settings: opens as a tab with the keyboard, in its search box; Ctrl+W closes it.
   await page.keyboard.press("Control+,");
-  const settings = page.getByRole("dialog", { name: "Settings" });
+  const settings = page.getByRole("region", { name: "Settings" });
   await expect(settings).toBeVisible();
-  await expect(settings.locator(":focus")).toHaveCount(1);
-  await page.keyboard.press("Escape");
+  await expect(page.getByRole("searchbox", { name: "Search settings" })).toBeFocused();
+  await page.keyboard.press("Control+w");
   await expect(settings).toBeHidden();
 });

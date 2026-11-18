@@ -59,9 +59,9 @@ for (const scheme of ["light", "dark"] as const) {
     found.push(...(await violations(page, "SQL panel")));
 
     await page.keyboard.press("Control+,");
-    await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Settings" })).toBeVisible();
     found.push(...(await violations(page, "settings")));
-    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+w");
 
     expect(found, found.join("\n")).toEqual([]);
   });

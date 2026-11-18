@@ -1,17 +1,17 @@
 import { FileUp } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { CommandPalette } from "../components/palette/CommandPalette";
 import { ExportDialog } from "../components/export/ExportDialog";
 import { EmptyState } from "../components/shell/EmptyState";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
-import { TabBar } from "../components/shell/TabBar";
+import { SETTINGS_TAB, TabBar } from "../components/shell/TabBar";
 import { OpenPattern } from "../components/shell/OpenPattern";
 import { OpenUrl } from "../components/shell/OpenUrl";
 import { HelpDialog, type HelpTopic } from "../components/shell/HelpDialog";
 import { MenuBar } from "../components/shell/MenuBar";
 import { UpdateDialog } from "../components/shell/UpdateDialog";
-import { SettingsDialog } from "../components/settings/SettingsDialog";
+import { SettingsPage } from "../components/settings/SettingsPage";
 import { call } from "../lib/ipc";
 import { MENUS, resolveMenus, toNative } from "../lib/menus";
 import {
@@ -42,6 +42,7 @@ import { baseName } from "../lib/files";
 import { useRecent } from "../stores/recent";
 import { baseOf, useTabs, type Tab } from "../stores/tabs";
 import { ThemeController } from "./ThemeController";
+import { useNativeGuards } from "./useNativeGuards";
 import { useShortcuts } from "./useShortcuts";
 import { useFileWatch } from "./useFileWatch";
 import { CrashNotice } from "../components/shell/CrashNotice";
@@ -70,7 +71,7 @@ function viewVerb(tab: Tab): { ed: string; ing: string } {
   return { ed: "filtered", ing: "filtering" };
 }
 
-function statusMessage(tab: Tab | undefined, engineVersion: string | null): string {
+function statusMessage(tab: Tab | undefined): string {
   const parts: string[] = [];
   if (!tab) parts.push("Ready");
   else if (tab.status === "loading") parts.push(`Opening ${tab.title}…`);
@@ -116,7 +117,6 @@ function statusMessage(tab: Tab | undefined, engineVersion: string | null): stri
     if (tab.previewMs !== undefined) parts.push(formatDuration(tab.previewMs));
     if (tab.import?.status === "running") parts.push("importing…");
   }
-  if (engineVersion) parts.push(`DuckDB ${engineVersion}`);
   return parts.join(" · ");
 }
 
@@ -178,7 +178,6 @@ export function App() {
     cancelImport,
     readDirect,
     close,
-    cycle,
   } = useTabs();
   const sidebar = useLayout((s) => s.sidebar);
   const profileOpen = useLayout((s) => s.profile);
@@ -200,7 +199,6 @@ export function App() {
   useFileWatch();
   // Open, and the text it starts with ("Copy " for Shift+Ctrl+C).
   const [palette, setPalette] = useState<{ query: string } | null>(null);
-  const engineVersion = useEngine((s) => s.version);
   const exportJob = useExport((s) => s.job);
   const cancelExport = useExport((s) => s.cancel);
   const probeEngine = useEngine((s) => s.probe);
@@ -256,9 +254,53 @@ export function App() {
 
   const [patternOpen, setPatternOpen] = useState(false);
   const [help, setHelp] = useState<HelpTopic | null>(null);
-  const setSettingsOpen = useApp((s) => s.setSettingsOpen);
+  const settingsOpen = useApp((s) => s.settingsOpen);
+  const settingsActive = useApp((s) => s.settingsActive);
+  const showSettings = useApp((s) => s.showSettings);
+  const hideSettings = useApp((s) => s.hideSettings);
+  const closeSettings = useApp((s) => s.closeSettings);
+  /** Ctrl+Tab: through the files' tabs, then the Settings tab. */
+  const cycleTabs = useCallback(
+    (step: 1 | -1) => {
+      const ui = useApp.getState();
+      const files = useTabs.getState();
+      const ids = [...files.tabs.map((t) => t.id), ...(ui.settingsOpen ? [SETTINGS_TAB] : [])];
+      if (ids.length === 0) return;
+      const at = ids.indexOf((ui.settingsActive ? SETTINGS_TAB : files.activeId) ?? "");
+      const next = ids[(Math.max(at, 0) + step + ids.length) % ids.length]!;
+      if (next === SETTINGS_TAB) ui.showSettings();
+      else {
+        ui.hideSettings();
+        setActive(next);
+      }
+    },
+    [setActive],
+  );
+  /** A file's tab to the front (from the tab bar or the sidebar). */
+  const selectFile = useCallback(
+    (id: string) => {
+      hideSettings();
+      setActive(id);
+    },
+    [hideSettings, setActive],
+  );
+  // A file opened or switched to by anything else (recent files, the
+  // palette, a drop) comes to the front too; closing one leaves Settings.
+  useEffect(
+    () =>
+      useTabs.subscribe((now, before) => {
+        if (
+          now.activeId &&
+          now.activeId !== before.activeId &&
+          now.tabs.length >= before.tabs.length
+        )
+          useApp.getState().hideSettings();
+      }),
+    [],
+  );
   const startNewWorkspace = useWorkspace((s) => s.startNew);
   const clearRecent = useRecent((s) => s.clear);
+  const removeRecent = useRecent((s) => s.remove);
   // Open URL, and whether it starts on the S3 settings.
   const [urlOpen, setUrlOpen] = useState<{ s3: boolean } | null>(null);
   const openFolder = useMemo(
@@ -286,17 +328,18 @@ export function App() {
       openFile: () => void openFile(),
       openFolder: () => void openFolder(),
       closeTab: () => {
+        if (useApp.getState().settingsActive) return closeSettings();
         const id = useTabs.getState().activeId;
         if (id) close(id);
       },
-      nextTab: () => cycle(1),
-      previousTab: () => cycle(-1),
+      nextTab: () => cycleTabs(1),
+      previousTab: () => cycleTabs(-1),
       commandPalette: () => setPalette({ query: "" }),
       copyAs: () => setPalette({ query: "Copy " }),
       saveWorkspace: () => void saveWorkspace(),
       saveWorkspaceAs: () => void saveWorkspace(true),
       newWorkspace: startNewWorkspace,
-      settings: () => setSettingsOpen(true),
+      settings: () => showSettings(),
       toggleSql: () => {
         const open = !useSql.getState().open;
         setSqlOpen(open);
@@ -315,11 +358,12 @@ export function App() {
       openFile,
       openFolder,
       close,
-      cycle,
       setSqlOpen,
       saveWorkspace,
       startNewWorkspace,
-      setSettingsOpen,
+      showSettings,
+      closeSettings,
+      cycleTabs,
     ],
   );
   useShortcuts(shortcuts);
@@ -668,17 +712,8 @@ export function App() {
     ),
   );
 
-  // The webview's own context menu (reload, print, inspect …) makes no
-  // sense in an app; text fields keep it for cut/copy/paste.
-  useEffect(() => {
-    const onMenu = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest("input, textarea, [contenteditable='true']")) return;
-      e.preventDefault();
-    };
-    window.addEventListener("contextmenu", onMenu);
-    return () => window.removeEventListener("contextmenu", onMenu);
-  }, []);
+  // No browser menu, shortcuts (reload, print, find) or image dragging.
+  useNativeGuards();
 
   // Keep the cache size in the sidebar current as imports finish.
   const importsDone = tabs.filter((t) => t.import?.status === "done").length;
@@ -692,9 +727,14 @@ export function App() {
       <TabBar
         tabs={tabs}
         activeId={activeId}
-        onSelect={setActive}
+        onSelect={selectFile}
         onClose={close}
         onOpen={() => void openFile()}
+        settings={
+          settingsOpen
+            ? { active: settingsActive, onSelect: () => showSettings(), onClose: closeSettings }
+            : undefined
+        }
         onCommands={() => setPalette({ query: "" })}
         menu={isMac ? undefined : <AppMenus />}
         panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
@@ -721,7 +761,6 @@ export function App() {
         onOpen={(u) => void openPaths([u])}
       />
       {isMac && <AppMenus />}
-      <SettingsDialog />
       <HelpDialog topic={help} onClose={() => setHelp(null)} />
       <UpdateDialog />
       <CommandPalette
@@ -735,18 +774,25 @@ export function App() {
         {sidebar && (
           <Sidebar
             tabs={tabs}
-            active={active}
-            onSelect={setActive}
+            active={settingsActive ? undefined : active}
+            onSelect={selectFile}
             onLayoutChange={active ? (l) => setLayout(active.id, l) : undefined}
           />
         )}
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
           <CrashNotice />
+          {/* Kept while it's open, so its search and place survive a visit to a file. */}
+          {settingsOpen && (
+            <div hidden={!settingsActive} className="flex min-h-0 flex-1 flex-col">
+              <SettingsPage />
+            </div>
+          )}
           {active ? (
             <Suspense fallback={null}>
               <FileView
                 key={active.id}
                 tab={active}
+                active={!settingsActive}
                 onReopen={(o) => void reopen(active.id, o)}
                 onReload={active.path ? () => void reload(active.id) : undefined}
                 onCancelImport={() => void cancelImport(active.id)}
@@ -756,22 +802,30 @@ export function App() {
               />
             </Suspense>
           ) : (
-            <EmptyState
-              onOpen={() => void openFile()}
-              onOpenFolder={() => void openFolder()}
-              onOpenSample={() => void openSample()}
-              recent={recent}
-              onOpenRecent={(p) => void openPaths([p])}
-              dragging={dragging}
-            />
+            !settingsActive && (
+              <EmptyState
+                onOpen={() => void openFile()}
+                onOpenFolder={() => void openFolder()}
+                onConnectDatabase={() => useConnect.getState().show()}
+                onOpenUrl={() => setUrlOpen({ s3: false })}
+                onOpenSample={() => void openSample()}
+                recent={recent}
+                onOpenRecent={(p) => void openPaths([p])}
+                onRemoveRecent={removeRecent}
+                onClearRecent={clearRecent}
+                dragging={dragging}
+              />
+            )
           )}
           <ExportDialog />
           <ConvertDialog />
           <ConnectDialog />
           {sqlOpen && (
-            <Suspense fallback={null}>
-              <SqlPanel />
-            </Suspense>
+            <div hidden={settingsActive} className="contents">
+              <Suspense fallback={null}>
+                <SqlPanel />
+              </Suspense>
+            </div>
           )}
           {active && dragging && (
             <div
@@ -789,7 +843,9 @@ export function App() {
             ? `Exporting ${baseName(exportJob.path)}…${
                 exportJob.percent != null ? ` ${Math.floor(exportJob.percent)}%` : ""
               }`
-            : statusMessage(active, engineVersion)
+            : settingsActive
+              ? "Settings · changes apply as you make them"
+              : statusMessage(active)
         }
         action={
           exportJob

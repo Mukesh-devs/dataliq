@@ -68,25 +68,48 @@ export function TipSteps({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** The tips on the start screen, until they're closed (Help › Show tips has them too). */
+/** The tips on the start screen, in one row, until they're closed (Help › Show tips has them too). */
 export function Tips() {
   const hidden = useOnboarding((s) => s.tipsHidden);
   const hide = useOnboarding((s) => s.hideTips);
+  const [i, setI] = useState(0);
   if (hidden) return null;
+  const last = i === TIPS.length - 1;
   return (
     <section
       aria-label="Getting started"
-      className="relative flex w-full max-w-xl flex-col gap-2 rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-3"
+      className="mt-5 flex w-full items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface py-2.5 pr-2 pl-3.5"
     >
+      <p className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap text-fg-subtle uppercase">
+        <Lightbulb className="size-3.5" aria-hidden /> Tip {i + 1} of {TIPS.length}
+      </p>
+      <div aria-live="polite" className="min-w-0 flex-1">
+        <h2 className="inline font-semibold text-fg">{TIPS[i]!.title}.</h2>{" "}
+        <span className="text-fg-muted">{TIPS[i]!.body}</span>
+      </div>
+      {i > 0 && (
+        <Button size="sm" variant="ghost" onClick={() => setI(i - 1)}>
+          <ChevronLeft className="size-3.5" aria-hidden /> Back
+        </Button>
+      )}
+      {/* One button that turns into "Got it", so the keyboard focus stays on it. */}
+      <Button size="sm" variant="secondary" onClick={last ? hide : () => setI(i + 1)}>
+        {last ? (
+          "Got it"
+        ) : (
+          <>
+            Next <ChevronRight className="size-3.5" aria-hidden />
+          </>
+        )}
+      </Button>
       <button
         type="button"
         onClick={hide}
         aria-label="Close the tips"
-        className="absolute top-2 right-2 rounded-[var(--radius)] p-1 text-fg-subtle hover:bg-hover hover:text-fg"
+        className="shrink-0 rounded-[var(--radius)] p-1 text-fg-subtle hover:bg-hover hover:text-fg"
       >
         <X className="size-3.5" aria-hidden />
       </button>
-      <TipSteps onDone={hide} />
     </section>
   );
 }
