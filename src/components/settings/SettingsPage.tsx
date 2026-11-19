@@ -78,7 +78,7 @@ function Field({
   return (
     <div
       data-setting
-      className="grid grid-cols-[13rem_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5"
+      className="grid grid-cols-1 items-start gap-x-3 gap-y-0.5 @[36rem]:grid-cols-[13rem_minmax(0,1fr)]"
     >
       <label htmlFor={id} className="pt-1 text-fg-muted">
         {label}
@@ -378,10 +378,10 @@ export function SettingsPage() {
   };
 
   return (
-    <section aria-label="Settings" className="flex min-h-0 flex-1 bg-bg">
+    <section aria-label="Settings" className="@container/page flex min-h-0 flex-1 bg-bg">
       <nav
         aria-label="Settings sections"
-        className="flex w-52 shrink-0 flex-col gap-0.5 border-r border-border bg-surface px-2 py-4"
+        className="hidden w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border bg-surface px-2 py-4 @[44rem]/page:flex"
       >
         <h1 className="mb-2 px-2 text-[15px] font-semibold text-fg">Settings</h1>
         {SECTIONS.filter((s) => visible.includes(s.id)).map((s) => (
@@ -401,8 +401,8 @@ export function SettingsPage() {
           </button>
         ))}
       </nav>
-      <div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-7 px-8 pt-5 pb-10">
+      <div ref={scroller} onScroll={onScroll} className="@container min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-3xl flex-col gap-7 px-4 pt-5 pb-10 @[36rem]:px-8">
           <div className="flex flex-col gap-1.5">
             <div className="relative">
               <Search

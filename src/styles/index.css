@@ -32,10 +32,13 @@
 }
 
 @layer base {
+  /* The window never scrolls, as in code editors: each panel scrolls on its
+     own when it has more than fits. */
   html,
   body,
   #root {
     height: 100%;
+    overflow: hidden;
   }
 
   body {

@@ -1381,3 +1381,27 @@ accent colour, many tabs scrolling sideways instead of widening the window.
   maximise button; the drawn one doesn't show them yet (Win+arrow keys and
   dragging to an edge still snap).
 
+
+## D82 — The window never scrolls; each panel scrolls on its own
+
+The whole page could scroll, so anything a little too big gave the window
+its own scroll bars, as on a web page. Two things did it. The status bar's
+icon buttons were 28 px tall in a 24 px bar, so the page was 3 px taller
+than the window; and a row that didn't fit (the file's toolbar) pushed past
+the window's right edge. Code editors don't scroll their window: each panel
+scrolls by itself when it has more than fits.
+
+- `html`, `body` and the app's root don't scroll (`overflow: hidden`). What
+  doesn't fit must scroll inside its own panel (the grid, the sidebar, the
+  Home page, Settings, the profile) or make itself fit.
+- **Button sizes.** `cn()` joined class names without knowing that two of
+  them could set the same thing: an icon button's default `size-7` and the
+  `size-5` a caller passed both applied, and the stylesheet's order chose,
+  not the caller. It now goes through `tailwind-merge`, so what a caller
+  passes replaces the default; this fixed the status bar and the other icon
+  buttons given their own size.
+- **Fitting small windows**, checked screen by screen at 720 × 480 (the
+  smallest window) up to 1920 × 1000: the title bar's sides never get
+  narrower than the menus and window buttons (the search gives way); in
+  Settings, labels go above their controls and the section list folds away
+  when the page is narrow (searching still finds everything).

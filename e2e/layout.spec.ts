@@ -250,3 +250,20 @@ test("DataLiq's own title bar: one row, the tabs below it, the window's buttons 
   // Nothing sticks out of the window.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test("the window itself never scrolls; the status bar's buttons fit in it", async ({ page }) => {
+  await page.setViewportSize({ width: 720, height: 480 });
+  await open(page);
+  const fits = await page.evaluate(() => {
+    const d = document.documentElement;
+    const bar = document.querySelector("footer")!.getBoundingClientRect();
+    const buttons = [...document.querySelectorAll("footer button")].map((b) =>
+      b.getBoundingClientRect(),
+    );
+    return {
+      scrolls: getComputedStyle(d).overflow !== "hidden" || d.scrollTop !== 0,
+      outside: buttons.filter((b) => b.top < bar.top || b.bottom > bar.bottom).length,
+    };
+  });
+  expect(fits).toEqual({ scrolls: false, outside: 0 });
+});
