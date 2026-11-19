@@ -87,3 +87,26 @@ describe("TabBar with Settings open", () => {
     expect(screen.getByRole("tab", { name: "a.csv" })).toHaveAttribute("aria-selected", "false");
   });
 });
+
+describe("TabBar icons", () => {
+  it("shows each file's kind, and a spinner while it opens", () => {
+    render(
+      <TabBar
+        tabs={[
+          tab("1", "Master.csv"),
+          tab("2", "accounts.json"),
+          tab("3", "Report.xlsx", { info: { format: "xlsx" } as never }),
+          tab("4", "calls.parquet", { status: "loading" }),
+        ]}
+        activeId="1"
+        onSelect={() => {}}
+        onClose={() => {}}
+        onOpen={() => {}}
+      />,
+    );
+    const kinds = screen
+      .getAllByRole("tab")
+      .map((t) => t.querySelector("[data-file-kind]")?.getAttribute("data-file-kind") ?? "busy");
+    expect(kinds).toEqual(["csv", "json", "excel", "busy"]);
+  });
+});

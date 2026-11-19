@@ -32,6 +32,7 @@ import {
 } from "../../lib/layout";
 import { formatBytes } from "../../lib/format";
 import { cn } from "../../lib/cn";
+import { fileKind } from "../../lib/fileKind";
 import { isMac, modKey } from "../../lib/platform";
 import { columnRef } from "../../lib/sql";
 import { useApp } from "../../stores/app";
@@ -43,6 +44,7 @@ import { Button } from "../ui/Button";
 import { Resizable } from "../ui/Resizable";
 import { VirtualList } from "../ui/VirtualList";
 import { useColumnDrag } from "./useColumnDrag";
+import { FileIcon } from "./FileIcon";
 
 function Section({
   title,
@@ -144,10 +146,11 @@ export function Sidebar({ tabs, active, onSelect, onLayoutChange }: SidebarProps
                       disabled={!onSelect}
                       onClick={() => onSelect?.(t.id)}
                       className={cn(
-                        "flex min-h-6 w-full items-center truncate rounded-[var(--radius)] px-1.5 text-left",
+                        "flex min-h-6 w-full items-center gap-1.5 truncate rounded-[var(--radius)] px-1.5 text-left",
                         current ? "bg-hover font-medium text-fg" : "text-fg-muted hover:bg-hover",
                       )}
                     >
+                      <FileIcon kind={fileKind(t)} />
                       <span className="truncate">{t.title}</span>
                     </button>
                   </li>

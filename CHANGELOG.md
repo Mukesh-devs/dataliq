@@ -13,6 +13,9 @@ you're working, and zoom.
 
 ### Added
 
+- An icon for each kind of file in the sidebar's Files list and in the tabs, with its own
+  shape and colour: Excel, CSV/TSV, JSON, Parquet, databases, folders opened as one table,
+  URLs and S3, SQL results and comparisons. A tab shows a spinner while its file opens.
 - Zoom the whole window with Ctrl+= (or Ctrl++), Ctrl+- and Ctrl+0 to reset (Cmd on macOS),
   from View › Zoom in / Zoom out / Reset zoom, the command palette, or Settings › Appearance ›
   Zoom: 50% to 200%, kept for next time. While it isn't 100%, the status bar shows the

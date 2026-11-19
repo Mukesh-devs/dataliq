@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
-import { LoaderCircle, Plus, Settings, Table2, X } from "lucide-react";
+import { LoaderCircle, Plus, Settings, X } from "lucide-react";
 import { cn } from "../../lib/cn";
+import { fileKind, type FileKind } from "../../lib/fileKind";
 import { modKey } from "../../lib/platform";
 import { scrollSideways } from "../../lib/wheel";
 import type { Tab } from "../../stores/tabs";
 import { IconButton } from "../ui/Button";
+import { FileIcon } from "./FileIcon";
 
 interface TabBarProps {
   tabs: Tab[];
@@ -29,6 +31,7 @@ interface Item {
   title: string;
   path?: string;
   busy: boolean;
+  kind?: FileKind;
 }
 
 /**
@@ -51,6 +54,7 @@ export function TabBar({
     title: tab.title,
     path: tab.path,
     busy: tab.status === "loading" || tab.import?.status === "running",
+    kind: fileKind(tab),
   }));
   if (settings) items.push({ id: SETTINGS_TAB, title: "Settings", busy: false });
   const current = settings?.active ? SETTINGS_TAB : activeId;
@@ -117,7 +121,6 @@ export function TabBar({
         }}
       >
         {items.map((tab) => {
-          const Icon = tab.id === SETTINGS_TAB ? Settings : Table2;
           const front = tab.id === current;
           return (
             <div
@@ -144,8 +147,10 @@ export function TabBar({
               >
                 {tab.busy ? (
                   <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                ) : tab.id === SETTINGS_TAB ? (
+                  <Settings className="size-3.5 shrink-0" aria-hidden />
                 ) : (
-                  <Icon className={cn("size-3.5 shrink-0", front && "text-accent")} aria-hidden />
+                  <FileIcon kind={tab.kind ?? "table"} />
                 )}
                 <span className="truncate">{tab.title}</span>
               </button>
