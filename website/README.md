@@ -52,6 +52,10 @@ scroll, the speed cells are selected one by one, the hero eases away, and the he
 box shows the cell reference of the section in view. With "reduce motion" set, none of this
 runs and everything is shown at once.
 
+The colour is the app's own indigo (`--accent` in `src/styles/tokens.css`): `#4f46e5` in
+the light theme and `#818cf8` in the dark, so the page matches the screenshots and the app.
+Change them together.
+
 Type is Geist (headings and text) with JetBrains Mono for data (file names, cell
 references); both are variable fonts under the SIL Open Font License, served from
 `assets/fonts/`. Light and dark themes follow the system until the visitor picks one with

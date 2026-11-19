@@ -10,7 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - The website has a new design built on the spreadsheet idea: a hero on a cell grid where
   a highlighted cell follows the pointer, cell references as section labels, the speed
-  figures as cells, the other features as a table, a floating header, Geist type, and light
+  figures as cells, the other features as a table, a floating header, Geist type, the
+  app's indigo, and light
   and dark themes with a switch. Downloads are clearer: the file for your computer first,
   then a column for each system with its recommended file and its other files. Scrolling is
   smoother, with effects taken from spreadsheets: headings filled in by a dragged selection,

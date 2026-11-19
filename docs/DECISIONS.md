@@ -1316,6 +1316,11 @@ labels are sentence case, and nothing is set in wide or spaced-out capitals.
   structure, a chart), each at the page's full width so the app reads at
   close to its real size, and each in light and dark to match the page's
   theme. The rest of the features are words in a table, not pictures.
+- **Colour.** The app's brand indigo, the same `--accent` as
+  `src/styles/tokens.css`: `#4f46e5` light and `#818cf8` dark, with the
+  app's hover shades. The screenshots are full of it (selections, the
+  profile histogram, the Run button), so the page and the product read as
+  one brand. Every text and button pairing passes WCAG AA.
 - **Type.** Geist for headings and text, tightly spaced at large sizes;
   JetBrains Mono (the app's data font) only for data: cell references, file
   names, sizes, code. Both are variable fonts (one file each, about 30 KB

@@ -36,11 +36,11 @@
   --faint: #8a92a3;
   --line: #dde1e8;
   --line-2: #e8ebf0;
-  --grid: rgb(36 87 255 / 0.07);
-  --accent: #2457ff;
-  --accent-hover: #1a45d6;
+  --grid: rgb(79 70 229 / 0.07);
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
   --accent-ink: #ffffff;
-  --accent-soft: rgb(36 87 255 / 0.08);
+  --accent-soft: rgb(79 70 229 / 0.08);
   --shadow: 0 30px 70px -28px rgb(15 25 60 / 0.35), 0 10px 24px -16px rgb(15 25 60 / 0.2);
   --shadow-sm: 0 8px 24px -14px rgb(15 25 60 / 0.3);
 }
@@ -56,11 +56,11 @@
   --faint: #6c7486;
   --line: #222938;
   --line-2: #1a2030;
-  --grid: rgb(124 156 255 / 0.07);
-  --accent: #7c9cff;
-  --accent-hover: #a2b9ff;
+  --grid: rgb(129 140 248 / 0.07);
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
   --accent-ink: #090c13;
-  --accent-soft: rgb(124 156 255 / 0.13);
+  --accent-soft: rgb(129 140 248 / 0.13);
   --shadow: 0 30px 70px -28px rgb(0 0 0 / 0.8), 0 10px 24px -16px rgb(0 0 0 / 0.6);
   --shadow-sm: 0 8px 24px -14px rgb(0 0 0 / 0.7);
 }
@@ -78,11 +78,11 @@
     --faint: #6c7486;
     --line: #222938;
     --line-2: #1a2030;
-    --grid: rgb(124 156 255 / 0.07);
-    --accent: #7c9cff;
-    --accent-hover: #a2b9ff;
+    --grid: rgb(129 140 248 / 0.07);
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
     --accent-ink: #090c13;
-    --accent-soft: rgb(124 156 255 / 0.13);
+    --accent-soft: rgb(129 140 248 / 0.13);
   }
 }
 
@@ -417,7 +417,7 @@ code {
   bottom: -1px;
   height: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #22d3ee, var(--accent), #6366f1);
+  background: linear-gradient(90deg, #67e8f9, #3b82f6 45%, var(--accent));
   transform-origin: 0 50%;
   transform: scaleX(var(--p, 0));
 }
@@ -909,9 +909,11 @@ code {
   --s-fg: #eef1f8;
   --s-muted: #9aa3b6;
   --s-line: rgb(255 255 255 / 0.1);
+  --accent: #818cf8;
+  --accent-soft: rgb(129 140 248 / 0.14);
   margin-top: clamp(72px, 9vw, 120px);
   background:
-    radial-gradient(900px 420px at 85% -10%, rgb(54 98 255 / 0.34), transparent 70%),
+    radial-gradient(900px 420px at 85% -10%, rgb(79 70 229 / 0.38), transparent 70%),
     radial-gradient(700px 360px at 0% 110%, rgb(34 211 238 / 0.12), transparent 70%), #080b14;
   color: var(--s-fg);
 }
@@ -922,7 +924,7 @@ code {
 .speed .eyebrow__ref {
   border-color: var(--s-line);
   background: rgb(255 255 255 / 0.04);
-  color: #8ea9ff;
+  color: #a5b4fc;
 }
 .speed .eyebrow__meta {
   color: var(--s-muted);
@@ -956,7 +958,7 @@ code {
   min-width: 72px;
   justify-content: center;
   border-right: 1px solid var(--s-line);
-  color: #8ea9ff;
+  color: #a5b4fc;
   font-weight: 700;
 }
 .fx__f {
@@ -1003,7 +1005,7 @@ code {
 .cell:focus-visible,
 .cell.is-on {
   background: rgb(255 255 255 / 0.035);
-  box-shadow: inset 0 0 0 2px #7c9cff;
+  box-shadow: inset 0 0 0 2px #818cf8;
 }
 .cell dt {
   color: var(--s-muted);
@@ -1020,7 +1022,7 @@ code {
 }
 .cell dd small {
   margin-left: 6px;
-  color: #8ea9ff;
+  color: #a5b4fc;
   font-size: 0.34em;
   font-weight: 600;
   letter-spacing: 0;
@@ -1301,7 +1303,7 @@ code {
   color: #6b7488;
 }
 .term .p {
-  color: #7c9cff;
+  color: #818cf8;
   font-weight: 700;
 }
 .term [data-type].is-typing::after {
@@ -1311,7 +1313,7 @@ code {
   height: 1.15em;
   margin-left: 2px;
   vertical-align: -0.2em;
-  background: #7c9cff;
+  background: #818cf8;
   animation: blink 1s steps(1) infinite;
 }
 @keyframes blink {
