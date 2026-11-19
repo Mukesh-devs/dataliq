@@ -1296,3 +1296,55 @@ The hook was checked by compiling it with NSIS and running it under Wine
 against the registry states an install leaves (first install, reinstall, no
 previous default, uninstall). `scripts/installer.test.mjs` keeps its list of
 types the same as the config's.
+
+## D80 — The website as a sheet
+
+The second design of the website (D75 set out its rules, which still hold)
+takes its idea from the product: the page is a spreadsheet. Each section
+starts with its cell reference (`A3 Features`), and wide screens get a row
+header of the sections once the hero has scrolled away; the hero sits on a
+cell grid with column letters and row numbers, and a highlighted cell (with
+Excel's fill handle) follows the pointer; "in seconds." is a selected range
+and the icon sits in a copied cell with marching ants; the speed figures are
+cells with references and a formula bar; the features beyond the three main
+ones are a table. The ideas come from spreadsheets, not from other product
+sites: the header is a floating rounded bar with a progress line, buttons and
+labels are sentence case, and nothing is set in wide or spaced-out capitals.
+
+- **Few screenshots, shown large.** Four real captures of version 1.8 (the
+  grid with a profile, SQL with a column being dragged in, the JSON
+  structure, a chart), each at the page's full width so the app reads at
+  close to its real size, and each in light and dark to match the page's
+  theme. The rest of the features are words in a table, not pictures.
+- **Colour.** The app's brand indigo, the same `--accent` as
+  `src/styles/tokens.css`: `#4f46e5` light and `#818cf8` dark, with the
+  app's hover shades. The screenshots are full of it (selections, the
+  profile histogram, the Run button), so the page and the product read as
+  one brand. Every text and button pairing passes WCAG AA.
+- **Type.** Geist for headings and text, tightly spaced at large sizes;
+  JetBrains Mono (the app's data font) only for data: cell references, file
+  names, sizes, code. Both are variable fonts (one file each, about 30 KB
+  and 40 KB) served from the site.
+- **Motion.** Scrolling is the site's own, under 200 lines with no
+  library: the wheel eases toward where it points and in-page links glide,
+  but the browser keeps doing the scrolling, so the scroll bar, keyboard,
+  touch, find-in-page and areas that scroll on their own work as usual,
+  and the visitor's own scrolling always wins over an easing in progress.
+  The effects are spreadsheet gestures rather than the usual fade-and-rise:
+  a selection box with its fill handle drags across each heading and the
+  text fills in behind it; rows fill in one after another and their row
+  number lights up; screenshots un-crop in step with the scroll (and back);
+  the speed cells are selected one by one; the hero eases away; the
+  header's name box shows the section's cell reference. "Reduce motion"
+  turns all of it off, and nothing depends on it to be read.
+- **Theme.** The page follows the system until the visitor picks light or
+  dark with the button in the bar; the choice is kept in the browser and
+  applied before the first paint.
+- **Downloads.** The file for the visitor's computer first, in a panel
+  with one large button; then one column per system (Windows, macOS,
+  Linux), each with its recommended file and a button, then its other
+  files with what they are for, their file names and sizes. The visitor's
+  column is marked "This computer" and its button is the strong one (all
+  are strong when the visitor isn't on a desktop). Everything is on screen
+  at once, with no tabs to find. It all still comes from the GitHub
+  Releases API, as in D75.
