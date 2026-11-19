@@ -198,6 +198,7 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                 }
               : recorded;
           // The window itself (title, frame, minimise …): recorded, nothing to do.
+          if (cmd.startsWith("plugin:webview|")) return null;
           if (cmd.startsWith("plugin:window|")) {
             if (cmd === "plugin:window|is_maximized") return false;
             if (cmd === "plugin:window|is_decorated") return w.__decorated ?? true;

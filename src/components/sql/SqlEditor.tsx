@@ -21,6 +21,7 @@ import {
   WidgetType,
   drawSelection,
   highlightActiveLine,
+  highlightActiveLineGutter,
   keymap,
   lineNumbers,
   placeholder,
@@ -104,14 +105,26 @@ const theme = EditorView.theme({
   "&": { height: "100%", fontSize: "12.5px", backgroundColor: "var(--bg)", color: "var(--fg)" },
   ".cm-scroller": { fontFamily: "var(--font-data)", lineHeight: "1.55" },
   ".cm-content": { caretColor: "var(--fg)" },
-  // A visible focus ring (inset: the panel's edges clip outer outlines).
-  "&.cm-focused": { outline: "2px solid var(--focus-ring)", outlineOffset: "-2px" },
+  // A visible focus ring round the whole editor, line numbers included. Drawn
+  // as a layer over the editor's own (the scroller, its gutter and the
+  // current line's band are layers that cover an outline), below its pop-ups.
+  "&.cm-focused": { outline: "none" },
+  "&.cm-focused::after": {
+    content: '""',
+    position: "absolute",
+    inset: "0",
+    border: "2px solid var(--focus-ring)",
+    pointerEvents: "none",
+    zIndex: "400",
+  },
   ".cm-gutters": {
     backgroundColor: "var(--surface)",
     color: "var(--fg-subtle)",
     borderRight: "1px solid var(--border)",
   },
   ".cm-activeLine": { backgroundColor: "var(--hover)" },
+  // The current line's number stands out, as in code editors.
+  ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--fg)" },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
     backgroundColor: "var(--accent-soft) !important",
   },
@@ -176,6 +189,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
           history(),
           drawSelection(),
           highlightActiveLine(),
+          highlightActiveLineGutter(),
           bracketMatching(),
           closeBrackets(),
           autocompletion(),

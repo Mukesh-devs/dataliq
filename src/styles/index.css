@@ -32,10 +32,13 @@
 }
 
 @layer base {
+  /* The window never scrolls, as in code editors: each panel scrolls on its
+     own when it has more than fits. */
   html,
   body,
   #root {
     height: 100%;
+    overflow: hidden;
   }
 
   body {
@@ -61,11 +64,88 @@
     background: var(--accent-soft);
   }
 
+  /* Scroll bars as in code editors (Windows and Linux; macOS keeps its own
+     overlay bars): thin, no arrows, shown on the panel you point at or
+     scroll (see useScrollbars), hidden the rest of the time but still there
+     to grab. */
+  :root:not([data-platform="mac"]) {
+    & ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    & ::-webkit-scrollbar-track,
+    & ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    & ::-webkit-scrollbar-button {
+      display: none;
+    }
+    & ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+      background-color: transparent;
+    }
+    & :hover::-webkit-scrollbar-thumb,
+    & .is-scrolling::-webkit-scrollbar-thumb,
+    /* The grid draws on a canvas beside its scroller: pointing at it counts. */
+    & [data-testid="data-grid"]:hover ::-webkit-scrollbar-thumb {
+      background-color: var(--scrollbar);
+    }
+    & ::-webkit-scrollbar-thumb:hover,
+    & ::-webkit-scrollbar-thumb:active {
+      background-color: var(--scrollbar-strong);
+    }
+  }
+
   /* The grid draws on a canvas: ring the whole grid while it has the
      keyboard focus (the selected cell shows where in it). */
   [data-testid="data-grid"]:has(canvas:focus-visible) {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
+  }
+}
+
+@layer components {
+  /* A toolbar (a file's, the SQL panel's). Short of room, its buttons show
+     only their icons: the name stays in the tooltip and for screen readers.
+     Shorter still, the bar scrolls sideways (the wheel scrolls it too)
+     instead of pushing past the window. */
+  .toolbar {
+    container: toolbar / inline-size;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  @container toolbar (max-width: 68rem) {
+    .tb-label-wide {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  @container toolbar (max-width: 54rem) {
+    .tb-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  @container toolbar (max-width: 40rem) {
+    .tb-label-sm {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   }
 }
 

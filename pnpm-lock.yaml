@@ -86,6 +86,9 @@ importers:
       sql-formatter:
         specifier: 15.9.0
         version: 15.9.0
+      tailwind-merge:
+        specifier: 3.7.0
+        version: 3.7.0
       zustand:
         specifier: 5.0.15
         version: 5.0.15(@types/react@18.3.12)(react@18.3.1)
@@ -2193,6 +2196,9 @@ packages:
 
   style-mod@4.1.4:
     resolution: {integrity: sha512-XXWIQt633/EpAFx8aZDOTjBzrCaGmhvEQlQo6MVPfa2OzO2cWo+4hV9h+6UkHYlXGfy+ODXKUdP7Pthmcu5ATw==}
+
+  tailwind-merge@3.7.0:
+    resolution: {integrity: sha512-XPPUyAc+cvspz3lHTcR/QgPfW2A0lv/xQNIjX3HGhLR+Nq2lHaLq5MtTesHn8GUr3W3DguT2KT5x3NVgRtYwmA==}
 
   tailwindcss@4.3.3:
     resolution: {integrity: sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==}
@@ -4389,6 +4395,8 @@ snapshots:
       min-indent: 1.0.1
 
   style-mod@4.1.4: {}
+
+  tailwind-merge@3.7.0: {}
 
   tailwindcss@4.3.3: {}
 

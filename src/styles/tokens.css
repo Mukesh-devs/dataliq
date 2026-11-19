@@ -41,6 +41,20 @@
   --accent-fg: #ffffff;
   --accent-soft: rgb(79 70 229 / 0.12);
   --focus-ring: rgb(79 70 229 / 0.85);
+  /* Scroll bars: the thumb, and while it's pointed at or dragged. */
+  --scrollbar: rgb(24 24 27 / 0.22);
+  --scrollbar-strong: rgb(24 24 27 / 0.4);
+  /* File kinds' icons (Files list, tabs): at least 4:1 on the panels. */
+  --file-csv: #2563eb;
+  --file-excel: #15803d;
+  --file-json: #b45309;
+  --file-parquet: #9333ea;
+  --file-database: #475569;
+  --file-folder: #64748b;
+  --file-url: #0e7490;
+  --file-sql: #4f46e5;
+  --file-compare: #c2410c;
+  --file-table: var(--fg-muted);
   /* Behind a dialog: dims the window. */
   --overlay: rgb(15 15 20 / 0.28);
   --danger: #c62020;
@@ -98,6 +112,18 @@
   --accent-fg: #111113;
   --accent-soft: rgb(129 140 248 / 0.16);
   --focus-ring: rgb(129 140 248 / 0.7);
+  --scrollbar: rgb(236 236 239 / 0.2);
+  --scrollbar-strong: rgb(236 236 239 / 0.38);
+  --file-csv: #60a5fa;
+  --file-excel: #4ade80;
+  --file-json: #fbbf24;
+  --file-parquet: #c084fc;
+  --file-database: #94a3b8;
+  --file-folder: #94a3b8;
+  --file-url: #22d3ee;
+  --file-sql: #818cf8;
+  --file-compare: #fb923c;
+  --file-table: var(--fg-muted);
   --overlay: rgb(0 0 0 / 0.55);
   --danger: #f87171;
   --warning: #fbbf24;

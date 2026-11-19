@@ -1,13 +1,14 @@
 import { FileUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { CommandPalette } from "../components/palette/CommandPalette";
+import { CommandSearch } from "../components/palette/CommandSearch";
 import { ExportDialog } from "../components/export/ExportDialog";
 import { EmptyState } from "../components/shell/EmptyState";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { SETTINGS_TAB, TabBar } from "../components/shell/TabBar";
 import { TitleBar } from "../components/shell/TitleBar";
-import { inAppWindow, useOwnTitleBar, useWindowTitle } from "./windowChrome";
+import { inAppWindow, useOwnTitleBar, useWindowTitle, useWindowZoom } from "./windowChrome";
+import { roomAt, stepZoom, zoomLabel } from "../lib/zoom";
 import { OpenPattern } from "../components/shell/OpenPattern";
 import { OpenUrl } from "../components/shell/OpenUrl";
 import { HelpDialog, type HelpTopic } from "../components/shell/HelpDialog";
@@ -171,6 +172,7 @@ function AppMenus() {
 
 export function App() {
   const ownTitleBar = useOwnTitleBar();
+  useWindowZoom();
   const {
     tabs,
     activeId,
@@ -356,11 +358,22 @@ export function App() {
         const l = useLayout.getState();
         l.setProfile(!l.profile);
       },
+      zoom: (step: "in" | "out" | "reset") => {
+        const { zoom, setZoom } = useSettings.getState();
+        if (step === "reset") return setZoom(1);
+        const next = stepZoom(zoom, step === "in" ? 1 : -1);
+        // Zooming in stops before the layout would get cramped.
+        if (step === "in" && next > zoom && !roomAt(next, zoom, innerWidth, innerHeight))
+          return notice(`The window is too small to zoom in past ${zoomLabel(zoom)}`);
+        if (next !== zoom) notice(`Zoom ${zoomLabel(next)}`);
+        setZoom(next);
+      },
     }),
     [
       openFile,
       openFolder,
       close,
+      notice,
       setSqlOpen,
       saveWorkspace,
       startNewWorkspace,
@@ -559,6 +572,32 @@ export function App() {
         run: showLibrary("saved"),
       },
     );
+    list.push(
+      {
+        id: "zoom-in",
+        title: "Zoom in",
+        group: "Appearance",
+        shortcut: `${modKey}+=`,
+        keywords: "bigger larger scale text size",
+        run: () => shortcuts.zoom("in"),
+      },
+      {
+        id: "zoom-out",
+        title: "Zoom out",
+        group: "Appearance",
+        shortcut: `${modKey}+-`,
+        keywords: "smaller scale text size",
+        run: () => shortcuts.zoom("out"),
+      },
+      {
+        id: "zoom-reset",
+        title: "Reset zoom",
+        group: "Appearance",
+        shortcut: `${modKey}+0`,
+        keywords: "actual size 100% scale",
+        run: () => shortcuts.zoom("reset"),
+      },
+    );
     const themes: [ThemePreference, string][] = [
       ["light", "Light"],
       ["dark", "Dark"],
@@ -751,7 +790,15 @@ export function App() {
         controls={ownTitleBar && inAppWindow()}
         menu={isMac ? undefined : <AppMenus />}
         tabs={ownTitleBar ? undefined : tabBar}
-        onCommands={() => setPalette({ query: "" })}
+        search={
+          <CommandSearch
+            request={palette}
+            // A click or typing opens it with what's typed; closing forgets it.
+            onOpen={(query) => setPalette((p) => p ?? { query })}
+            onClose={() => setPalette(null)}
+            className={ownTitleBar ? "w-full min-w-0" : "w-56 shrink-0"}
+          />
+        }
         panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
         onTogglePanel={(panel) =>
           panel === "left"
@@ -778,13 +825,6 @@ export function App() {
       {isMac && <AppMenus />}
       <HelpDialog topic={help} onClose={() => setHelp(null)} />
       <UpdateDialog />
-      <CommandPalette
-        // A fresh body (and starting text) each time it opens.
-        key={palette ? `open:${palette.query}` : "closed"}
-        open={palette !== null}
-        onOpenChange={(o) => !o && setPalette(null)}
-        initialQuery={palette?.query}
-      />
       <div className="flex min-h-0 flex-1">
         {sidebar && (
           <Sidebar

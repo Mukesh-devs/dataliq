@@ -24,7 +24,7 @@ export function DatabaseSettings({ info, onChange }: DatabaseSettingsProps) {
       className="flex items-center gap-1.5 text-[12px] text-fg-muted"
       title={`In SQL: ${info.alias}.${info.schema === "main" ? "" : `${info.schema}.`}${info.table}`}
     >
-      Table
+      <span className="tb-label">Table</span>
       <select
         aria-label="Table"
         className={selectClass}

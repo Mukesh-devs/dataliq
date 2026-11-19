@@ -6,6 +6,47 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-19
+
+A window that behaves like a code editor's: nothing spills out of it, scroll bars only where
+you're working, and zoom.
+
+### Added
+
+- An icon for each kind of file in the sidebar's Files list and in the tabs, with its own
+  shape and colour: Excel, CSV/TSV, JSON, Parquet, databases, folders opened as one table,
+  URLs and S3, SQL results and comparisons. A tab shows a spinner while its file opens.
+- Zoom the whole window with Ctrl+= (or Ctrl++), Ctrl+- and Ctrl+0 to reset (Cmd on macOS),
+  from View › Zoom in / Zoom out / Reset zoom, the command palette, or Settings › Appearance ›
+  Zoom: 50% to 200%, kept for next time. While it isn't 100%, the status bar shows the
+  level; click it to go back. Zooming in stops before the window gets too cramped.
+
+### Changed
+
+- The search is the title bar's box itself: type there, and the matching actions drop down
+  right under it, instead of a second box opening elsewhere. Ctrl+K puts the cursor in it.
+- The window itself never scrolls any more, as in code editors: each panel scrolls on its
+  own when it has more than fits, so there are no scroll bars around the whole window.
+- Scroll bars are thin, without arrows, and show only on the panel you point at or are
+  scrolling (Windows and Linux; macOS keeps its own).
+- Toolbars fit their space: short of room, the buttons of a file's toolbar and the SQL
+  panel's show only their icons (hover for the name); shorter still, the toolbar scrolls
+  sideways (the mouse wheel scrolls it) instead of running past the window.
+- On a small window, Settings puts each label above its control and hides the list of
+  sections (search still finds everything), and the title bar never cuts off its menus.
+
+### Fixed
+
+- An Excel file's header row is now a number you type instead of a list of rows 1 to 10:
+  it shows the row DataLiq found (say 12), any row can be typed, and 0 means no header row.
+  It applies on Enter or when you leave the box; Esc puts it back. Before, a sheet whose
+  header was found on row 12 couldn't go back to 12 once row 1 was picked. After choosing a
+  row, ↺ finds the header again.
+- The SQL editor's focus border goes round the whole editor and is no longer cut by the line
+  numbers or the current line's highlight.
+- The status bar's buttons were taller than the bar, which made the window scroll by a few
+  pixels; icon buttons now get the size they ask for.
+
 ## [1.9.0] - 2026-11-19
 
 One row of window chrome on Windows, as in VS Code.

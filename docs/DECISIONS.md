@@ -1381,3 +1381,112 @@ accent colour, many tabs scrolling sideways instead of widening the window.
   maximise button; the drawn one doesn't show them yet (Win+arrow keys and
   dragging to an edge still snap).
 
+
+## D82 — The window never scrolls; each panel scrolls on its own
+
+The whole page could scroll, so anything a little too big gave the window
+its own scroll bars, as on a web page. Two things did it. The status bar's
+icon buttons were 28 px tall in a 24 px bar, so the page was 3 px taller
+than the window; and a row that didn't fit (the file's toolbar) pushed past
+the window's right edge. Code editors don't scroll their window: each panel
+scrolls by itself when it has more than fits.
+
+- `html`, `body` and the app's root don't scroll (`overflow: hidden`). What
+  doesn't fit must scroll inside its own panel (the grid, the sidebar, the
+  Home page, Settings, the profile) or make itself fit.
+- **Button sizes.** `cn()` joined class names without knowing that two of
+  them could set the same thing: an icon button's default `size-7` and the
+  `size-5` a caller passed both applied, and the stylesheet's order chose,
+  not the caller. It now goes through `tailwind-merge`, so what a caller
+  passes replaces the default; this fixed the status bar and the other icon
+  buttons given their own size.
+- **Fitting small windows**, checked screen by screen at 720 × 480 (the
+  smallest window) up to 1920 × 1000: the title bar's sides never get
+  narrower than the menus and window buttons (the search gives way); in
+  Settings, labels go above their controls and the section list folds away
+  when the page is narrow (searching still finds everything).
+
+## D83 — Toolbars give up their labels, then scroll, rather than spill out
+
+A file's toolbar (Grid/Chart, Clean, Quality, Compare, Open in SQL, Export,
+and the Excel, table or import settings) was one row that couldn't shrink:
+on a small window, or beside the sidebar, it ran past the window's edge.
+Toolbars now fit in two steps, with CSS container queries on the bar itself
+(`.toolbar` in `index.css`), so they react to their own width, not the
+window's:
+
+- **Icons only.** Below 68 rem, the less used buttons (Compare, Open in
+  SQL) show only their icons; below 54 rem, all of them do, and the Excel
+  and table pickers drop their words. The name is visually hidden, not
+  removed: it stays the button's accessible name, and the tooltip shows it.
+  The SQL panel's toolbar does the same below 40 rem (Run keeps its word).
+- **Then sideways.** If even the icons don't fit, the bar scrolls sideways
+  inside itself, and the mouse wheel scrolls it (`scrollSideways`, also
+  used by the tabs). The file's name keeps a little room and shortens with
+  an ellipsis.
+- A "More" menu for what doesn't fit was the other way: it would need a
+  second form of every control (menu items for buttons, and the Excel
+  pickers don't fit in a menu), for a case only the narrowest windows
+  reach. Scrolling the bar keeps one form of each control.
+
+## D84 — Scroll bars show while you use a panel, as in code editors
+
+On Windows the web view draws the system's classic scroll bars: thick, with
+arrow buttons, always there. They are now thin (10 px), rounded and without
+arrows, and they show only on the panel you point at or that is scrolling;
+the rest of the time their place stays empty but they can still be grabbed.
+
+- CSS `::-webkit-scrollbar` styles, which WebView2 (Windows) and WebKitGTK
+  (Linux) both follow. The thumb's colours are tokens (`--scrollbar`,
+  `--scrollbar-strong`) for the light and dark themes.
+- "While scrolling" is a class (`is-scrolling`) put on whatever scrolls,
+  from one listener for scroll events, and taken off 0.9 s after it stops
+  (`showScrollbarsWhileScrolling`): wheel, keyboard and dragging all count,
+  wherever the pointer is.
+- The grid draws on a canvas beside its scroller, so pointing anywhere on
+  the grid shows its bars.
+- macOS is left alone (`data-platform="mac"`): its own overlay scroll bars
+  already behave like this and follow the system setting.
+- They don't fade in and out as VS Code's do: those are drawn by VS Code
+  itself, and the system's bars, even restyled, can only appear or not.
+
+## D85 — Zoom is DataLiq's own, remembered, and stops before it cramps
+
+Ctrl + and Ctrl − did nothing: Tauri turns the web view's zoom keys off,
+and DataLiq had no zoom of its own. It has one now, as code editors do.
+
+- **Keys and menus.** Ctrl+= (or Ctrl++), Ctrl+− and Ctrl+0 (Cmd on macOS),
+  from the main keys or the number pad and whatever the keyboard layout
+  puts on Shift (`zoomKey`); View › Zoom in, Zoom out, Reset zoom; the same
+  three in the command palette and the shortcuts list; native accelerators
+  in macOS's menu bar.
+- **Levels.** 50 % to 200 % in the steps code editors use (67, 80, 90, 110,
+  125, 150, 175 %). The level is a setting (Settings › Appearance › Zoom),
+  kept between sessions and applied at start with Tauri's
+  `webview.setZoom` (permission `core:webview:allow-set-webview-zoom`).
+- **Where it shows.** A short notice says the new level; while it isn't
+  100 %, the status bar shows it, and clicking that puts it back.
+- **A floor.** Zooming in stops when the window, at the new level, would be
+  narrower than 640 or shorter than 400 CSS pixels, where the sidebar, the
+  grid and the toolbars get too cramped (the smallest window, 720 × 480,
+  goes up to 110 %); the notice says so.
+- The web view's own zoom (`zoomHotkeysEnabled`) was the other way: no
+  menus, no setting, not remembered, and no floor.
+
+## D86 — The search is the title bar's own box
+
+The title bar's "Search… Ctrl+K" was a button that opened the command
+palette: a second box with its own input, lower down in the middle of the
+window. You looked at one place and typed in another. Now the title bar's
+box is where you type, and the matching actions drop down right under it,
+as in code editors and browsers' address bars (`CommandSearch`).
+
+- One combobox (`role="combobox"`, "Search commands") with its listbox in a
+  popover anchored to the box: at least 30 rem wide (wider than the box on a
+  small window), centred under it and kept inside the window.
+- Ctrl+K puts the cursor in it; Shift+Ctrl+C opens it with "Copy " typed; a
+  click or typing opens it too. Arrows, Enter and Escape work as before, and
+  after an action or Escape the focus goes back to where it was.
+- The focus never leaves the box while the list shows: clicking an action
+  or the list's scroll bar keeps it there; Tab or a click elsewhere closes
+  the list.

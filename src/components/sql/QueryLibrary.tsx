@@ -36,7 +36,7 @@ export function HistoryButton() {
     <Popover.Root open={open} onOpenChange={(o) => setLibrary(o ? "history" : null)}>
       <Popover.Trigger asChild>
         <Button size="sm" variant="ghost" title="Queries you ran">
-          <History className="size-3" aria-hidden /> History
+          <History className="size-3" aria-hidden /> <span className="tb-label-sm">History</span>
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -136,7 +136,7 @@ export function SavedButton() {
     <Popover.Root open={open} onOpenChange={(o) => setLibrary(o ? "saved" : null)}>
       <Popover.Trigger asChild>
         <Button size="sm" variant="ghost" title="Saved queries">
-          <Bookmark className="size-3" aria-hidden /> Saved
+          <Bookmark className="size-3" aria-hidden /> <span className="tb-label-sm">Saved</span>
         </Button>
       </Popover.Trigger>
       <Popover.Portal>

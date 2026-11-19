@@ -99,6 +99,10 @@ export const MENUS: MenuSpec[] = [
         ],
       },
       sep,
+      { command: "zoom-in", label: "Zoom in" },
+      { command: "zoom-out", label: "Zoom out" },
+      { command: "zoom-reset", label: "Reset zoom" },
+      sep,
       { command: "next-tab", label: "Next tab" },
       { command: "previous-tab", label: "Previous tab" },
     ],
@@ -159,6 +163,9 @@ export const MAC_ACCELERATORS: Record<string, string> = {
   "save-workspace": "CmdOrCtrl+S",
   "save-workspace-as": "CmdOrCtrl+Shift+S",
   "close-tab": "CmdOrCtrl+W",
+  "zoom-in": "CmdOrCtrl+=",
+  "zoom-out": "CmdOrCtrl+-",
+  "zoom-reset": "CmdOrCtrl+0",
 };
 
 export type ResolvedItem =

@@ -1,3 +1,4 @@
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
 import { isMac } from "../lib/platform";
@@ -39,4 +40,15 @@ export function useWindowTitle(name: string | undefined): void {
       .setTitle(name ? `${name} — DataLiq` : "DataLiq")
       .catch(() => {});
   }, [name]);
+}
+
+/** Zooms the whole window to the Zoom setting (on start, and when it changes). */
+export function useWindowZoom(): void {
+  const zoom = useSettings((s) => s.zoom);
+  useEffect(() => {
+    if (!inAppWindow()) return;
+    void getCurrentWebview()
+      .setZoom(zoom)
+      .catch(() => {});
+  }, [zoom]);
 }

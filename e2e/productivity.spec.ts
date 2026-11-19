@@ -53,19 +53,24 @@ test("command palette finds and runs actions (Ctrl+K)", async ({ page }) => {
   await input.fill("sort amount desc");
   await expect(page.getByRole("option")).toHaveText([/Sort by amount descending/]);
   await input.press("Enter");
-  await expect(page.getByRole("combobox")).toBeHidden();
+  // The list closes; the box stays in the title bar, empty again.
+  await expect(page.getByRole("listbox", { name: "Commands" })).toBeHidden();
+  await expect(input).toHaveAttribute("aria-expanded", "false");
+  await expect(input).toHaveValue("");
   await expect
     .poll(async () => (await invokes(page, "open_view")).at(-1)?.spec)
     .toEqual({
       sort: [{ column: "amount", descending: true }],
     });
 
-  // The search box in the tab bar opens it too; Escape closes it.
-  await page.getByRole("button", { name: "Search commands" }).click();
-  await page.getByRole("combobox").fill("clear sort");
+  // Clicking the box opens it too, typing right there; Escape closes it.
+  await input.click();
+  await expect(input).toHaveAttribute("aria-expanded", "true");
+  await input.fill("clear sort");
   await expect(page.getByRole("option")).toHaveText([/Clear sort/]);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("combobox")).toBeHidden();
+  await expect(page.getByRole("listbox", { name: "Commands" })).toBeHidden();
+  await expect(input).not.toBeFocused();
 });
 
 test("copy a selection as Markdown and JSON (Shift+Ctrl+C)", async ({ page, context }) => {
@@ -79,13 +84,12 @@ test("copy a selection as Markdown and JSON (Shift+Ctrl+C)", async ({ page, cont
   await page.keyboard.up("Shift");
 
   // On a slow runner the grid can still be handling the Shift+click when the
-  // shortcut is pressed; press again until the palette opens.
+  // shortcut is pressed; press again until the search opens with the copy choices.
   const input = page.getByRole("combobox", { name: "Search commands" });
   await expect(async () => {
     await page.keyboard.press("Control+Shift+c");
-    await expect(input).toBeVisible({ timeout: 1000 });
+    await expect(input).toHaveValue("Copy ", { timeout: 1000 });
   }).toPass();
-  await expect(input).toHaveValue("Copy ");
   await input.pressSequentially("markdown");
   await input.press("Enter");
   await expect

@@ -18,6 +18,7 @@ import { fetchRows } from "../../lib/files";
 import { useEffect, useMemo, useState } from "react";
 import { formatCount, formatDuration } from "../../lib/format";
 import { modKey } from "../../lib/platform";
+import { scrollSideways } from "../../lib/wheel";
 import { useExport } from "../../stores/export";
 import { useNotice } from "../../stores/notice";
 import { cleanTableName } from "../../lib/sql";
@@ -141,7 +142,10 @@ export function SqlPanel() {
         onPointerDown={startResize}
         className="absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize"
       />
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
+      <div
+        className="toolbar flex h-9 shrink-0 items-center gap-2 border-b border-border px-3"
+        onWheel={scrollSideways}
+      >
         <span className="font-medium text-fg">SQL</span>
         <Button
           size="sm"
@@ -166,17 +170,18 @@ export function SqlPanel() {
             title="Open the result in a tab to filter, sort, profile and copy it"
           >
             <SquareArrowOutUpRight className="size-3" aria-hidden />{" "}
-            {result.owned ? "Opened in a tab" : "Open in tab"}
+            <span className="tb-label-sm">{result.owned ? "Opened in a tab" : "Open in tab"}</span>
           </Button>
         )}
         {result?.dataset && !running && (
           <Button size="sm" variant="ghost" onClick={exportResult} title="Export the result">
-            <Download className="size-3" aria-hidden /> Export
+            <Download className="size-3" aria-hidden /> <span className="tb-label-sm">Export</span>
           </Button>
         )}
         <ExplainButton disabled={!!running} onExplain={(analyze) => void explain(analyze)} />
         <Button size="sm" variant="ghost" onClick={formatNow} title="Format SQL">
-          <WandSparkles className="size-3" aria-hidden /> Format
+          <WandSparkles className="size-3" aria-hidden />{" "}
+          <span className="tb-label-sm">Format</span>
         </Button>
         <HistoryButton />
         <SavedButton />
@@ -342,7 +347,7 @@ function ExplainButton({
           title="How DuckDB runs the query"
           aria-haspopup="menu"
         >
-          <ListTree className="size-3" aria-hidden /> Explain
+          <ListTree className="size-3" aria-hidden /> <span className="tb-label-sm">Explain</span>
           <ChevronDown className="size-3" aria-hidden />
         </Button>
       </Popover.Trigger>
