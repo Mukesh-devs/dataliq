@@ -191,37 +191,100 @@ const kindOf = (d) => {
     : `${d.label} · ${ext}`;
 };
 
-/** A download's detail without the trailing ".exe" (the button says it). */
+/** A download's detail without the trailing ".exe" (the file name says it). */
 const plainDetail = (detail) => detail.replace(/ · \.\w+$/, "");
 
-/** One of the "other files" rows: label, detail, file name, size. */
-function fileRow(d) {
-  return el("a", { class: "file", href: d.url, rel: "noopener", download: "" }, [
-    el("span", { class: "file__label", text: d.label }),
-    el("span", { class: "file__detail", text: plainDetail(d.detail) }),
-    el("span", { class: "file__name", text: d.name, title: d.name }),
-    el("span", { class: "file__get" }, [
-      d.size ? document.createTextNode(d.size) : null,
-      icon("i-download"),
+const OS_ICONS = { windows: "i-windows", macos: "i-apple", linux: "i-linux" };
+const SYSTEMS = Object.keys(OS_NAMES);
+
+/* ------------------------------------------------ the recommended file */
+function recPanel({ iconId, kicker, title, meta, action }) {
+  const rec = $("[data-rec]");
+  if (!rec) return;
+  rec.replaceChildren(
+    el("span", { class: "rec__icon" }, [icon(iconId)]),
+    el("div", {}, [
+      el("p", { class: "rec__kicker", text: kicker }),
+      el("h3", { class: "rec__title", text: title }),
+      meta ? el("p", { class: "rec__meta" }, meta) : null,
     ]),
+    ...(action ? [action] : []),
+  );
+}
+
+function downloadButton(d) {
+  return el("a", { class: "btn btn--primary", href: d.url, rel: "noopener", download: "" }, [
+    icon("i-download"),
+    el("span", { text: `Download ${extOf(d.name)}` }),
+    d.size ? el("small", { text: d.size }) : null,
   ]);
 }
 
-/** The recommended download of a system: what it is, and a big button. */
-function mainBlock(d, strong) {
-  return [
-    el("h4", { text: d.label }),
-    el("p", { text: plainDetail(d.detail) }),
-    el(
-      "a",
-      { class: strong ? "btn btn--ink" : "btn", href: d.url, rel: "noopener", download: "" },
-      [
-        icon("i-download"),
-        el("span", { text: `Download ${extOf(d.name)}` }),
-        d.size ? el("small", { text: d.size }) : null,
-      ],
-    ),
-  ];
+function linkButton(href, text, iconId = "i-out") {
+  return el("a", { class: "btn", href, rel: "noopener" }, [icon(iconId), el("span", { text })]);
+}
+
+/* --------------------------------------- every file: the workbook sheet */
+function fileRow(d, i) {
+  return el("a", { class: "book__row", href: d.url, rel: "noopener", download: "" }, [
+    el("span", { text: String(i + 1) }),
+    el("span", { class: "book__file" }, [
+      el("b", {}, [
+        document.createTextNode(d.label),
+        i === 0 ? el("span", { class: "book__chip", text: "Recommended" }) : null,
+      ]),
+      el("small", { text: d.name, title: d.name }),
+    ]),
+    el("span", { class: "book__for", text: plainDetail(d.detail) }),
+    el("span", { class: "book__size", text: d.size || "" }),
+    el("span", {}, [el("span", { class: "book__get" }, [icon("i-download")])]),
+  ]);
+}
+
+function messageRow(children) {
+  return el("div", { class: "book__row" }, [
+    el("span", { text: "1" }),
+    el("span", { class: "book__empty" }, children),
+  ]);
+}
+
+/** The sheet tabs: one per system, arrow keys move between them. */
+function tabs(onSelect) {
+  const list = $("[data-dl-tabs]");
+  const panel = $("#dl-panel");
+  if (!list || !panel) return () => {};
+  const buttons = $$("[data-os-tab]", list);
+  const select = (os, focus = false) => {
+    for (const b of buttons) {
+      const on = b.dataset.osTab === os;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+      if (on) {
+        panel.setAttribute("aria-labelledby", b.id);
+        if (focus) b.focus();
+      }
+    }
+    onSelect(os);
+  };
+  for (const b of buttons) b.addEventListener("click", () => select(b.dataset.osTab));
+  list.addEventListener("keydown", (e) => {
+    const i = buttons.indexOf(document.activeElement);
+    if (i < 0) return;
+    const next =
+      e.key === "ArrowRight"
+        ? (i + 1) % buttons.length
+        : e.key === "ArrowLeft"
+          ? (i - 1 + buttons.length) % buttons.length
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? buttons.length - 1
+              : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    select(buttons[next].dataset.osTab, true);
+  });
+  return select;
 }
 
 function setPrimaryButtons({ href, label, note }) {
@@ -246,23 +309,23 @@ function showProblem(kind) {
         ? "GitHub is limiting requests from your network right now. The downloads are on the releases page."
         : "The latest release couldn't be looked up just now. The downloads are on the releases page.";
   if (meta) meta.textContent = text;
-  for (const card of $$("[data-os]")) {
-    $("[data-os-main]", card).replaceChildren(
-      el("p", { class: "platform__empty", text: "Find the installers on GitHub." }),
-      el(
-        "a",
-        {
-          class: "btn",
-          href: kind === "none" ? RELEASES_URL : `${RELEASES_URL}/latest`,
-          rel: "noopener",
-        },
-        [icon("i-out"), el("span", { text: kind === "none" ? "Releases" : "Latest release" })],
-      ),
-    );
-    $("[data-os-list]", card).replaceChildren();
-    const label = $(".platform__label", card);
-    if (label) label.hidden = true;
-  }
+  const href = kind === "none" ? RELEASES_URL : `${RELEASES_URL}/latest`;
+  recPanel({
+    iconId: "i-download",
+    kicker: kind === "none" ? "Coming soon" : "On GitHub",
+    title: "Find the installers on GitHub",
+    meta: [el("span", { text: "Windows, macOS and Linux, from the project's releases page." })],
+    action: linkButton(href, kind === "none" ? "Releases" : "Latest release"),
+  });
+  const list = $("[data-dl-tabs]");
+  if (list) list.hidden = true;
+  $("#dl-panel")?.removeAttribute("role");
+  $("[data-dl-rows]")?.replaceChildren(
+    messageRow([
+      document.createTextNode("The file list isn't available right now. "),
+      el("a", { href, rel: "noopener", text: "See every file on GitHub" }),
+    ]),
+  );
   setPrimaryButtons({ href: "#download", label: "Download DataLiq", note: "" });
 }
 
@@ -271,46 +334,60 @@ function render(release, os) {
   for (const node of $$("[data-release-version]")) node.textContent = `v${version}`;
   const date = formatDate(release.publishedAt);
   const meta = $("[data-release-meta]");
-  if (meta)
-    meta.textContent = `Version ${version}${date ? `, released ${date}` : ""}. Free, with no account. Your system is first.`;
+  if (meta) meta.textContent = `Version ${version}${date ? `, released ${date}` : ""}.`;
 
-  for (const card of $$("[data-os]")) {
-    const name = card.dataset.os;
+  // The file for this computer, with one big button.
+  const mine = os ? release.downloads[os]?.[0] : null;
+  if (mine) {
+    recPanel({
+      iconId: OS_ICONS[os],
+      kicker: "Recommended for this computer",
+      title: `DataLiq for ${OS_NAMES[os]}`,
+      meta: [
+        el("span", { text: `${mine.label} · ${plainDetail(mine.detail)}` }),
+        el("code", { text: mine.name }),
+      ],
+      action: downloadButton(mine),
+    });
+  } else if (os) {
+    recPanel({
+      iconId: OS_ICONS[os],
+      kicker: "Your system",
+      title: `No ${OS_NAMES[os]} build in version ${version}`,
+      meta: [el("span", { text: "Earlier releases may have one." })],
+      action: linkButton(RELEASES_URL, "All releases"),
+    });
+  } else {
+    recPanel({
+      iconId: "i-download",
+      kicker: `Version ${version}`,
+      title: "DataLiq is a desktop app",
+      meta: [el("span", { text: "For Windows, macOS and Linux. Pick your system below." })],
+      action: null,
+    });
+  }
+
+  // Every file, one sheet per system; this computer's system first shown.
+  const rows = $("[data-dl-rows]");
+  const show = (name) => {
     const items = release.downloads[name] ?? [];
-    const yours = name === os;
-    card.classList.toggle("is-yours", yours);
-    const kicker = $("[data-os-kicker]", card);
-    if (kicker) kicker.textContent = yours ? "Your system" : "Platform";
-    const main = $("[data-os-main]", card);
-    const list = $("[data-os-list]", card);
-    const label = $(".platform__label", card);
-    if (items.length === 0) {
-      main.replaceChildren(
-        el("p", { class: "platform__empty" }, [
-          document.createTextNode(`This release has no ${OS_NAMES[name]} build. `),
-          el("a", { href: RELEASES_URL, rel: "noopener", text: "See earlier releases" }),
-        ]),
-      );
-      list.replaceChildren();
-      if (label) label.hidden = true;
-      continue;
-    }
-    // The recommended file stands out on the visitor's own system (on
-    // every card when the system isn't a desktop we know).
-    main.replaceChildren(...mainBlock(items[0], yours || !os));
-    list.replaceChildren(...items.slice(1).map(fileRow));
-    if (label) label.hidden = items.length < 2;
+    rows?.replaceChildren(
+      ...(items.length
+        ? items.map(fileRow)
+        : [
+            messageRow([
+              document.createTextNode(`This release has no ${OS_NAMES[name]} build. `),
+              el("a", { href: RELEASES_URL, rel: "noopener", text: "See earlier releases" }),
+            ]),
+          ]),
+    );
+  };
+  for (const b of $$("[data-os-tab]")) {
+    const yours = b.dataset.osTab === os;
+    b.classList.toggle("is-yours", yours);
+    if (yours) b.title = "Your system";
   }
-
-  // Numbered in the order shown: the visitor's system first.
-  const cards = $$("[data-os]");
-  const ordered = cards
-    .filter((c) => c.classList.contains("is-yours"))
-    .concat(cards.filter((c) => !c.classList.contains("is-yours")));
-  for (const [i, c] of ordered.entries()) {
-    const no = $(".platform__no", c);
-    if (no) no.textContent = String(i + 1).padStart(2, "0");
-  }
+  tabs(show)(os && SYSTEMS.includes(os) ? os : "windows");
 
   const sums = $("[data-release-checksums]");
   if (sums && release.downloads.checksums) {
@@ -327,7 +404,6 @@ function render(release, os) {
     notes.hidden = false;
   }
 
-  const mine = os ? release.downloads[os]?.[0] : null;
   if (mine) {
     setPrimaryButtons({
       href: mine.url,
@@ -350,9 +426,7 @@ export async function initReleases() {
     maxTouchPoints: navigator.maxTouchPoints ?? 0,
   });
   const result = await latestRelease();
-  if (result.release && result.release.hasDownloads) render(result.release, os);
-  else if (result.release) {
-    // A release without installers (source only): say so, link to it.
-    render(result.release, os);
-  } else showProblem(result.none ? "none" : result.error);
+  // A release without installers (source only) still shows, with its links.
+  if (result.release) render(result.release, os);
+  else showProblem(result.none ? "none" : result.error);
 }

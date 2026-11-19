@@ -8,11 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The website has a new design: an editorial "sheet" look (numbered sections, a hero on a
-  cell grid where a highlighted cell follows the pointer, the speed figures as cells, the
-  other features as a table), wide display type, light and dark themes with a switch, and a
-  cleaner download section with your system first. It shows four real screenshots of
-  version 1.8, each in light and dark.
+- The website has a new design built on the spreadsheet idea: a hero on a cell grid where
+  a highlighted cell follows the pointer, cell references as section labels, the speed
+  figures as cells, the other features as a table, a floating header, Geist type, and light
+  and dark themes with a switch. Downloads are clearer: the file for your computer first,
+  then every file on one sheet per system with sheet tabs. It shows four real screenshots
+  of version 1.8, each in light and dark.
 
 ## [1.8.0] - 2026-11-18
 

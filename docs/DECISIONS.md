@@ -1300,26 +1300,33 @@ types the same as the config's.
 ## D80 — The website as a sheet
 
 The second design of the website (D75 set out its rules, which still hold)
-takes its idea from the product: the page is a spreadsheet. Sections are
-numbered rows (`03 / Features`) with a row header on the left and a scroll
-ruler on the right of wide screens; the hero sits on a cell grid with column
-letters and row numbers, and a highlighted cell (with Excel's fill handle)
-follows the pointer; the speed figures are cells with references and a
-formula bar; the features beyond the three main ones are a table.
+takes its idea from the product: the page is a spreadsheet. Each section
+starts with its cell reference (`A3 Features`), and wide screens get a row
+header of the sections once the hero has scrolled away; the hero sits on a
+cell grid with column letters and row numbers, and a highlighted cell (with
+Excel's fill handle) follows the pointer; "in seconds." is a selected range
+and the icon sits in a copied cell with marching ants; the speed figures are
+cells with references and a formula bar; the features beyond the three main
+ones are a table. The ideas come from spreadsheets, not from other product
+sites: the header is a floating rounded bar with a progress line, buttons and
+labels are sentence case, and nothing is set in wide or spaced-out capitals.
 
 - **Few screenshots, shown large.** Four real captures of version 1.8 (the
   grid with a profile, SQL with a column being dragged in, the JSON
   structure, a chart), each at the page's full width so the app reads at
   close to its real size, and each in light and dark to match the page's
   theme. The rest of the features are words in a table, not pictures.
-- **Type.** Archivo at its widest and heaviest for headings and numbers,
-  JetBrains Mono (the app's data font) for labels, Inter for text. Archivo
-  is the variable font with a width axis, so one 90 KB file gives every
-  width; all fonts are served from the site.
+- **Type.** Geist for headings and text, tightly spaced at large sizes;
+  JetBrains Mono (the app's data font) only for data: cell references, file
+  names, sizes, code. Both are variable fonts (one file each, about 30 KB
+  and 40 KB) served from the site.
 - **Theme.** The page follows the system until the visitor picks light or
   dark with the button in the bar; the choice is kept in the browser and
   applied before the first paint.
-- **Downloads.** One column per system, the visitor's first and marked
-  "Your system": its recommended file with a large button, then its other
-  files with their file names and sizes. Everything still comes from the
-  GitHub Releases API, as in D75.
+- **Downloads.** The file for the visitor's computer first, in a panel
+  with one large button; then a small workbook with every file of the
+  release on one sheet per system (file, what it is for, size), switched
+  with sheet tabs along the bottom like a spreadsheet's, the visitor's
+  system open first and marked. Tabs follow the ARIA tabs pattern (arrow
+  keys, Home, End). Everything still comes from the GitHub Releases API, as
+  in D75.

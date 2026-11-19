@@ -34,13 +34,19 @@ Then open <http://localhost:4321/>. (Modules need a server; opening the file dir
 
 ## The design
 
-The page is a sheet: hairline rules, numbered sections (`01 / DataLiq`), a hero laid on a
-cell grid with column letters and row numbers where a highlighted cell follows the pointer,
-the speed figures as cells with references and a formula bar, the other features as a
-table, and a row header (left) and a scroll ruler (right) on wide screens. Display type is
-Archivo at its widest (Expanded; SIL Open Font License), labels are JetBrains Mono, text is
-Inter, all served from `assets/fonts/`. Light and dark themes follow the system until the
-visitor picks one with the button in the bar (remembered in the browser).
+The page is a sheet. The hero sits on a cell grid with column letters and row numbers where
+a highlighted cell follows the pointer; "in seconds." is a selected range with Excel's fill
+handle, and the app's icon sits in a "copied" cell with marching ants. Each section starts
+with its cell reference (`A2 Speed`), the speed figures are cells with a formula bar, the
+other features are a table, and the downloads are a small workbook: the file for your
+computer first, then every file on one sheet per system, with sheet tabs at the bottom. The
+header floats, rounded, with a line that shows how far down the page you are; a row header
+of the sections appears on the left of wide screens once the hero has scrolled away.
+
+Type is Geist (headings and text) with JetBrains Mono for data (file names, cell
+references); both are variable fonts under the SIL Open Font License, served from
+`assets/fonts/`. Light and dark themes follow the system until the visitor picks one with
+the button in the header (remembered in the browser).
 
 ## Files
 
@@ -49,8 +55,8 @@ visitor picks one with the button in the bar (remembered in the browser).
 | `index.html` | The page: every section, in order |
 | `css/site.css` | Design tokens, then the pieces, then the sections top to bottom |
 | `js/main.js` | Starts the two parts below |
-| `js/site.js` | Theme, menu, the hero's cell grid, reveals, the tilted showcase, ruler, counters, formula bar, ticker, terminal typing, lightbox, the footer's fitted wordmark |
-| `js/releases.js` | The latest release: lookup, the download columns (your system first), release notes (sanitized) |
+| `js/site.js` | Theme, menu, the row header, the hero's cell grid, reveals, the tilted showcase, the header's progress line, counters, formula bar, ticker, terminal typing, lightbox, the footer's fitted wordmark |
+| `js/releases.js` | The latest release: lookup, the recommended file, the workbook of files with its sheet tabs, release notes (sanitized) |
 | `js/release-assets.js` | Pure functions: which file is which download, which system the visitor has |
 | `404.html`, `robots.txt`, `sitemap.xml`, `site.webmanifest` | For GitHub Pages and search engines |
 

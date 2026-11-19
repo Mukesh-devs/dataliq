@@ -36,14 +36,7 @@
 
     <link
       rel="preload"
-      href="assets/fonts/archivo-latin.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-    <link
-      rel="preload"
-      href="assets/fonts/inter-latin.woff2"
+      href="assets/fonts/geist-latin.woff2"
       as="font"
       type="font/woff2"
       crossorigin
@@ -806,118 +799,120 @@
       </symbol>
     </svg>
 
-    <!-- The frame: a row header on the left, a ruler on the right (wide screens). -->
+    <!-- The row header: the sections as a sheet's rows (wide screens, after the hero). -->
     <aside class="rail rail--rows" aria-label="Sections" data-rows>
-      <a href="#top" data-row="top"><span>01</span><b>DataLiq</b></a>
-      <a href="#speed" data-row="speed"><span>02</span><b>Speed</b></a>
-      <a href="#features" data-row="features"><span>03</span><b>Features</b></a>
-      <a href="#automation" data-row="automation"><span>04</span><b>Automation</b></a>
-      <a href="#privacy" data-row="privacy"><span>05</span><b>Privacy</b></a>
-      <a href="#download" data-row="download"><span>06</span><b>Download</b></a>
-      <a href="#questions" data-row="questions"><span>07</span><b>Questions</b></a>
+      <a href="#top" data-row="top"><span>1</span><b>DataLiq</b></a>
+      <a href="#speed" data-row="speed"><span>2</span><b>Speed</b></a>
+      <a href="#features" data-row="features"><span>3</span><b>Features</b></a>
+      <a href="#automation" data-row="automation"><span>4</span><b>Automation</b></a>
+      <a href="#privacy" data-row="privacy"><span>5</span><b>Privacy</b></a>
+      <a href="#download" data-row="download"><span>6</span><b>Download</b></a>
+      <a href="#questions" data-row="questions"><span>7</span><b>Questions</b></a>
     </aside>
-    <div class="rail rail--ruler" aria-hidden="true" data-ruler>
-      <div class="ruler__ticks"></div>
-      <div class="ruler__mark" data-ruler-mark><span data-ruler-value>000</span>%</div>
-    </div>
 
     <header class="nav" data-nav>
-      <a class="nav__brand" href="#top" aria-label="DataLiq, to the top">
-        <img src="assets/icon.svg" width="30" height="30" alt="" />
-        <span class="wordmark">DataLiq</span>
-      </a>
-      <nav class="nav__links" aria-label="Main" data-menu>
-        <a href="#features">Features</a>
-        <a href="#speed">Speed</a>
-        <a href="#automation">Automation</a>
-        <a href="#privacy">Privacy</a>
-        <a href="#questions">Questions</a>
-        <a class="nav__docs" href="https://github.com/Mukesh-devs/dataliq#readme" rel="noopener"
-          >Docs <svg aria-hidden="true"><use href="#i-out" /></svg
-        ></a>
-      </nav>
-      <div class="nav__tools">
-        <a
-          class="nav__cell"
-          href="https://github.com/Mukesh-devs/dataliq"
-          rel="noopener"
-          aria-label="DataLiq on GitHub"
-          title="DataLiq on GitHub"
-          ><svg aria-hidden="true"><use href="#i-github" /></svg
-        ></a>
-        <button
-          class="nav__cell"
-          type="button"
-          data-theme-toggle
-          aria-label="Switch to dark theme"
-          title="Switch theme"
-        >
-          <svg class="only-light" aria-hidden="true"><use href="#i-moon" /></svg>
-          <svg class="only-dark" aria-hidden="true"><use href="#i-sun" /></svg>
-        </button>
-        <button
-          class="nav__cell nav__menu"
-          type="button"
-          aria-expanded="false"
-          aria-label="Menu"
-          data-menu-toggle
-        >
-          <svg aria-hidden="true"><use href="#i-menu" /></svg>
-        </button>
-        <a class="nav__get" href="#download" data-download-primary>
-          <svg aria-hidden="true"><use href="#i-download" /></svg>
-          <span data-download-label>Download</span>
+      <div class="nav__bar">
+        <a class="nav__brand" href="#top" aria-label="DataLiq, to the top">
+          <img src="assets/icon.svg" width="28" height="28" alt="" />
+          <span>DataLiq</span>
         </a>
+        <nav class="nav__links" aria-label="Main" data-menu>
+          <a href="#features">Features</a>
+          <a href="#speed">Speed</a>
+          <a href="#automation">Automation</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#questions">FAQ</a>
+          <a href="https://github.com/Mukesh-devs/dataliq#readme" rel="noopener"
+            >Docs <svg aria-hidden="true"><use href="#i-out" /></svg
+          ></a>
+        </nav>
+        <div class="nav__tools">
+          <a
+            class="icon-btn"
+            href="https://github.com/Mukesh-devs/dataliq"
+            rel="noopener"
+            aria-label="DataLiq on GitHub"
+            title="DataLiq on GitHub"
+            ><svg aria-hidden="true"><use href="#i-github" /></svg
+          ></a>
+          <button
+            class="icon-btn"
+            type="button"
+            data-theme-toggle
+            aria-label="Switch to dark theme"
+            title="Switch theme"
+          >
+            <svg class="only-light" aria-hidden="true"><use href="#i-moon" /></svg>
+            <svg class="only-dark" aria-hidden="true"><use href="#i-sun" /></svg>
+          </button>
+          <button
+            class="icon-btn nav__menu"
+            type="button"
+            aria-expanded="false"
+            aria-label="Menu"
+            data-menu-toggle
+          >
+            <svg aria-hidden="true"><use href="#i-menu" /></svg>
+          </button>
+          <a class="btn btn--primary btn--sm nav__get" href="#download" data-download-primary>
+            <svg aria-hidden="true"><use href="#i-download" /></svg>
+            <span data-download-label>Download</span>
+          </a>
+        </div>
+        <span class="nav__progress" aria-hidden="true" data-progress></span>
       </div>
     </header>
 
     <main id="main">
       <!-- 01 · Hero: the page as a sheet -->
       <section class="hero" id="top" aria-labelledby="hero-title">
-        <div class="shead">
-          <span>01 / DataLiq</span>
-          <span class="shead__meta">Desktop data viewer · Windows, macOS, Linux</span>
-        </div>
         <div class="sheet" data-sheet>
           <div class="sheet__cols" aria-hidden="true" data-sheet-cols></div>
           <div class="sheet__rows" aria-hidden="true" data-sheet-rows></div>
           <div class="sheet__cell" aria-hidden="true" data-sheet-cell></div>
           <div class="sheet__name" aria-hidden="true" data-sheet-name>A1</div>
 
-          <div class="hero__body">
-            <div class="hero__icon reveal">
-              <img src="assets/icon.svg" width="144" height="144" alt="" />
+          <div class="hero__grid">
+            <div class="hero__copy">
+              <p class="hero__chip reveal">
+                <span class="tag" data-release-version>Latest</span>
+                <span>Free desktop app for Windows, macOS and Linux</span>
+              </p>
+              <h1 class="hero__title reveal" id="hero-title">
+                Open huge data files <span class="sel">in&nbsp;seconds.</span>
+              </h1>
+              <p class="hero__lead reveal">
+                DataLiq opens multi-gigabyte CSV, Parquet, JSON and Excel files in about a second,
+                then lets you filter, query with SQL, chart, clean and export them. Nothing is
+                uploaded. No account. It works offline.
+              </p>
+              <div class="hero__actions reveal">
+                <a class="btn btn--primary" href="#download" data-download-primary>
+                  <svg aria-hidden="true"><use href="#i-download" /></svg>
+                  <span data-download-label>Download DataLiq</span>
+                </a>
+                <a class="btn" href="#features">
+                  <span>Explore features</span>
+                  <svg aria-hidden="true"><use href="#i-arrow" /></svg>
+                </a>
+                <a
+                  class="btn btn--ghost"
+                  href="https://github.com/Mukesh-devs/dataliq"
+                  rel="noopener"
+                >
+                  <svg aria-hidden="true"><use href="#i-github" /></svg>
+                  <span>GitHub</span>
+                </a>
+              </div>
+              <p class="hero__note reveal">
+                <span data-download-note>Free for every use · MIT licensed</span>
+                <a href="#download">All downloads</a>
+              </p>
             </div>
-            <p class="hero__tag reveal">
-              <span class="tag" data-release-version>Latest</span>
-              <span class="wordmark wordmark--lg">DataLiq</span>
-            </p>
-            <h1 class="hero__title reveal" id="hero-title">
-              Open huge data files <em>in&nbsp;seconds.</em>
-            </h1>
-            <p class="hero__lead reveal">
-              A desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files in about a
-              second, then lets you filter, query with SQL, chart, clean and export them. Nothing is
-              uploaded. No account. It works offline.
-            </p>
-            <div class="hero__actions reveal">
-              <a class="btn btn--ink" href="#download" data-download-primary>
-                <svg aria-hidden="true"><use href="#i-download" /></svg>
-                <span data-download-label>Download DataLiq</span>
-              </a>
-              <a class="btn" href="#features">
-                <svg aria-hidden="true"><use href="#i-layers" /></svg>
-                <span>Explore features</span>
-              </a>
-              <a class="btn" href="https://github.com/Mukesh-devs/dataliq" rel="noopener">
-                <svg aria-hidden="true"><use href="#i-github" /></svg>
-                <span>View on GitHub</span>
-              </a>
+            <div class="hero__art reveal" aria-hidden="true">
+              <span class="hero__ref">DataLiq</span>
+              <img src="assets/icon.svg" width="200" height="200" alt="" />
             </div>
-            <p class="hero__note reveal">
-              <span data-download-note>Free for every use · MIT licensed</span>
-              <a href="#download">All downloads</a>
-            </p>
           </div>
         </div>
 
@@ -999,11 +994,11 @@
 
       <!-- 02 · Speed -->
       <section class="speed" id="speed" aria-labelledby="speed-title">
-        <div class="shead shead--inv">
-          <span>02 / Speed</span>
-          <span class="shead__meta">Measured on a 4-core Linux machine</span>
-        </div>
         <div class="wrap">
+          <p class="eyebrow reveal">
+            <span class="eyebrow__ref">A2</span><span class="eyebrow__name">Speed</span
+            ><span class="eyebrow__meta">Measured on a 4-core Linux machine</span>
+          </p>
           <div class="speed__intro">
             <h2 class="display reveal" id="speed-title">
               Built for the files that freeze spreadsheets.
@@ -1059,18 +1054,18 @@
 
       <!-- 03 · Features -->
       <section class="features" id="features" aria-labelledby="features-title">
-        <div class="shead">
-          <span>03 / Features</span>
-          <span class="shead__meta">Every screen below is the real app on real files</span>
-        </div>
         <div class="wrap">
+          <p class="eyebrow reveal">
+            <span class="eyebrow__ref">A3</span><span class="eyebrow__name">Features</span
+            ><span class="eyebrow__meta">The real app on real files</span>
+          </p>
           <h2 class="display features__title reveal" id="features-title">
             From a raw file to an answer, without leaving the window.
           </h2>
 
           <article class="feature reveal" aria-labelledby="f-sql">
             <div class="feature__text">
-              <p class="feature__no">03.1 · SQL</p>
+              <p class="feature__no">SQL</p>
               <h3 id="f-sql">Every open file is a table.</h3>
               <p>
                 Query, join and aggregate your files with SQL. Drag a column from the sidebar into
@@ -1128,7 +1123,7 @@
 
           <article class="feature reveal" aria-labelledby="f-json">
             <div class="feature__text">
-              <p class="feature__no">03.2 · JSON</p>
+              <p class="feature__no">JSON</p>
               <h3 id="f-json">See the shape of JSON before you read a line.</h3>
               <p>
                 The structure view reads every record and draws one map: each key with its type, how
@@ -1186,7 +1181,7 @@
 
           <article class="feature reveal" aria-labelledby="f-chart">
             <div class="feature__text">
-              <p class="feature__no">03.3 · Charts</p>
+              <p class="feature__no">Charts</p>
               <h3 id="f-chart">Charts from the whole file, not a sample.</h3>
               <p>
                 Bar, line, pie, histogram, scatter and box plots, computed by the engine over every
@@ -1370,11 +1365,11 @@
 
       <!-- 04 · Automation -->
       <section class="automation" id="automation" aria-labelledby="auto-title">
-        <div class="shead">
-          <span>04 / Automation</span>
-          <span class="shead__meta">Command line · MCP for AI assistants</span>
-        </div>
         <div class="wrap automation__grid">
+          <p class="eyebrow reveal">
+            <span class="eyebrow__ref">A4</span><span class="eyebrow__name">Automation</span
+            ><span class="eyebrow__meta">Command line and MCP</span>
+          </p>
           <div class="automation__text">
             <h2 class="display reveal" id="auto-title">Run it without the window.</h2>
             <p class="reveal">
@@ -1427,11 +1422,11 @@
 
       <!-- 05 · Privacy -->
       <section class="privacy" id="privacy" aria-labelledby="privacy-title">
-        <div class="shead">
-          <span>05 / Privacy</span>
-          <span class="shead__meta">Offline by design</span>
-        </div>
         <div class="wrap">
+          <p class="eyebrow reveal">
+            <span class="eyebrow__ref">A5</span><span class="eyebrow__name">Privacy</span
+            ><span class="eyebrow__meta">Offline by design</span>
+          </p>
           <p class="privacy__big reveal" aria-hidden="true"><span>0</span> bytes uploaded.</p>
           <h2 class="privacy__title reveal" id="privacy-title">
             Your data stays on your computer.
@@ -1460,11 +1455,11 @@
 
       <!-- 06 · Download -->
       <section class="download" id="download" aria-labelledby="download-title">
-        <div class="shead">
-          <span>06 / Get DataLiq</span>
-          <span class="shead__meta">Free · open source · no account</span>
-        </div>
         <div class="wrap">
+          <p class="eyebrow reveal">
+            <span class="eyebrow__ref">A6</span><span class="eyebrow__name">Download</span
+            ><span class="eyebrow__meta">Free, open source, no account</span>
+          </p>
           <div class="download__head">
             <h2 class="display" id="download-title">
               Get DataLiq <span class="tag tag--lg" data-release-version>Latest</span>
@@ -1482,76 +1477,61 @@
             </p>
           </noscript>
 
-          <div class="platforms" data-platforms>
-            <article class="platform" data-os="windows" aria-labelledby="os-windows">
-              <header class="platform__head">
-                <span class="platform__kicker" data-os-kicker>Platform</span>
-                <span class="platform__no">01</span>
-              </header>
-              <div class="platform__body">
-                <h3 class="platform__name" id="os-windows">
-                  <span class="platform__icon"
-                    ><svg aria-hidden="true"><use href="#i-windows" /></svg
-                  ></span>
-                  Windows
-                </h3>
-                <div class="platform__main" data-os-main>
-                  <p class="platform__loading">Looking up the latest release…</p>
-                </div>
-                <p class="platform__label">Other files for Windows</p>
-                <div class="files" data-os-list></div>
-              </div>
-            </article>
-            <article class="platform" data-os="macos" aria-labelledby="os-macos">
-              <header class="platform__head">
-                <span class="platform__kicker" data-os-kicker>Platform</span>
-                <span class="platform__no">02</span>
-              </header>
-              <div class="platform__body">
-                <h3 class="platform__name" id="os-macos">
-                  <span class="platform__icon"
-                    ><svg aria-hidden="true"><use href="#i-apple" /></svg
-                  ></span>
-                  macOS
-                </h3>
-                <div class="platform__main" data-os-main>
-                  <p class="platform__loading">Looking up the latest release…</p>
-                </div>
-                <p class="platform__label">Other files for macOS</p>
-                <div class="files" data-os-list></div>
-              </div>
-            </article>
-            <article class="platform" data-os="linux" aria-labelledby="os-linux">
-              <header class="platform__head">
-                <span class="platform__kicker" data-os-kicker>Platform</span>
-                <span class="platform__no">03</span>
-              </header>
-              <div class="platform__body">
-                <h3 class="platform__name" id="os-linux">
-                  <span class="platform__icon"
-                    ><svg aria-hidden="true"><use href="#i-linux" /></svg
-                  ></span>
-                  Linux
-                </h3>
-                <div class="platform__main" data-os-main>
-                  <p class="platform__loading">Looking up the latest release…</p>
-                </div>
-                <p class="platform__label">Other files for Linux</p>
-                <div class="files" data-os-list></div>
-              </div>
-            </article>
+          <div class="rec" data-rec>
+            <p class="rec__loading">Looking up the latest release…</p>
           </div>
 
-          <div class="download__links">
-            <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
-              ><svg aria-hidden="true"><use href="#i-history" /></svg>All releases</a
-            >
-            <a href="#" data-release-checksums hidden rel="noopener"
-              ><svg aria-hidden="true"><use href="#i-shield" /></svg>SHA-256 checksums</a
-            >
-            <a href="https://github.com/Mukesh-devs/dataliq#build-from-source" rel="noopener"
-              ><svg aria-hidden="true"><use href="#i-terminal" /></svg>Build from source</a
-            >
+          <div class="book" data-book>
+            <div class="book__sheet" role="tabpanel" id="dl-panel" tabindex="-1">
+              <div class="book__head" aria-hidden="true">
+                <span></span><span>A · File</span><span>B · For</span><span>C · Size</span
+                ><span></span>
+              </div>
+              <div class="book__rows" data-dl-rows></div>
+            </div>
+            <div class="book__tabs">
+              <div class="book__tablist" role="tablist" aria-label="Systems" data-dl-tabs>
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-windows"
+                  data-os-tab="windows"
+                  aria-controls="dl-panel"
+                  aria-selected="false"
+                >
+                  <svg aria-hidden="true"><use href="#i-windows" /></svg>Windows
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-macos"
+                  data-os-tab="macos"
+                  aria-controls="dl-panel"
+                  aria-selected="false"
+                >
+                  <svg aria-hidden="true"><use href="#i-apple" /></svg>macOS
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-linux"
+                  data-os-tab="linux"
+                  aria-controls="dl-panel"
+                  aria-selected="false"
+                >
+                  <svg aria-hidden="true"><use href="#i-linux" /></svg>Linux
+                </button>
+              </div>
+              <div class="book__links">
+                <a href="#" data-release-checksums hidden rel="noopener">SHA-256 checksums</a>
+                <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
+                  >All releases</a
+                >
+                <a href="https://github.com/Mukesh-devs/dataliq#build-from-source" rel="noopener"
+                  >Build from source</a
+                >
+              </div>
+            </div>
           </div>
 
           <details class="notes" data-release-notes hidden>
@@ -1569,12 +1549,20 @@
 
       <!-- 07 · Questions -->
       <section class="questions" id="questions" aria-labelledby="q-title">
-        <div class="shead">
-          <span>07 / Questions</span>
-          <span class="shead__meta">Short answers</span>
-        </div>
         <div class="wrap questions__grid">
-          <h2 class="display" id="q-title">Good to know.</h2>
+          <p class="eyebrow reveal">
+            <span class="eyebrow__ref">A7</span><span class="eyebrow__name">Questions</span
+            ><span class="eyebrow__meta">Short answers</span>
+          </p>
+          <div class="questions__side">
+            <h2 class="display" id="q-title">Good to know.</h2>
+            <p>
+              Something else?
+              <a href="https://github.com/Mukesh-devs/dataliq/issues" rel="noopener"
+                >Ask on GitHub</a
+              >
+            </p>
+          </div>
           <div class="faq">
             <details>
               <summary>
@@ -1651,7 +1639,7 @@
           >
         </nav>
       </div>
-      <p class="footer__mark" aria-hidden="true"><span data-fit>DATALIQ</span></p>
+      <p class="footer__mark" aria-hidden="true"><span data-fit>DataLiq</span></p>
       <p class="footer__base">
         <span>Built with DuckDB and Tauri</span>
         <span>Free and open source</span>

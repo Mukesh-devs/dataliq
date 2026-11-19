@@ -73,6 +73,14 @@ function nav() {
     { rootMargin: "-35% 0px -55% 0px", threshold: [0, 0.2, 0.6] },
   );
   for (const s of sections) io.observe(s);
+
+  // The floating row header shows once the hero's own one has scrolled away.
+  const rail = $("[data-rows]");
+  const hero = $("[data-sheet]");
+  if (rail && hero)
+    new IntersectionObserver(([e]) => rail.classList.toggle("is-shown", !e.isIntersecting), {
+      rootMargin: "-30% 0px 0px 0px",
+    }).observe(hero);
 }
 
 /* ------------------------------------------- the hero as a spreadsheet */
@@ -178,17 +186,13 @@ function tilt() {
   addEventListener("resize", perFrame(update));
 }
 
-/* -------------------------------------------- the ruler on the right */
-function ruler() {
-  const mark = $("[data-ruler-mark]");
-  const value = $("[data-ruler-value]");
-  if (!mark) return;
+/* ------------------------------- how far down the page, in the header */
+function progress() {
+  const bar = $("[data-progress]");
+  if (!bar) return;
   const update = () => {
     const max = document.documentElement.scrollHeight - innerHeight;
-    const p = max > 0 ? Math.min(1, scrollY / max) : 0;
-    const rail = mark.parentElement.clientHeight - 22;
-    mark.style.top = `${Math.round(p * rail)}px`;
-    value.textContent = String(Math.round(p * 100)).padStart(3, "0");
+    bar.style.setProperty("--p", String(max > 0 ? Math.min(1, scrollY / max) : 0));
   };
   update();
   addEventListener("scroll", perFrame(update), { passive: true });
@@ -326,7 +330,7 @@ export function initSite() {
   sheet();
   reveals();
   tilt();
-  ruler();
+  progress();
   counters();
   cells();
   ticker();
