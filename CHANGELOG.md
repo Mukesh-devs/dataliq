@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-19
+
+One row of window chrome on Windows, as in VS Code.
+
 ### Changed
 
 - On Windows, DataLiq draws its own title bar, as VS Code does: one row with the app's
