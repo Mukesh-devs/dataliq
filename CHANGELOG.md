@@ -6,8 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-19
+
+One row of window chrome on Windows, as in VS Code.
+
 ### Changed
 
+- On Windows, DataLiq draws its own title bar, as VS Code does: one row with the app's
+  icon, the menus, the search in the middle and the window's minimise, maximise and close
+  buttons, so there is one row less above your data. Drag an empty part of it to move the
+  window, or double-click it to maximise. The file tabs have their own row above the file,
+  beside the sidebar. The window's name follows the file in front, for the taskbar and
+  Alt+Tab. Settings › Appearance › Title bar brings back the system's title bar.
 - The website has a new design built on the spreadsheet idea: a hero on a cell grid where
   a highlighted cell follows the pointer, cell references as section labels, the speed
   figures as cells, the other features as a table, a floating header, Geist type, the

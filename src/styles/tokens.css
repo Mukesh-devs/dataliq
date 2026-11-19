@@ -13,11 +13,14 @@
   /* Density: grid row height and chrome padding. */
   --row-height: 28px;
   --chrome-height: 36px;
+  /* The file tabs' row (below DataLiq's own title bar). */
+  --tab-height: 35px;
 }
 
 :root[data-density="compact"] {
   --row-height: 22px;
   --chrome-height: 32px;
+  --tab-height: 30px;
 }
 
 :root,
