@@ -195,7 +195,6 @@ const kindOf = (d) => {
 const plainDetail = (detail) => detail.replace(/ · \.\w+$/, "");
 
 const OS_ICONS = { windows: "i-windows", macos: "i-apple", linux: "i-linux" };
-const SYSTEMS = Object.keys(OS_NAMES);
 
 /* ------------------------------------------------ the recommended file */
 function recPanel({ iconId, kicker, title, meta, action }) {
@@ -212,79 +211,59 @@ function recPanel({ iconId, kicker, title, meta, action }) {
   );
 }
 
-function downloadButton(d) {
-  return el("a", { class: "btn btn--primary", href: d.url, rel: "noopener", download: "" }, [
-    icon("i-download"),
-    el("span", { text: `Download ${extOf(d.name)}` }),
-    d.size ? el("small", { text: d.size }) : null,
-  ]);
+function downloadButton(d, strong = true) {
+  return el(
+    "a",
+    { class: strong ? "btn btn--primary" : "btn", href: d.url, rel: "noopener", download: "" },
+    [
+      icon("i-download"),
+      el("span", { text: `Download ${extOf(d.name)}` }),
+      d.size ? el("small", { text: d.size }) : null,
+    ],
+  );
 }
 
 function linkButton(href, text, iconId = "i-out") {
   return el("a", { class: "btn", href, rel: "noopener" }, [icon(iconId), el("span", { text })]);
 }
 
-/* --------------------------------------- every file: the workbook sheet */
-function fileRow(d, i) {
-  return el("a", { class: "book__row", href: d.url, rel: "noopener", download: "" }, [
-    el("span", { text: String(i + 1) }),
-    el("span", { class: "book__file" }, [
-      el("b", {}, [
-        document.createTextNode(d.label),
-        i === 0 ? el("span", { class: "book__chip", text: "Recommended" }) : null,
-      ]),
-      el("small", { text: d.name, title: d.name }),
+/* ------------------------------------------- one column per system */
+/** A system's recommended file: what it is, its file name, a full-width button. */
+function mainBlock(d, strong) {
+  return [
+    el("p", { class: "system__kind" }, [
+      el("b", { text: d.label }),
+      el("span", { class: "system__chip", text: "Recommended" }),
     ]),
-    el("span", { class: "book__for", text: plainDetail(d.detail) }),
-    el("span", { class: "book__size", text: d.size || "" }),
-    el("span", {}, [el("span", { class: "book__get" }, [icon("i-download")])]),
-  ]);
+    el("p", { class: "system__detail", text: plainDetail(d.detail) }),
+    el("code", { class: "system__name", text: d.name, title: d.name }),
+    downloadButton(d, strong),
+  ];
 }
 
-function messageRow(children) {
-  return el("div", { class: "book__row" }, [
-    el("span", { text: "1" }),
-    el("span", { class: "book__empty" }, children),
-  ]);
-}
-
-/** The sheet tabs: one per system, arrow keys move between them. */
-function tabs(onSelect) {
-  const list = $("[data-dl-tabs]");
-  const panel = $("#dl-panel");
-  if (!list || !panel) return () => {};
-  const buttons = $$("[data-os-tab]", list);
-  const select = (os, focus = false) => {
-    for (const b of buttons) {
-      const on = b.dataset.osTab === os;
-      b.setAttribute("aria-selected", String(on));
-      b.tabIndex = on ? 0 : -1;
-      if (on) {
-        panel.setAttribute("aria-labelledby", b.id);
-        if (focus) b.focus();
-      }
-    }
-    onSelect(os);
-  };
-  for (const b of buttons) b.addEventListener("click", () => select(b.dataset.osTab));
-  list.addEventListener("keydown", (e) => {
-    const i = buttons.indexOf(document.activeElement);
-    if (i < 0) return;
-    const next =
-      e.key === "ArrowRight"
-        ? (i + 1) % buttons.length
-        : e.key === "ArrowLeft"
-          ? (i - 1 + buttons.length) % buttons.length
-          : e.key === "Home"
-            ? 0
-            : e.key === "End"
-              ? buttons.length - 1
-              : -1;
-    if (next < 0) return;
-    e.preventDefault();
-    select(buttons[next].dataset.osTab, true);
-  });
-  return select;
+/** One of a system's other files: a row you click to download. */
+function fileRow(d) {
+  return el(
+    "a",
+    {
+      class: "system__file",
+      href: d.url,
+      rel: "noopener",
+      download: "",
+      "aria-label": `Download ${d.label}, ${plainDetail(d.detail)}${d.size ? `, ${d.size}` : ""}`,
+    },
+    [
+      el("span", { class: "system__text" }, [
+        el("b", { text: d.label }),
+        el("span", { text: plainDetail(d.detail) }),
+        el("small", { text: d.name, title: d.name }),
+      ]),
+      el("span", { class: "system__get" }, [
+        d.size ? el("small", { text: d.size }) : null,
+        icon("i-download"),
+      ]),
+    ],
+  );
 }
 
 function setPrimaryButtons({ href, label, note }) {
@@ -317,15 +296,8 @@ function showProblem(kind) {
     meta: [el("span", { text: "Windows, macOS and Linux, from the project's releases page." })],
     action: linkButton(href, kind === "none" ? "Releases" : "Latest release"),
   });
-  const list = $("[data-dl-tabs]");
-  if (list) list.hidden = true;
-  $("#dl-panel")?.removeAttribute("role");
-  $("[data-dl-rows]")?.replaceChildren(
-    messageRow([
-      document.createTextNode("The file list isn't available right now. "),
-      el("a", { href, rel: "noopener", text: "See every file on GitHub" }),
-    ]),
-  );
+  const systems = $("[data-systems]");
+  if (systems) systems.hidden = true;
   setPrimaryButtons({ href: "#download", label: "Download DataLiq", note: "" });
 }
 
@@ -367,27 +339,32 @@ function render(release, os) {
     });
   }
 
-  // Every file, one sheet per system; this computer's system first shown.
-  const rows = $("[data-dl-rows]");
-  const show = (name) => {
+  // Then every system in its own column: its recommended file, then the rest.
+  for (const card of $$("[data-os]")) {
+    const name = card.dataset.os;
     const items = release.downloads[name] ?? [];
-    rows?.replaceChildren(
-      ...(items.length
-        ? items.map(fileRow)
-        : [
-            messageRow([
-              document.createTextNode(`This release has no ${OS_NAMES[name]} build. `),
-              el("a", { href: RELEASES_URL, rel: "noopener", text: "See earlier releases" }),
-            ]),
-          ]),
-    );
-  };
-  for (const b of $$("[data-os-tab]")) {
-    const yours = b.dataset.osTab === os;
-    b.classList.toggle("is-yours", yours);
-    if (yours) b.title = "Your system";
+    const yours = name === os;
+    card.classList.toggle("is-yours", yours);
+    const badge = $("[data-os-badge]", card);
+    if (badge) badge.hidden = !yours;
+    const main = $("[data-os-main]", card);
+    const more = $("[data-os-more]", card);
+    if (items.length === 0) {
+      main.replaceChildren(
+        el("p", { class: "system__wait" }, [
+          document.createTextNode(`This release has no ${OS_NAMES[name]} build. `),
+          el("a", { href: RELEASES_URL, rel: "noopener", text: "See earlier releases" }),
+        ]),
+      );
+      more.hidden = true;
+      continue;
+    }
+    // The button is strong on this computer's column, or on all of them
+    // when the visitor isn't on a desktop we know.
+    main.replaceChildren(...mainBlock(items[0], yours || !os));
+    $("[data-os-list]", more).replaceChildren(...items.slice(1).map(fileRow));
+    more.hidden = items.length < 2;
   }
-  tabs(show)(os && SYSTEMS.includes(os) ? os : "windows");
 
   const sums = $("[data-release-checksums]");
   if (sums && release.downloads.checksums) {

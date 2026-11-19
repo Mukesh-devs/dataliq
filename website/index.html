@@ -1481,58 +1481,66 @@
             <p class="rec__loading">Looking up the latest release…</p>
           </div>
 
-          <div class="book" data-book>
-            <div class="book__sheet" role="tabpanel" id="dl-panel" tabindex="-1">
-              <div class="book__head" aria-hidden="true">
-                <span></span><span>A · File</span><span>B · For</span><span>C · Size</span
-                ><span></span>
+          <div class="systems" data-systems>
+            <article class="system" data-os="windows" aria-labelledby="sys-windows">
+              <header class="system__head">
+                <span class="system__icon"
+                  ><svg aria-hidden="true"><use href="#i-windows" /></svg
+                ></span>
+                <h3 id="sys-windows">Windows</h3>
+                <span class="system__badge" data-os-badge hidden>This computer</span>
+              </header>
+              <div class="system__main" data-os-main>
+                <p class="system__wait">Looking up the files…</p>
               </div>
-              <div class="book__rows" data-dl-rows></div>
-            </div>
-            <div class="book__tabs">
-              <div class="book__tablist" role="tablist" aria-label="Systems" data-dl-tabs>
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-windows"
-                  data-os-tab="windows"
-                  aria-controls="dl-panel"
-                  aria-selected="false"
-                >
-                  <svg aria-hidden="true"><use href="#i-windows" /></svg>Windows
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-macos"
-                  data-os-tab="macos"
-                  aria-controls="dl-panel"
-                  aria-selected="false"
-                >
-                  <svg aria-hidden="true"><use href="#i-apple" /></svg>macOS
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="tab-linux"
-                  data-os-tab="linux"
-                  aria-controls="dl-panel"
-                  aria-selected="false"
-                >
-                  <svg aria-hidden="true"><use href="#i-linux" /></svg>Linux
-                </button>
+              <div class="system__more" data-os-more hidden>
+                <p class="system__label">More Windows files</p>
+                <div class="system__files" data-os-list></div>
               </div>
-              <div class="book__links">
-                <a href="#" data-release-checksums hidden rel="noopener">SHA-256 checksums</a>
-                <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
-                  >All releases</a
-                >
-                <a href="https://github.com/Mukesh-devs/dataliq#build-from-source" rel="noopener"
-                  >Build from source</a
-                >
+            </article>
+            <article class="system" data-os="macos" aria-labelledby="sys-macos">
+              <header class="system__head">
+                <span class="system__icon"
+                  ><svg aria-hidden="true"><use href="#i-apple" /></svg
+                ></span>
+                <h3 id="sys-macos">macOS</h3>
+                <span class="system__badge" data-os-badge hidden>This computer</span>
+              </header>
+              <div class="system__main" data-os-main>
+                <p class="system__wait">Looking up the files…</p>
               </div>
-            </div>
+              <div class="system__more" data-os-more hidden>
+                <p class="system__label">More macOS files</p>
+                <div class="system__files" data-os-list></div>
+              </div>
+            </article>
+            <article class="system" data-os="linux" aria-labelledby="sys-linux">
+              <header class="system__head">
+                <span class="system__icon"
+                  ><svg aria-hidden="true"><use href="#i-linux" /></svg
+                ></span>
+                <h3 id="sys-linux">Linux</h3>
+                <span class="system__badge" data-os-badge hidden>This computer</span>
+              </header>
+              <div class="system__main" data-os-main>
+                <p class="system__wait">Looking up the files…</p>
+              </div>
+              <div class="system__more" data-os-more hidden>
+                <p class="system__label">More Linux files</p>
+                <div class="system__files" data-os-list></div>
+              </div>
+            </article>
           </div>
+
+          <p class="dl-links">
+            <a href="#" data-release-checksums hidden rel="noopener">SHA-256 checksums</a>
+            <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
+              >All releases</a
+            >
+            <a href="https://github.com/Mukesh-devs/dataliq#build-from-source" rel="noopener"
+              >Build from source</a
+            >
+          </p>
 
           <details class="notes" data-release-notes hidden>
             <summary>

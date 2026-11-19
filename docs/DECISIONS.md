@@ -1324,9 +1324,10 @@ labels are sentence case, and nothing is set in wide or spaced-out capitals.
   dark with the button in the bar; the choice is kept in the browser and
   applied before the first paint.
 - **Downloads.** The file for the visitor's computer first, in a panel
-  with one large button; then a small workbook with every file of the
-  release on one sheet per system (file, what it is for, size), switched
-  with sheet tabs along the bottom like a spreadsheet's, the visitor's
-  system open first and marked. Tabs follow the ARIA tabs pattern (arrow
-  keys, Home, End). Everything still comes from the GitHub Releases API, as
-  in D75.
+  with one large button; then one column per system (Windows, macOS,
+  Linux), each with its recommended file and a button, then its other
+  files with what they are for, their file names and sizes. The visitor's
+  column is marked "This computer" and its button is the strong one (all
+  are strong when the visitor isn't on a desktop). Everything is on screen
+  at once, with no tabs to find. It all still comes from the GitHub
+  Releases API, as in D75.

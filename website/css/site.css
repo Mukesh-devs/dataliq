@@ -1407,7 +1407,7 @@ code {
   margin: 32px 0 0;
 }
 html:not(.js) .rec,
-html:not(.js) .book {
+html:not(.js) .systems {
   display: none;
 }
 
@@ -1472,104 +1472,192 @@ html:not(.js) .book {
   color: var(--muted);
 }
 
-/* Every file: a workbook, one sheet per system. */
-.book {
+/* Every system in its own column: its recommended file, then the rest. */
+.systems {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
   margin-top: 22px;
+}
+.system {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--panel);
   overflow: hidden;
 }
-.book__head,
-.book__row {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1.3fr) minmax(0, 1fr) 104px 72px;
-  align-items: stretch;
+.system.is-yours {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    var(--shadow-sm);
 }
-.book__head span,
-.book__row > span {
+.system__head {
   display: flex;
   align-items: center;
-  min-width: 0;
-  padding: 14px 16px;
-  border-right: 1px solid var(--line-2);
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line-2);
 }
-.book__head span:last-child,
-.book__row > span:last-child {
-  justify-content: center;
-  border-right: 0;
-}
-.book__head span {
-  padding-block: 10px;
+.system__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 11px;
   background: var(--panel-2);
-  color: var(--faint);
-  font: 500 12px/1 var(--mono);
+  color: var(--ink);
 }
-.book__head span:first-child,
-.book__row > span:first-child {
-  justify-content: center;
-  padding-inline: 0;
-  background: var(--panel-2);
-  color: var(--faint);
-  font: 500 12px/1 var(--mono);
-}
-.book__row {
-  border-top: 1px solid var(--line-2);
-  color: inherit;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-.book__row:hover {
+.system.is-yours .system__icon {
   background: var(--accent-soft);
+  color: var(--accent);
 }
-.book__row:hover > span:first-child {
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 700;
+.system__icon svg {
+  width: 20px;
+  height: 20px;
 }
-.book__file {
-  flex-direction: column;
-  align-items: flex-start !important;
-  justify-content: center;
-  gap: 3px;
+.system__head h3 {
+  margin: 0;
+  font-weight: 650;
+  font-size: 22px;
+  letter-spacing: -0.035em;
 }
-.book__file b {
+.system__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.system__badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.system__main {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 20px 22px;
+}
+.system__kind {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
-  font-size: 15.5px;
+  margin: 0;
 }
-.book__file small {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--faint);
-  font: 500 12px/1.4 var(--mono);
+.system__kind b {
+  font-weight: 650;
+  font-size: 17px;
+  letter-spacing: -0.02em;
 }
-.book__chip {
-  padding: 2px 7px;
+.system__chip {
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 11.5px;
   font-weight: 600;
 }
-.book__for {
+.system__detail {
+  margin: 0;
   color: var(--muted);
   font-size: 14.5px;
 }
-.book__size {
-  justify-content: flex-end;
-  color: var(--ink-2);
-  font: 500 13px/1 var(--mono);
+.system__name {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
 }
-.book__get {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
+.system__main .btn {
+  margin-top: 16px;
+  min-height: 48px;
+}
+.system__wait {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+.system__more {
+  border-top: 1px solid var(--line-2);
+  background: color-mix(in srgb, var(--panel-2) 45%, var(--panel));
+  flex: 1;
+}
+.system__label {
+  margin: 0;
+  padding: 14px 20px 6px;
+  color: var(--faint);
+  font-size: 13px;
+  font-weight: 600;
+}
+.system__file {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line-2);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.system__label + .system__files .system__file:first-child {
+  border-top: 0;
+}
+.system__file:hover {
+  background: var(--accent-soft);
+}
+.system__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.system__text b {
+  font-weight: 600;
+  font-size: 15px;
+}
+.system__text span {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.system__text small {
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+  font: 500 11.5px/1.5 var(--mono);
+}
+.system__get {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  color: var(--muted);
+  font: 500 12px/1 var(--mono);
+}
+.system__get svg {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
@@ -1579,87 +1667,25 @@ html:not(.js) .book {
     color 0.15s,
     border-color 0.15s;
 }
-.book__get svg {
-  width: 18px;
-  height: 18px;
-}
-.book__row:hover .book__get {
+.system__file:hover .system__get svg {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-ink);
 }
-.book__empty {
-  grid-column: 2 / -1;
-  color: var(--muted);
-}
-/* Sheet tabs along the bottom, as in a workbook. */
-.book__tabs {
+.dl-links {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  justify-content: space-between;
-  border-top: 1px solid var(--line);
-  background: var(--panel-2);
+  gap: 8px 24px;
+  margin: 20px 0 0;
+  font-size: 14.5px;
 }
-.book__tablist {
-  display: flex;
-}
-.book__tablist button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  height: 46px;
-  padding: 0 20px;
-  border: 0;
-  border-right: 1px solid var(--line);
-  background: transparent;
-  color: var(--muted);
-  font: 500 14.5px/1 var(--sans);
-  cursor: pointer;
-}
-.book__tablist button svg {
-  width: 17px;
-  height: 17px;
-}
-.book__tablist button:hover {
-  color: var(--ink);
-}
-.book__tablist button[aria-selected="true"] {
-  margin-top: -1px;
-  background: var(--panel);
-  color: var(--ink);
-  font-weight: 600;
-  box-shadow: inset 0 -3px 0 var(--accent);
-}
-.book__tablist button.is-yours::after {
-  content: "";
-  position: absolute;
-  top: 9px;
-  right: 8px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.book__links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 20px;
-  padding: 10px 18px;
-  font-size: 14px;
-}
-.book__links a {
+.dl-links a {
   color: var(--muted);
   font-weight: 500;
-  text-decoration: none;
+  text-underline-offset: 4px;
 }
-.book__links a:hover {
+.dl-links a:hover {
   color: var(--accent);
-}
-.book__links a[hidden] {
-  display: none;
 }
 .notes {
   margin-top: 22px;
@@ -1937,6 +1963,12 @@ html:not(.js) .book {
   }
 }
 
+@media (max-width: 1000px) {
+  .systems {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 900px) {
   .nav__menu {
     display: grid;
@@ -1979,14 +2011,6 @@ html:not(.js) .book {
   }
   .rec .btn {
     grid-column: 1 / -1;
-  }
-  .book__head,
-  .book__row {
-    grid-template-columns: 44px minmax(0, 1fr) 96px 64px;
-  }
-  .book__head span:nth-child(3),
-  .book__for {
-    display: none !important;
   }
 }
 
@@ -2062,31 +2086,6 @@ html:not(.js) .book {
   .rec__icon {
     width: 52px;
     height: 52px;
-  }
-  .book__head {
-    display: none;
-  }
-  .book__row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .book__row > span:first-child,
-  .book__size {
-    display: none !important;
-  }
-  .book__tablist {
-    width: 100%;
-  }
-  .book__tablist button {
-    flex: 1;
-    justify-content: center;
-    padding: 0 10px;
-  }
-  .book__tablist button:last-child {
-    border-right: 0;
-  }
-  .book__links {
-    width: 100%;
-    border-top: 1px solid var(--line);
   }
   .footer__base {
     flex-direction: column;
