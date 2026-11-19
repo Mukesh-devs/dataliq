@@ -12,7 +12,10 @@ All notable changes to this project are documented here. The format follows
   a highlighted cell follows the pointer, cell references as section labels, the speed
   figures as cells, the other features as a table, a floating header, Geist type, and light
   and dark themes with a switch. Downloads are clearer: the file for your computer first,
-  then a column for each system with its recommended file and its other files. It shows four real screenshots
+  then a column for each system with its recommended file and its other files. Scrolling is
+  smoother, with effects taken from spreadsheets: headings filled in by a dragged selection,
+  rows filling in, screenshots that un-crop as you scroll, and a name box in the header that
+  shows where you are (all off when your system asks for reduced motion). It shows four real screenshots
   of version 1.8, each in light and dark.
 
 ## [1.8.0] - 2026-11-18

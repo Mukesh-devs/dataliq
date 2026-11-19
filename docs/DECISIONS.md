@@ -1320,6 +1320,18 @@ labels are sentence case, and nothing is set in wide or spaced-out capitals.
   JetBrains Mono (the app's data font) only for data: cell references, file
   names, sizes, code. Both are variable fonts (one file each, about 30 KB
   and 40 KB) served from the site.
+- **Motion.** Scrolling is the site's own, under 200 lines with no
+  library: the wheel eases toward where it points and in-page links glide,
+  but the browser keeps doing the scrolling, so the scroll bar, keyboard,
+  touch, find-in-page and areas that scroll on their own work as usual,
+  and the visitor's own scrolling always wins over an easing in progress.
+  The effects are spreadsheet gestures rather than the usual fade-and-rise:
+  a selection box with its fill handle drags across each heading and the
+  text fills in behind it; rows fill in one after another and their row
+  number lights up; screenshots un-crop in step with the scroll (and back);
+  the speed cells are selected one by one; the hero eases away; the
+  header's name box shows the section's cell reference. "Reduce motion"
+  turns all of it off, and nothing depends on it to be read.
 - **Theme.** The page follows the system until the visitor picks light or
   dark with the button in the bar; the choice is kept in the browser and
   applied before the first paint.

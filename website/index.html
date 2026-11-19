@@ -816,6 +816,9 @@
           <img src="assets/icon.svg" width="28" height="28" alt="" />
           <span>DataLiq</span>
         </a>
+        <span class="namebox" aria-hidden="true" data-namebox
+          ><b data-namebox-ref>A1</b><span data-namebox-name>DataLiq</span></span
+        >
         <nav class="nav__links" aria-label="Main" data-menu>
           <a href="#features">Features</a>
           <a href="#speed">Speed</a>
@@ -1000,7 +1003,7 @@
             ><span class="eyebrow__meta">Measured on a 4-core Linux machine</span>
           </p>
           <div class="speed__intro">
-            <h2 class="display reveal" id="speed-title">
+            <h2 class="display sweep" id="speed-title">
               Built for the files that freeze spreadsheets.
             </h2>
             <p class="reveal">
@@ -1015,7 +1018,7 @@
             <span class="fx__f">fx</span>
             <span class="fx__text" data-fx-text>first_rows("orders_5gb.csv")</span>
           </div>
-          <dl class="cells" data-cells>
+          <dl class="cells" data-cells data-fill>
             <div class="cell" data-ref="B2" data-fx='first_rows("a 5 GB CSV")'>
               <dt>First rows of a 5 GB CSV</dt>
               <dd><span data-count="0.28" data-decimals="2">0.28</span><small>s</small></dd>
@@ -1059,27 +1062,27 @@
             <span class="eyebrow__ref">A3</span><span class="eyebrow__name">Features</span
             ><span class="eyebrow__meta">The real app on real files</span>
           </p>
-          <h2 class="display features__title reveal" id="features-title">
+          <h2 class="display features__title sweep" id="features-title">
             From a raw file to an answer, without leaving the window.
           </h2>
 
-          <article class="feature reveal" aria-labelledby="f-sql">
+          <article class="feature" aria-labelledby="f-sql">
             <div class="feature__text">
-              <p class="feature__no">SQL</p>
-              <h3 id="f-sql">Every open file is a table.</h3>
-              <p>
+              <p class="feature__no reveal">SQL</p>
+              <h3 class="sweep" id="f-sql">Every open file is a table.</h3>
+              <p class="reveal">
                 Query, join and aggregate your files with SQL. Drag a column from the sidebar into
                 the editor, or Ctrl+click it, and its name goes in where you want it.
                 <code>current_view</code> is always the rows on screen, with your filters applied.
               </p>
-              <ul class="ticks">
+              <ul class="ticks" data-fill>
                 <li>Explain plans, history and saved queries</li>
                 <li>Open any result as a new tab</li>
                 <li>Joins across files, folders and databases</li>
               </ul>
-              <p class="feature__stat"><b>48 ms</b> for this query over 9.2M rows</p>
+              <p class="feature__stat reveal"><b>48 ms</b> for this query over 9.2M rows</p>
             </div>
-            <figure class="feature__shot">
+            <figure class="feature__shot" data-scrub>
               <div class="window">
                 <div class="window__bar" aria-hidden="true">
                   <i></i><i></i><i></i><span>SQL</span>
@@ -1121,23 +1124,23 @@
             </figure>
           </article>
 
-          <article class="feature reveal" aria-labelledby="f-json">
+          <article class="feature" aria-labelledby="f-json">
             <div class="feature__text">
-              <p class="feature__no">JSON</p>
-              <h3 id="f-json">See the shape of JSON before you read a line.</h3>
-              <p>
+              <p class="feature__no reveal">JSON</p>
+              <h3 class="sweep" id="f-json">See the shape of JSON before you read a line.</h3>
+              <p class="reveal">
                 The structure view reads every record and draws one map: each key with its type, how
                 often it appears and how long its arrays are. Here, two million log records show
                 that <code>user_id</code> is in 80% of them.
               </p>
-              <ul class="ticks">
+              <ul class="ticks" data-fill>
                 <li>One record as connected cards, or the shape of all</li>
                 <li>Filter by a value, add it as a column, unnest arrays</li>
                 <li>Also for nested Parquet columns</li>
               </ul>
-              <p class="feature__stat"><b>2,072,884</b> records in one map</p>
+              <p class="feature__stat reveal"><b>2,072,884</b> records in one map</p>
             </div>
-            <figure class="feature__shot">
+            <figure class="feature__shot" data-scrub>
               <div class="window">
                 <div class="window__bar" aria-hidden="true">
                   <i></i><i></i><i></i><span>web_logs.ndjson.gz — Structure</span>
@@ -1179,23 +1182,23 @@
             </figure>
           </article>
 
-          <article class="feature reveal" aria-labelledby="f-chart">
+          <article class="feature" aria-labelledby="f-chart">
             <div class="feature__text">
-              <p class="feature__no">Charts</p>
-              <h3 id="f-chart">Charts from the whole file, not a sample.</h3>
-              <p>
+              <p class="feature__no reveal">Charts</p>
+              <h3 class="sweep" id="f-chart">Charts from the whole file, not a sample.</h3>
+              <p class="reveal">
                 Bar, line, pie, histogram, scatter and box plots, computed by the engine over every
                 row. Group by a date, split by a column, stack it. Export as PNG or SVG, or copy the
                 chart's SQL.
               </p>
-              <ul class="ticks">
+              <ul class="ticks" data-fill>
                 <li>Dates bucketed by day, month or year</li>
                 <li>Sum, average, count and more</li>
                 <li>Follows your filters as you change them</li>
               </ul>
-              <p class="feature__stat"><b>543 ms</b> for 60 bars over 9.2M rows</p>
+              <p class="feature__stat reveal"><b>543 ms</b> for 60 bars over 9.2M rows</p>
             </div>
-            <figure class="feature__shot">
+            <figure class="feature__shot" data-scrub>
               <div class="window">
                 <div class="window__bar" aria-hidden="true">
                   <i></i><i></i><i></i><span>orders.csv — Chart</span>
@@ -1237,9 +1240,9 @@
             </figure>
           </article>
 
-          <div class="more reveal">
-            <h3 class="more__title">And everything else you reach for.</h3>
-            <div class="table" role="table" aria-label="More features">
+          <div class="more">
+            <h3 class="more__title sweep">And everything else you reach for.</h3>
+            <div class="table" role="table" aria-label="More features" data-fill>
               <div class="table__head" role="row">
                 <span role="columnheader"><abbr title="Row">#</abbr></span>
                 <span role="columnheader">A · Feature</span>
@@ -1371,7 +1374,7 @@
             ><span class="eyebrow__meta">Command line and MCP</span>
           </p>
           <div class="automation__text">
-            <h2 class="display reveal" id="auto-title">Run it without the window.</h2>
+            <h2 class="display sweep" id="auto-title">Run it without the window.</h2>
             <p class="reveal">
               Save your cleaning steps as a recipe and apply them from the command line: reports on
               a schedule, with no window. Or turn on the built-in MCP server and let Claude Desktop,
@@ -1379,7 +1382,7 @@
               read-only, limited to those folders, every call is logged, and it is off until you
               turn it on.
             </p>
-            <div class="tools reveal" role="table" aria-label="What an assistant can do">
+            <div class="tools" role="table" data-fill aria-label="What an assistant can do">
               <div role="row">
                 <code role="cell">list_files</code
                 ><span role="cell">The data files in the folders you share</span>
@@ -1427,11 +1430,13 @@
             <span class="eyebrow__ref">A5</span><span class="eyebrow__name">Privacy</span
             ><span class="eyebrow__meta">Offline by design</span>
           </p>
-          <p class="privacy__big reveal" aria-hidden="true"><span>0</span> bytes uploaded.</p>
+          <p class="privacy__big sweep" aria-hidden="true">
+            <span class="privacy__zero">0</span> bytes uploaded.
+          </p>
           <h2 class="privacy__title reveal" id="privacy-title">
             Your data stays on your computer.
           </h2>
-          <div class="privacy__grid reveal">
+          <div class="privacy__grid" data-fill>
             <div class="pcell">
               <svg aria-hidden="true"><use href="#i-user" /></svg><b>No account</b
               ><span>Open the app and work. Nothing to sign up for.</span>
@@ -1461,7 +1466,7 @@
             ><span class="eyebrow__meta">Free, open source, no account</span>
           </p>
           <div class="download__head">
-            <h2 class="display" id="download-title">
+            <h2 class="display sweep" id="download-title">
               Get DataLiq <span class="tag tag--lg" data-release-version>Latest</span>
             </h2>
             <p class="download__meta" data-release-meta>
@@ -1481,7 +1486,7 @@
             <p class="rec__loading">Looking up the latest release…</p>
           </div>
 
-          <div class="systems" data-systems>
+          <div class="systems" data-systems data-fill>
             <article class="system" data-os="windows" aria-labelledby="sys-windows">
               <header class="system__head">
                 <span class="system__icon"
@@ -1563,7 +1568,7 @@
             ><span class="eyebrow__meta">Short answers</span>
           </p>
           <div class="questions__side">
-            <h2 class="display" id="q-title">Good to know.</h2>
+            <h2 class="display sweep" id="q-title">Good to know.</h2>
             <p>
               Something else?
               <a href="https://github.com/Mukesh-devs/dataliq/issues" rel="noopener"
@@ -1571,7 +1576,7 @@
               >
             </p>
           </div>
-          <div class="faq">
+          <div class="faq" data-fill>
             <details>
               <summary>
                 Is it really free?<svg aria-hidden="true"><use href="#i-down" /></svg>

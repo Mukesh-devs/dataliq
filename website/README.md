@@ -43,6 +43,15 @@ one column per system with its recommended file and its other files. The
 header floats, rounded, with a line that shows how far down the page you are; a row header
 of the sections appears on the left of wide screens once the hero has scrolled away.
 
+Scrolling is the site's own (`js/scroll.js`, no library): the mouse wheel eases instead of
+jumping and in-page links glide, while the browser still does the scrolling (scroll bar,
+keyboard, touch and find-in-page behave as usual). The effects borrow spreadsheet gestures:
+headings are filled in by a selection box dragged across with the fill handle, rows fill in
+one after another with their row number lighting up, screenshots un-crop in step with the
+scroll, the speed cells are selected one by one, the hero eases away, and the header's name
+box shows the cell reference of the section in view. With "reduce motion" set, none of this
+runs and everything is shown at once.
+
 Type is Geist (headings and text) with JetBrains Mono for data (file names, cell
 references); both are variable fonts under the SIL Open Font License, served from
 `assets/fonts/`. Light and dark themes follow the system until the visitor picks one with
@@ -54,8 +63,9 @@ the button in the header (remembered in the browser).
 | --- | --- |
 | `index.html` | The page: every section, in order |
 | `css/site.css` | Design tokens, then the pieces, then the sections top to bottom |
-| `js/main.js` | Starts the two parts below |
-| `js/site.js` | Theme, menu, the row header, the hero's cell grid, reveals, the tilted showcase, the header's progress line, counters, formula bar, ticker, terminal typing, lightbox, the footer's fitted wordmark |
+| `js/main.js` | Starts the parts below |
+| `js/scroll.js` | Eased wheel scrolling, gliding in-page links, the hero easing away, screenshots un-cropping with the scroll |
+| `js/site.js` | Theme, menu, the row header and name box, the hero's cell grid, reveals (rise, sweep, fill), the tilted showcase, the header's progress line, counters, formula bar, ticker, terminal typing, lightbox, the footer's fitted wordmark |
 | `js/releases.js` | The latest release: lookup, the file for this computer, one column of files per system, release notes (sanitized) |
 | `js/release-assets.js` | Pure functions: which file is which download, which system the visitor has |
 | `404.html`, `robots.txt`, `sitemap.xml`, `site.webmanifest` | For GitHub Pages and search engines |

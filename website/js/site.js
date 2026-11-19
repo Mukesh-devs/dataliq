@@ -61,8 +61,20 @@ function nav() {
   for (const a of $$('.nav__links a[href^="#"], [data-rows] a'))
     links.set(a, a.getAttribute("href").slice(1));
   const sections = $$("main > section[id]");
+  const box = $("[data-namebox]");
+  let shown = "top";
   const mark = (id) => {
     for (const [a, target] of links) a.classList.toggle("is-on", target === id);
+    if (!box || id === shown) return;
+    shown = id;
+    // The section's own cell reference, as in a spreadsheet's name box.
+    const section = document.getElementById(id);
+    $("[data-namebox-ref]", box).textContent = $(".eyebrow__ref", section)?.textContent ?? "A1";
+    $("[data-namebox-name]", box).textContent =
+      $(".eyebrow__name", section)?.textContent ?? "DataLiq";
+    box.classList.remove("is-swap");
+    void box.offsetWidth; // restart the animation
+    box.classList.add("is-swap");
   };
   const io = new IntersectionObserver(
     (entries) => {
@@ -149,8 +161,36 @@ function sheet() {
 }
 
 /* ------------------------------------------------------------ reveals */
+/**
+ * Three kinds, all run once as they come into view:
+ * `.reveal` rises into focus; `.sweep` (headings) is filled in by a
+ * selection box dragged across with the fill handle; `[data-fill]` shows
+ * its rows one after another, like a range filling down.
+ */
 function reveals() {
-  const items = $$(".reveal");
+  for (const h of $$(".sweep")) {
+    const text = document.createElement("span");
+    text.className = "sweep__text";
+    text.append(...h.childNodes);
+    h.append(text);
+  }
+  const items = $$(".reveal, .sweep, [data-fill]");
+  // The selection hugs the longest line, not the heading's whole width.
+  const hug = (h) => {
+    const range = document.createRange();
+    range.selectNodeContents(h.firstElementChild);
+    let right = 0;
+    for (const r of range.getClientRects()) right = Math.max(right, r.right);
+    const gap = h.getBoundingClientRect().right - right;
+    if (right && gap > 0) h.style.setProperty("--gap", `${Math.round(gap)}px`);
+  };
+  const show = (el) => {
+    if (el.classList.contains("sweep")) hug(el);
+    if (el.hasAttribute("data-fill"))
+      for (const [i, child] of [...el.children].entries())
+        child.style.setProperty("--i", String(Math.min(i, 12)));
+    el.classList.add("in");
+  };
   if (reduced() || !("IntersectionObserver" in window)) {
     for (const el of items) el.classList.add("in");
     return;
@@ -159,11 +199,11 @@ function reveals() {
     (entries) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;
-        e.target.classList.add("in");
+        show(e.target);
         io.unobserve(e.target);
       }
     },
-    { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
+    { rootMargin: "0px 0px -10% 0px", threshold: 0.05 },
   );
   for (const el of items) io.observe(el);
 }
@@ -239,12 +279,34 @@ function cells() {
     ref.textContent = c.dataset.ref;
     text.textContent = c.dataset.fx;
   };
+  // The visitor takes over by moving the pointer or the focus; the page
+  // scrolling under a resting pointer doesn't count.
+  let touched = false;
   for (const c of all) {
     c.tabIndex = 0;
-    c.addEventListener("pointerenter", () => pick(c));
-    c.addEventListener("focus", () => pick(c));
+    c.addEventListener("pointermove", (e) => {
+      if (!e.movementX && !e.movementY) return;
+      touched = true;
+      pick(c);
+    });
+    c.addEventListener("focus", () => {
+      touched = true;
+      pick(c);
+    });
   }
   pick(all[0]);
+  if (reduced()) return;
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      // Like moving through the cells with the arrow keys, then back to B2.
+      const steps = [...all.slice(1), all[0]];
+      steps.forEach((c, i) => setTimeout(() => !touched && pick(c), 380 + i * 150));
+    },
+    { threshold: 0.5 },
+  );
+  io.observe(ref.closest(".wrap") ?? all[0]);
 }
 
 /* ------------------------------------------------------- the ticker */
