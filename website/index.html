@@ -8,7 +8,8 @@
       name="description"
       content="DataLiq is a free desktop app for Windows, macOS and Linux that opens multi-gigabyte CSV, Parquet, JSON and Excel files in about a second. Filter, query with SQL, chart, clean and export millions of rows. Fully offline."
     />
-    <meta name="theme-color" content="#0b1530" />
+    <meta name="theme-color" content="#f1f0ec" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d0e11" media="(prefers-color-scheme: dark)" />
     <link rel="canonical" href="https://mukesh-devs.github.io/dataliq/" />
 
     <meta property="og:type" content="website" />
@@ -16,7 +17,7 @@
     <meta property="og:title" content="DataLiq — Open huge data files in seconds" />
     <meta
       property="og:description"
-      content="A desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files instantly. Filter, query with SQL, chart, clean and export. Free, open source, fully offline."
+      content="A desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files in about a second. Filter, query with SQL, chart, clean and export. Free, open source, fully offline."
     />
     <meta property="og:url" content="https://mukesh-devs.github.io/dataliq/" />
     <meta property="og:image" content="https://mukesh-devs.github.io/dataliq/assets/og.png" />
@@ -24,7 +25,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="The DataLiq window showing a 9-million-row CSV file with a column profile"
+      content="DataLiq: open huge data files in seconds. The app showing a 9-million-row CSV file."
     />
     <meta name="twitter:card" content="summary_large_image" />
 
@@ -35,18 +36,17 @@
 
     <link
       rel="preload"
-      href="assets/fonts/inter-latin.woff2"
+      href="assets/fonts/archivo-latin.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
     <link
       rel="preload"
-      as="image"
-      href="assets/shots/hero-light-1280.webp"
-      imagesrcset="assets/shots/hero-light-1280.webp 1280w, assets/shots/hero-light-2560.webp 2560w"
-      imagesizes="(min-width: 1240px) 1120px, 94vw"
-      fetchpriority="high"
+      href="assets/fonts/inter-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <link rel="preconnect" href="https://api.github.com" crossorigin />
     <link rel="stylesheet" href="css/site.css" />
@@ -66,54 +66,31 @@
       }
     </script>
     <script>
-      // Animations only start hidden when scripts run.
-      document.documentElement.classList.add("js");
+      // Before the first paint: the theme (chosen here, else the system's),
+      // and animations start hidden only when scripts run.
+      (function () {
+        var d = document.documentElement;
+        d.classList.add("js");
+        var t = null;
+        try {
+          t = localStorage.getItem("dataliq.site.theme");
+        } catch (e) {}
+        if (t !== "light" && t !== "dark")
+          t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        d.dataset.theme = t;
+      })();
     </script>
   </head>
 
   <body>
     <a class="skip" href="#main">Skip to content</a>
 
-    <!-- Icons used more than once. -->
     <svg class="sprite" aria-hidden="true" focusable="false">
       <symbol id="i-github" viewBox="0 0 24 24">
         <path
           fill="currentColor"
           d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.3-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.06.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
         />
-      </symbol>
-      <symbol
-        id="i-download"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-      </symbol>
-      <symbol
-        id="i-arrow"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M5 12h14m0 0-6-6m6 6-6 6" />
-      </symbol>
-      <symbol
-        id="i-check"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.4"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="m5 12.5 4.5 4.5L19 7.5" />
       </symbol>
       <symbol id="i-windows" viewBox="0 0 24 24">
         <path
@@ -144,944 +121,1507 @@
         />
         <path d="M10.200 6.800h.01M13.800 6.800h.01M10.500 9.300c.5.5 1 .7 1.500.7s1-.2 1.500-.7" />
       </symbol>
+      <symbol
+        id="i-download"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 15V3"></path>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <path d="m7 10 5 5 5-5"></path>
+      </symbol>
+      <symbol
+        id="i-arrow"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M5 12h14"></path>
+        <path d="m12 5 7 7-7 7"></path>
+      </symbol>
+      <symbol
+        id="i-down"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 5v14"></path>
+        <path d="m19 12-7 7-7-7"></path>
+      </symbol>
+      <symbol
+        id="i-out"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M7 7h10v10"></path>
+        <path d="M7 17 17 7"></path>
+      </symbol>
+      <symbol
+        id="i-check"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M20 6 9 17l-5-5"></path>
+      </symbol>
+      <symbol
+        id="i-sun"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2"></path>
+        <path d="M12 20v2"></path>
+        <path d="m4.93 4.93 1.41 1.41"></path>
+        <path d="m17.66 17.66 1.41 1.41"></path>
+        <path d="M2 12h2"></path>
+        <path d="M20 12h2"></path>
+        <path d="m6.34 17.66-1.41 1.41"></path>
+        <path d="m19.07 4.93-1.41 1.41"></path>
+      </symbol>
+      <symbol
+        id="i-moon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+        ></path>
+      </symbol>
+      <symbol
+        id="i-menu"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M4 5h16"></path>
+        <path d="M4 12h16"></path>
+        <path d="M4 19h16"></path>
+      </symbol>
+      <symbol
+        id="i-close"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </symbol>
+      <symbol
+        id="i-terminal"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m7 11 2-2-2-2"></path>
+        <path d="M11 13h4"></path>
+        <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+      </symbol>
+      <symbol
+        id="i-lock"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </symbol>
+      <symbol
+        id="i-filter"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"
+        ></path>
+      </symbol>
+      <symbol
+        id="i-sigma"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"
+        ></path>
+      </symbol>
+      <symbol
+        id="i-wand"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"
+        ></path>
+        <path d="m14 7 3 3"></path>
+        <path d="M5 6v4"></path>
+        <path d="M19 14v4"></path>
+        <path d="M10 2v2"></path>
+        <path d="M7 8H3"></path>
+        <path d="M21 16h-4"></path>
+        <path d="M11 3H9"></path>
+      </symbol>
+      <symbol
+        id="i-shield"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+        ></path>
+        <path d="m9 12 2 2 4-4"></path>
+      </symbol>
+      <symbol
+        id="i-compare"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="5" cy="6" r="3"></circle>
+        <path d="M12 6h5a2 2 0 0 1 2 2v7"></path>
+        <path d="m15 9-3-3 3-3"></path>
+        <circle cx="19" cy="18" r="3"></circle>
+        <path d="M12 18H7a2 2 0 0 1-2-2V9"></path>
+        <path d="m9 15 3 3-3 3"></path>
+      </symbol>
+      <symbol
+        id="i-pivot"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M3 9h18"></path>
+        <path d="M9 3v18"></path>
+        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+      </symbol>
+      <symbol
+        id="i-merge"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m8 6 4-4 4 4"></path>
+        <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22"></path>
+        <path d="m20 22-5-5"></path>
+      </symbol>
+      <symbol
+        id="i-export"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M4.226 20.925A2 2 0 0 0 6 22h12a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v3.127"
+        ></path>
+        <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+        <path d="m5 11-3 3"></path>
+        <path d="m5 17-3-3h10"></path>
+      </symbol>
+      <symbol
+        id="i-database"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+        <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+        <path d="M3 12A9 3 0 0 0 21 12"></path>
+      </symbol>
+      <symbol
+        id="i-globe"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+        <path d="M2 12h20"></path>
+      </symbol>
+      <symbol
+        id="i-history"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+        <path d="M3 3v5h5"></path>
+        <path d="M12 7v5l4 2"></path>
+      </symbol>
+      <symbol
+        id="i-undo"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M9 14 4 9l5-5"></path>
+        <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"></path>
+      </symbol>
+      <symbol
+        id="i-command"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"></path>
+      </symbol>
+      <symbol
+        id="i-contrast"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 18a6 6 0 0 0 0-12v12z"></path>
+      </symbol>
+      <symbol
+        id="i-braces"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"></path>
+        <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"></path>
+      </symbol>
+      <symbol
+        id="i-chart"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M3 3v16a2 2 0 0 0 2 2h16"></path>
+        <path d="M18 17V9"></path>
+        <path d="M13 17V5"></path>
+        <path d="M8 17v-3"></path>
+      </symbol>
+      <symbol
+        id="i-sql"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m7 11 2-2-2-2"></path>
+        <path d="M11 13h4"></path>
+        <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+      </symbol>
+      <symbol
+        id="i-bot"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 8V4H8"></path>
+        <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+        <path d="M2 14h2"></path>
+        <path d="M20 14h2"></path>
+        <path d="M15 13v2"></path>
+        <path d="M9 13v2"></path>
+      </symbol>
+      <symbol
+        id="i-columns"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+        <path d="M9 3v18"></path>
+        <path d="M15 3v18"></path>
+      </symbol>
+      <symbol
+        id="i-search"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m21 21-4.34-4.34"></path>
+        <circle cx="11" cy="11" r="8"></circle>
+      </symbol>
+      <symbol
+        id="i-zap"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"
+        ></path>
+      </symbol>
+      <symbol
+        id="i-drive"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M10 16h.01"></path>
+        <path
+          d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"
+        ></path>
+        <path d="M21.946 12.013H2.054"></path>
+        <path d="M6 16h.01"></path>
+      </symbol>
+      <symbol
+        id="i-expand"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M15 3h6v6"></path>
+        <path d="m21 3-7 7"></path>
+        <path d="m3 21 7-7"></path>
+        <path d="M9 21H3v-6"></path>
+      </symbol>
+      <symbol
+        id="i-folder"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"
+        ></path>
+      </symbol>
+      <symbol
+        id="i-settings"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
+        ></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </symbol>
+      <symbol
+        id="i-book"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 5v16"></path>
+        <path
+          d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"
+        ></path>
+      </symbol>
+      <symbol
+        id="i-copy"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+      </symbol>
+      <symbol
+        id="i-grip"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="9" cy="12" r="1"></circle>
+        <circle cx="9" cy="5" r="1"></circle>
+        <circle cx="9" cy="19" r="1"></circle>
+        <circle cx="15" cy="12" r="1"></circle>
+        <circle cx="15" cy="5" r="1"></circle>
+        <circle cx="15" cy="19" r="1"></circle>
+      </symbol>
+      <symbol
+        id="i-eye"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
+        ></path>
+        <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"></path>
+        <path
+          d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
+        ></path>
+        <path d="m2 2 20 20"></path>
+      </symbol>
+      <symbol
+        id="i-user"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <line x1="17" x2="22" y1="8" y2="13"></line>
+        <line x1="22" x2="17" y1="8" y2="13"></line>
+      </symbol>
+      <symbol
+        id="i-cloud"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057"></path>
+        <path d="M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78"></path>
+        <path d="m2 2 20 20"></path>
+      </symbol>
+      <symbol
+        id="i-file"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+        ></path>
+        <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+        <path d="M10 9H8"></path>
+        <path d="M16 13H8"></path>
+        <path d="M16 17H8"></path>
+      </symbol>
+      <symbol
+        id="i-layers"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
+        ></path>
+        <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path>
+        <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path>
+      </symbol>
+      <symbol
+        id="i-shuffle"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m18 14 4 4-4 4"></path>
+        <path d="m18 2 4 4-4 4"></path>
+        <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"></path>
+        <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"></path>
+        <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"></path>
+      </symbol>
+      <symbol
+        id="i-ruler"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"
+        ></path>
+        <path d="m14.5 12.5 2-2"></path>
+        <path d="m11.5 9.5 2-2"></path>
+        <path d="m8.5 6.5 2-2"></path>
+        <path d="m17.5 15.5 2-2"></path>
+      </symbol>
+      <symbol
+        id="i-keyboard"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M10 8h.01"></path>
+        <path d="M12 12h.01"></path>
+        <path d="M14 8h.01"></path>
+        <path d="M16 12h.01"></path>
+        <path d="M18 8h.01"></path>
+        <path d="M6 8h.01"></path>
+        <path d="M7 16h10"></path>
+        <path d="M8 12h.01"></path>
+        <rect width="20" height="16" x="2" y="4" rx="2"></rect>
+      </symbol>
+      <symbol
+        id="i-refresh"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+        <path d="M21 3v5h-5"></path>
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+        <path d="M8 16H3v5"></path>
+      </symbol>
+      <symbol
+        id="i-save"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path
+          d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
+        ></path>
+        <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path>
+        <path d="M7 3v4a1 1 0 0 0 1 1h7"></path>
+      </symbol>
     </svg>
 
+    <!-- The frame: a row header on the left, a ruler on the right (wide screens). -->
+    <aside class="rail rail--rows" aria-label="Sections" data-rows>
+      <a href="#top" data-row="top"><span>01</span><b>DataLiq</b></a>
+      <a href="#speed" data-row="speed"><span>02</span><b>Speed</b></a>
+      <a href="#features" data-row="features"><span>03</span><b>Features</b></a>
+      <a href="#automation" data-row="automation"><span>04</span><b>Automation</b></a>
+      <a href="#privacy" data-row="privacy"><span>05</span><b>Privacy</b></a>
+      <a href="#download" data-row="download"><span>06</span><b>Download</b></a>
+      <a href="#questions" data-row="questions"><span>07</span><b>Questions</b></a>
+    </aside>
+    <div class="rail rail--ruler" aria-hidden="true" data-ruler>
+      <div class="ruler__ticks"></div>
+      <div class="ruler__mark" data-ruler-mark><span data-ruler-value>000</span>%</div>
+    </div>
+
     <header class="nav" data-nav>
-      <div class="container nav__inner">
-        <a class="brand" href="#top" aria-label="DataLiq, home">
-          <img src="assets/icon.svg" width="34" height="34" alt="" />
-          <span>DataLiq</span>
+      <a class="nav__brand" href="#top" aria-label="DataLiq, to the top">
+        <img src="assets/icon.svg" width="30" height="30" alt="" />
+        <span class="wordmark">DataLiq</span>
+      </a>
+      <nav class="nav__links" aria-label="Main" data-menu>
+        <a href="#features">Features</a>
+        <a href="#speed">Speed</a>
+        <a href="#automation">Automation</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#questions">Questions</a>
+        <a class="nav__docs" href="https://github.com/Mukesh-devs/dataliq#readme" rel="noopener"
+          >Docs <svg aria-hidden="true"><use href="#i-out" /></svg
+        ></a>
+      </nav>
+      <div class="nav__tools">
+        <a
+          class="nav__cell"
+          href="https://github.com/Mukesh-devs/dataliq"
+          rel="noopener"
+          aria-label="DataLiq on GitHub"
+          title="DataLiq on GitHub"
+          ><svg aria-hidden="true"><use href="#i-github" /></svg
+        ></a>
+        <button
+          class="nav__cell"
+          type="button"
+          data-theme-toggle
+          aria-label="Switch to dark theme"
+          title="Switch theme"
+        >
+          <svg class="only-light" aria-hidden="true"><use href="#i-moon" /></svg>
+          <svg class="only-dark" aria-hidden="true"><use href="#i-sun" /></svg>
+        </button>
+        <button
+          class="nav__cell nav__menu"
+          type="button"
+          aria-expanded="false"
+          aria-label="Menu"
+          data-menu-toggle
+        >
+          <svg aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+        <a class="nav__get" href="#download" data-download-primary>
+          <svg aria-hidden="true"><use href="#i-download" /></svg>
+          <span data-download-label>Download</span>
         </a>
-        <nav class="nav__links" aria-label="Sections">
-          <a href="#tour">Tour</a>
-          <a href="#speed">Performance</a>
-          <a href="#features">Features</a>
-          <a href="#automate">Automation</a>
-          <a href="#download">Download</a>
-        </nav>
-        <div class="nav__actions">
-          <a class="nav__github" href="https://github.com/Mukesh-devs/dataliq" rel="noopener">
-            <svg width="20" height="20" aria-hidden="true"><use href="#i-github" /></svg>
-            <span>GitHub</span>
-          </a>
-          <a class="btn btn--primary btn--sm" href="#download" data-download-primary>
-            <svg width="16" height="16" aria-hidden="true"><use href="#i-download" /></svg>
-            <span data-download-label>Download</span>
-          </a>
-        </div>
       </div>
     </header>
 
     <main id="main">
-      <!-- ───────────────────────── Hero ───────────────────────── -->
-      <section class="hero" id="top">
-        <div class="hero__bg" aria-hidden="true">
-          <div class="hero__grid"></div>
-          <svg class="hero__curves" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
-            <defs>
-              <linearGradient id="curve" x1="0" x2="1" y1="0" y2="0">
-                <stop offset="0" stop-color="#3b82f6" stop-opacity="0" />
-                <stop offset=".5" stop-color="#3b82f6" stop-opacity=".35" />
-                <stop offset="1" stop-color="#6366f1" stop-opacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M-80 520 C 260 300, 520 760, 900 470 S 1420 300, 1560 470"
-              fill="none"
-              stroke="url(#curve)"
-              stroke-width="1.5"
-            />
-            <path
-              d="M-80 600 C 300 380, 560 820, 940 540 S 1440 380, 1560 560"
-              fill="none"
-              stroke="url(#curve)"
-              stroke-width="1"
-            />
-            <path
-              d="M-80 690 C 320 480, 600 880, 980 620 S 1460 470, 1560 650"
-              fill="none"
-              stroke="url(#curve)"
-              stroke-width="1"
-              opacity=".6"
-            />
-            <circle cx="1180" cy="170" r="210" fill="none" stroke="url(#curve)" stroke-width="1" />
-            <circle
-              cx="1180"
-              cy="170"
-              r="300"
-              fill="none"
-              stroke="url(#curve)"
-              stroke-width="1"
-              opacity=".5"
-            />
-          </svg>
+      <!-- 01 · Hero: the page as a sheet -->
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="shead">
+          <span>01 / DataLiq</span>
+          <span class="shead__meta">Desktop data viewer · Windows, macOS, Linux</span>
         </div>
+        <div class="sheet" data-sheet>
+          <div class="sheet__cols" aria-hidden="true" data-sheet-cols></div>
+          <div class="sheet__rows" aria-hidden="true" data-sheet-rows></div>
+          <div class="sheet__cell" aria-hidden="true" data-sheet-cell></div>
+          <div class="sheet__name" aria-hidden="true" data-sheet-name>A1</div>
 
-        <div class="container hero__copy">
-          <a class="pill" href="#download" data-reveal>
-            <span class="pill__dot"></span>
-            <span data-release-pill>Free and open source</span>
-            <span class="pill__sep" aria-hidden="true">·</span>
-            <span>Windows, macOS and Linux</span>
-          </a>
-          <h1 data-reveal>Open huge data files <span class="grad">in seconds.</span></h1>
-          <p class="lead" data-reveal>
-            DataLiq is a desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files in
-            about a second, then lets you filter, query with SQL, chart, clean and export them.
-            Nothing is uploaded. No account. It works offline.
-          </p>
-          <div class="hero__cta" data-reveal>
-            <a class="btn btn--primary btn--lg" href="#download" data-download-primary>
-              <svg width="20" height="20" aria-hidden="true"><use href="#i-download" /></svg>
-              <span data-download-label>Download DataLiq</span>
-            </a>
-            <a
-              class="btn btn--ghost btn--lg"
-              href="https://github.com/Mukesh-devs/dataliq"
-              rel="noopener"
-            >
-              <svg width="20" height="20" aria-hidden="true"><use href="#i-github" /></svg>
-              View on GitHub
-            </a>
+          <div class="hero__body">
+            <div class="hero__icon reveal">
+              <img src="assets/icon.svg" width="144" height="144" alt="" />
+            </div>
+            <p class="hero__tag reveal">
+              <span class="tag" data-release-version>Latest</span>
+              <span class="wordmark wordmark--lg">DataLiq</span>
+            </p>
+            <h1 class="hero__title reveal" id="hero-title">
+              Open huge data files <em>in&nbsp;seconds.</em>
+            </h1>
+            <p class="hero__lead reveal">
+              A desktop app that opens multi-gigabyte CSV, Parquet, JSON and Excel files in about a
+              second, then lets you filter, query with SQL, chart, clean and export them. Nothing is
+              uploaded. No account. It works offline.
+            </p>
+            <div class="hero__actions reveal">
+              <a class="btn btn--ink" href="#download" data-download-primary>
+                <svg aria-hidden="true"><use href="#i-download" /></svg>
+                <span data-download-label>Download DataLiq</span>
+              </a>
+              <a class="btn" href="#features">
+                <svg aria-hidden="true"><use href="#i-layers" /></svg>
+                <span>Explore features</span>
+              </a>
+              <a class="btn" href="https://github.com/Mukesh-devs/dataliq" rel="noopener">
+                <svg aria-hidden="true"><use href="#i-github" /></svg>
+                <span>View on GitHub</span>
+              </a>
+            </div>
+            <p class="hero__note reveal">
+              <span data-download-note>Free for every use · MIT licensed</span>
+              <a href="#download">All downloads</a>
+            </p>
           </div>
-          <p class="hero__note" data-reveal>
-            <span data-download-note>Free for every use, MIT licensed.</span>
-            <a href="#download">All downloads</a>
-          </p>
         </div>
 
-        <div class="container hero__stage" data-reveal="rise">
-          <div class="stage" data-parallax-root>
-            <figure class="window window--hero" data-parallax="0.04">
-              <div class="window__bar">
-                <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="window__title">orders.csv — DataLiq</span>
-              </div>
+        <figure class="showcase reveal" data-tilt>
+          <div class="window">
+            <div class="window__bar" aria-hidden="true">
+              <i></i><i></i><i></i>
+              <span>orders.csv — DataLiq</span>
+            </div>
+            <button
+              class="window__shot"
+              type="button"
+              data-zoom
+              aria-label="Enlarge the screenshot"
+            >
               <img
+                class="only-light"
                 src="assets/shots/hero-light-1280.webp"
                 srcset="
                   assets/shots/hero-light-1280.webp 1280w,
                   assets/shots/hero-light-2560.webp 2560w
                 "
-                sizes="(min-width: 1240px) 1120px, 94vw"
+                sizes="(min-width: 1360px) 1180px, 92vw"
                 width="1280"
                 height="800"
-                alt="DataLiq showing a 1 GB CSV file of 9,221,261 rows in its grid. A side panel profiles the total column with its distribution, and the status bar adds up the selected cells."
                 fetchpriority="high"
-                decoding="async"
+                alt="DataLiq showing orders.csv, a 1 GB file of 9,221,261 rows: the sidebar lists the columns, nine cells of the total column are selected, and the column profile on the right shows its statistics and distribution."
               />
-            </figure>
-
-            <figure
-              class="window window--dark window--float window--float-right"
-              data-parallax="-0.10"
-              aria-hidden="true"
-            >
-              <div class="window__bar">
-                <span class="window__dots"><i></i><i></i><i></i></span>
-                <span class="window__title">Chart</span>
-              </div>
               <img
-                src="assets/shots/chart-dark-1280.webp"
+                class="only-dark"
+                src="assets/shots/hero-dark-1280.webp"
                 srcset="
-                  assets/shots/chart-dark-1280.webp 1280w,
-                  assets/shots/chart-dark-2560.webp 2560w
+                  assets/shots/hero-dark-1280.webp 1280w,
+                  assets/shots/hero-dark-2560.webp 2560w
                 "
-                sizes="(min-width: 1240px) 520px, 44vw"
+                sizes="(min-width: 1360px) 1180px, 92vw"
                 width="1280"
                 height="800"
-                alt=""
-                loading="eager"
-                decoding="async"
+                loading="lazy"
+                alt="The same view of orders.csv in DataLiq's dark theme."
               />
-            </figure>
-
-            <div class="chip chip--a" data-parallax="-0.16" aria-hidden="true">
-              <span class="chip__k">Rows in this file</span>
-              <span class="chip__v">9,221,261</span>
-            </div>
-            <div class="chip chip--b" data-parallax="-0.20" aria-hidden="true">
-              <span class="chip__k">Profile of 9.2M values</span>
-              <span class="chip__v">482 ms</span>
-            </div>
+            </button>
+            <ol class="callouts" aria-label="What the screenshot shows">
+              <li style="--x: 9%; --y: 46%">
+                <b>Columns</b><span>Show, hide, drag into SQL</span>
+              </li>
+              <li style="--x: 35%; --y: 76%"><b>Grid</b><span>9,221,261 rows, smooth</span></li>
+              <li style="--x: 66.5%; --y: 25%" class="is-left">
+                <b>Selection</b><span>Count, sum, average</span>
+              </li>
+              <li style="--x: 78.5%; --y: 47%" class="is-left">
+                <b>Profile</b><span>9.2M values in 523 ms</span>
+              </li>
+            </ol>
           </div>
-          <p class="stage__caption">
-            Real screenshots of DataLiq with a 1&nbsp;GB CSV file. Timings shown are from the app's
-            own status bar.
-          </p>
-        </div>
-      </section>
+          <figcaption>
+            Real screenshot · a 1.0 GB CSV of 9,221,261 rows · timings from the app's own status bar
+          </figcaption>
+        </figure>
 
-      <!-- ───────────────────────── Formats ───────────────────────── -->
-      <section class="formats" aria-labelledby="formats-title">
-        <div class="container">
-          <h2 class="eyebrow" id="formats-title">Opens what you already have</h2>
-          <ul class="formats__list" data-reveal>
-            <li><b>CSV</b><span>and TSV</span></li>
-            <li><b>Parquet</b><span>read in place</span></li>
-            <li><b>JSON</b><span>and NDJSON</span></li>
-            <li><b>Excel</b><span>.xlsx and .xls</span></li>
-            <li><b>.gz · .zst</b><span>compressed</span></li>
-            <li><b>SQLite</b><span>and DuckDB files</span></li>
-            <li><b>MySQL</b><span>and PostgreSQL</span></li>
-            <li><b>Folders</b><span>as one table</span></li>
-            <li><b>URLs</b><span>and S3</span></li>
+        <div class="ticker" aria-label="Formats DataLiq opens">
+          <ul class="ticker__track" data-ticker>
+            <li>CSV</li>
+            <li>TSV</li>
+            <li>Parquet</li>
+            <li>JSON</li>
+            <li>NDJSON</li>
+            <li>Excel .xlsx · .xls</li>
+            <li>.gz · .zst</li>
+            <li>SQLite</li>
+            <li>DuckDB</li>
+            <li>MySQL</li>
+            <li>PostgreSQL</li>
+            <li>Folders as one table</li>
+            <li>HTTPS · S3</li>
           </ul>
         </div>
       </section>
 
-      <!-- ───────────────────────── Tour ───────────────────────── -->
-      <section class="section tour" id="tour" aria-labelledby="tour-title">
-        <div class="container">
-          <header class="section__head" data-reveal>
-            <p class="eyebrow">A tour of the app</p>
-            <h2 id="tour-title">From a raw file to an answer, without leaving the window.</h2>
-            <p class="section__lead">
-              Every screen below is the real application working on real files: 9.2&nbsp;million
-              orders in a CSV and 2&nbsp;million JSON log records.
-            </p>
-          </header>
-
-          <div class="tour__body" data-tour>
-            <div
-              class="tour__tabs"
-              role="tablist"
-              aria-label="Features"
-              aria-orientation="vertical"
-            >
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-explore"
-                aria-controls="tour-panel"
-                aria-selected="true"
-                data-shot="hero-light"
-                data-title="orders.csv — DataLiq"
-              >
-                <span class="tour__name">Explore</span>
-                <span class="tour__text"
-                  >Scroll millions of rows smoothly. Profile any column: nulls, distinct values, a
-                  histogram and the most common values. Select cells to see their sum and
-                  average.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-filter"
-                aria-controls="tour-panel"
-                aria-selected="false"
-                tabindex="-1"
-                data-shot="filters-light"
-                data-title="orders.csv — DataLiq"
-              >
-                <span class="tour__name">Filter, sort and search</span>
-                <span class="tour__text"
-                  >Stack filters as chips, pick values from a list with counts, sort by any column
-                  and search the text. Here, 9.2M rows narrow to 23,323 in about a second.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-sql"
-                aria-controls="tour-panel"
-                aria-selected="false"
-                tabindex="-1"
-                data-shot="sql-light"
-                data-title="SQL — DataLiq"
-              >
-                <span class="tour__name">Query with SQL</span>
-                <span class="tour__text"
-                  >Every open file is a table. Join them, aggregate them, see the plan with Explain,
-                  and open any result as a new tab. This query ran over 9.2M rows in
-                  79&nbsp;ms.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-chart"
-                aria-controls="tour-panel"
-                aria-selected="false"
-                tabindex="-1"
-                data-shot="chart-light"
-                data-title="Chart — DataLiq"
-              >
-                <span class="tour__name">Chart it</span>
-                <span class="tour__text"
-                  >Bar, line, pie, histogram, scatter and box plots, computed by the engine over the
-                  whole file. Export as PNG or SVG, or copy the chart's SQL.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-json"
-                aria-controls="tour-panel"
-                aria-selected="false"
-                tabindex="-1"
-                data-shot="json-record"
-                data-title="web_logs.ndjson.gz — DataLiq"
-              >
-                <span class="tour__name">Understand JSON</span>
-                <span class="tour__text"
-                  >See a record as connected cards. Click a nested value to filter by it, add it as
-                  a column, or unnest an array into rows.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-clean"
-                aria-controls="tour-panel"
-                aria-selected="false"
-                tabindex="-1"
-                data-shot="clean-light"
-                data-title="Clean — DataLiq"
-              >
-                <span class="tour__name">Clean, without touching the file</span>
-                <span class="tour__text"
-                  >Trim, change types, find and replace, fill empty cells, add calculated columns.
-                  Steps are undoable and can be saved as a recipe for the next file.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-              <button
-                class="tour__tab"
-                role="tab"
-                id="tab-export"
-                aria-controls="tour-panel"
-                aria-selected="false"
-                tabindex="-1"
-                data-shot="export-light"
-                data-title="Export — DataLiq"
-              >
-                <span class="tour__name">Export anywhere</span>
-                <span class="tour__text"
-                  >CSV, Parquet, JSON or Excel. One file, a folder per value of a column, or files
-                  of a set size. Or convert a whole folder at once.</span
-                >
-                <span class="tour__bar" aria-hidden="true"><i></i></span>
-              </button>
-            </div>
-
-            <div
-              class="tour__view"
-              id="tour-panel"
-              role="tabpanel"
-              aria-labelledby="tab-explore"
-              tabindex="0"
-            >
-              <figure class="window" data-tour-window>
-                <div class="window__bar">
-                  <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span class="window__title" data-tour-title>orders.csv — DataLiq</span>
-                  <button
-                    class="window__zoom"
-                    type="button"
-                    data-zoom
-                    aria-label="View this screenshot larger"
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                    </svg>
-                  </button>
-                </div>
-                <div class="tour__frames">
-                  <img
-                    class="is-active"
-                    data-tour-img="hero-light"
-                    src="assets/shots/hero-light-1280.webp"
-                    srcset="
-                      assets/shots/hero-light-1280.webp 1280w,
-                      assets/shots/hero-light-2560.webp 2560w
-                    "
-                    sizes="(min-width: 1100px) 780px, 94vw"
-                    width="1280"
-                    height="800"
-                    alt="The grid with a column profile panel: row count, nulls, distinct values, minimum, maximum, mean, a distribution chart and the most common values."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    data-tour-img="filters-light"
-                    data-src="filters-light"
-                    width="1280"
-                    height="800"
-                    alt="Two filter chips (country equals Germany, category is Computers or Peripherals), a sort by total, and a search for laptop highlighted in the grid. The status bar reads 23,323 of 9,221,261 rows, filtered and sorted in 1.06 seconds."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    data-tour-img="sql-light"
-                    data-src="sql-light"
-                    width="1280"
-                    height="800"
-                    alt="The SQL panel under the grid: a grouped query on the orders table with its seven result rows, returned in 79 milliseconds."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    data-tour-img="chart-light"
-                    data-src="chart-light"
-                    width="1280"
-                    height="800"
-                    alt="A stacked bar chart of the sum of total by month, split by seven product categories, over five years."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    data-tour-img="json-record"
-                    data-src="json-record"
-                    width="1280"
-                    height="800"
-                    alt="A JSON record drawn as cards: the record's keys, with its nested http object and tags array branching off. A details panel offers to filter by the selected value or add it as a column."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    data-tour-img="clean-light"
-                    data-src="clean-light"
-                    width="1280"
-                    height="800"
-                    alt="The Clean panel listing five steps (trim spaces, upper case, fill empty cells, round dates to the month, a calculated column) beside the grid showing the new columns."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    data-tour-img="export-light"
-                    data-src="export-light"
-                    width="1280"
-                    height="800"
-                    alt="The Export dialog: format buttons from CSV to Excel, with Parquet chosen, and the option to write a folder per value of the country column."
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-              </figure>
-            </div>
-          </div>
+      <!-- 02 · Speed -->
+      <section class="speed" id="speed" aria-labelledby="speed-title">
+        <div class="shead shead--inv">
+          <span>02 / Speed</span>
+          <span class="shead__meta">Measured on a 4-core Linux machine</span>
         </div>
-      </section>
-
-      <!-- ───────────────────────── Speed ───────────────────────── -->
-      <section class="section speed" id="speed" aria-labelledby="speed-title">
-        <div class="speed__glow" aria-hidden="true"></div>
-        <div class="container">
-          <header class="section__head section__head--light" data-reveal>
-            <p class="eyebrow eyebrow--light">Built for big files</p>
-            <h2 id="speed-title">
-              The file that freezes your spreadsheet opens here before you let go of the mouse.
+        <div class="wrap">
+          <div class="speed__intro">
+            <h2 class="display reveal" id="speed-title">
+              Built for the files that freeze spreadsheets.
             </h2>
-            <p class="section__lead">
+            <p class="reveal">
               DataLiq reads only what is on screen, runs on the DuckDB engine, and keeps a cache on
               disk so the second open is instant. Queries that outgrow memory spill to disk instead
               of crashing.
             </p>
-          </header>
+          </div>
 
-          <dl class="stats" data-reveal>
-            <div class="stat">
-              <dt>First rows of a 5&nbsp;GB CSV</dt>
+          <div class="fx" aria-hidden="true">
+            <span class="fx__ref" data-fx-ref>B2</span>
+            <span class="fx__f">fx</span>
+            <span class="fx__text" data-fx-text>first_rows("orders_5gb.csv")</span>
+          </div>
+          <dl class="cells" data-cells>
+            <div class="cell" data-ref="B2" data-fx='first_rows("a 5 GB CSV")'>
+              <dt>First rows of a 5 GB CSV</dt>
               <dd><span data-count="0.28" data-decimals="2">0.28</span><small>s</small></dd>
             </div>
-            <div class="stat">
-              <dt>Full import of that file, 46 million rows</dt>
-              <dd><span data-count="40">40</span><small>s</small></dd>
-            </div>
-            <div class="stat">
+            <div class="cell" data-ref="C2" data-fx='reopen("a file opened before")'>
               <dt>Reopening a file you opened before</dt>
               <dd><span data-count="2">2</span><small>ms</small></dd>
             </div>
-            <div class="stat">
+            <div class="cell" data-ref="D2" data-fx='open("a 50-million-row Parquet file")'>
               <dt>Opening a 50-million-row Parquet file</dt>
               <dd><span data-count="0.05" data-decimals="2">0.05</span><small>s</small></dd>
             </div>
+            <div class="cell" data-ref="E2" data-fx='import("a 5 GB CSV, 46 million rows")'>
+              <dt>Full import of that 5 GB CSV, 46 million rows</dt>
+              <dd><span data-count="40">40</span><small>s</small></dd>
+            </div>
+            <div class="cell cell--sm" data-ref="B3" data-fx='filter("50M rows")'>
+              <dt>Filter 50M rows, first rows</dt>
+              <dd>0.1–0.9<small>s</small></dd>
+            </div>
+            <div class="cell cell--sm" data-ref="C3" data-fx='sort("50M rows")'>
+              <dt>Sort 50M rows, first and last rows</dt>
+              <dd>0.8–1.0<small>s</small></dd>
+            </div>
+            <div class="cell cell--sm" data-ref="D3" data-fx='chart("50M rows")'>
+              <dt>Chart of 50M rows</dt>
+              <dd>0.1–1.9<small>s</small></dd>
+            </div>
+            <div class="cell cell--sm" data-ref="E3" data-fx='profile("a column of 50M rows")'>
+              <dt>Column profile of 50M rows</dt>
+              <dd>0.7–2.7<small>s</small></dd>
+            </div>
           </dl>
-
-          <div class="speed__more" data-reveal>
-            <ul class="bars" aria-label="More measurements on 50 million rows">
-              <li>
-                <span>Filter 50M rows, first rows</span>
-                <span class="bars__track"><i style="--w: 30%"></i></span>
-                <b>0.1 – 0.9 s</b>
-              </li>
-              <li>
-                <span>Sort 50M rows, first and last rows</span>
-                <span class="bars__track"><i style="--w: 34%"></i></span>
-                <b>0.8 – 1.0 s</b>
-              </li>
-              <li>
-                <span>Chart of 50M rows</span>
-                <span class="bars__track"><i style="--w: 64%"></i></span>
-                <b>0.1 – 1.9 s</b>
-              </li>
-              <li>
-                <span>Column profile of 50M rows</span>
-                <span class="bars__track"><i style="--w: 90%"></i></span>
-                <b>0.7 – 2.7 s</b>
-              </li>
-            </ul>
-            <p class="speed__foot">
-              Measured on a 4-core Linux machine.
-              <a
-                href="https://github.com/Mukesh-devs/dataliq/blob/main/docs/BENCHMARKS.md"
-                rel="noopener"
-                >Every number, on Windows, macOS and Linux</a
-              >
-            </p>
-          </div>
         </div>
       </section>
 
-      <!-- ───────────────────────── Deep dives ───────────────────────── -->
-      <section class="section dives" id="features" aria-labelledby="features-title">
-        <div class="container">
-          <header class="section__head" data-reveal>
-            <p class="eyebrow">Made for real work</p>
-            <h2 id="features-title">The tools you reach for, already in the window.</h2>
-          </header>
+      <!-- 03 · Features -->
+      <section class="features" id="features" aria-labelledby="features-title">
+        <div class="shead">
+          <span>03 / Features</span>
+          <span class="shead__meta">Every screen below is the real app on real files</span>
+        </div>
+        <div class="wrap">
+          <h2 class="display features__title reveal" id="features-title">
+            From a raw file to an answer, without leaving the window.
+          </h2>
 
-          <article class="dive">
-            <div class="dive__copy" data-reveal>
-              <h3>See the shape of a JSON file before you read a line of it.</h3>
+          <article class="feature reveal" aria-labelledby="f-sql">
+            <div class="feature__text">
+              <p class="feature__no">03.1 · SQL</p>
+              <h3 id="f-sql">Every open file is a table.</h3>
+              <p>
+                Query, join and aggregate your files with SQL. Drag a column from the sidebar into
+                the editor, or Ctrl+click it, and its name goes in where you want it.
+                <code>current_view</code> is always the rows on screen, with your filters applied.
+              </p>
+              <ul class="ticks">
+                <li>Explain plans, history and saved queries</li>
+                <li>Open any result as a new tab</li>
+                <li>Joins across files, folders and databases</li>
+              </ul>
+              <p class="feature__stat"><b>48 ms</b> for this query over 9.2M rows</p>
+            </div>
+            <figure class="feature__shot">
+              <div class="window">
+                <div class="window__bar" aria-hidden="true">
+                  <i></i><i></i><i></i><span>SQL</span>
+                </div>
+                <button
+                  class="window__shot"
+                  type="button"
+                  data-zoom
+                  aria-label="Enlarge the screenshot"
+                >
+                  <img
+                    class="only-light"
+                    src="assets/shots/sql-light-1280.webp"
+                    srcset="
+                      assets/shots/sql-light-1280.webp 1280w,
+                      assets/shots/sql-light-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1240px) 1160px, 92vw"
+                    width="1280"
+                    height="800"
+                    loading="lazy"
+                    alt="The SQL panel under the grid: a GROUP BY query over orders returns 7 rows in 48 ms, while the country column is being dragged from the sidebar into the editor."
+                  />
+                  <img
+                    class="only-dark"
+                    src="assets/shots/sql-dark-1280.webp"
+                    srcset="
+                      assets/shots/sql-dark-1280.webp 1280w,
+                      assets/shots/sql-dark-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1240px) 1160px, 92vw"
+                    width="1280"
+                    height="800"
+                    loading="lazy"
+                    alt="The same SQL panel in the dark theme."
+                  />
+                </button>
+              </div>
+            </figure>
+          </article>
+
+          <article class="feature reveal" aria-labelledby="f-json">
+            <div class="feature__text">
+              <p class="feature__no">03.2 · JSON</p>
+              <h3 id="f-json">See the shape of JSON before you read a line.</h3>
               <p>
                 The structure view reads every record and draws one map: each key with its type, how
-                often it appears, and how long arrays are. On this 2-million-record log, it shows
-                that <code>user_id</code> is present in 80% of records.
+                often it appears and how long its arrays are. Here, two million log records show
+                that <code>user_id</code> is in 80% of them.
               </p>
               <ul class="ticks">
-                <li>
-                  <svg aria-hidden="true"><use href="#i-check" /></svg>One record as connected
-                  cards, or the structure of all of them
-                </li>
-                <li>
-                  <svg aria-hidden="true"><use href="#i-check" /></svg>Copy any value's JSON path,
-                  or the SQL that reads it
-                </li>
-                <li>
-                  <svg aria-hidden="true"><use href="#i-check" /></svg>Also for nested Parquet
-                  columns
-                </li>
+                <li>One record as connected cards, or the shape of all</li>
+                <li>Filter by a value, add it as a column, unnest arrays</li>
+                <li>Also for nested Parquet columns</li>
               </ul>
+              <p class="feature__stat"><b>2,072,884</b> records in one map</p>
             </div>
-            <div class="dive__media" data-reveal="rise">
-              <div class="stack">
-                <figure class="window stack__front">
-                  <div class="window__bar">
-                    <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
-                    ><span class="window__title">Structure — web_logs.ndjson.gz</span>
-                  </div>
+            <figure class="feature__shot">
+              <div class="window">
+                <div class="window__bar" aria-hidden="true">
+                  <i></i><i></i><i></i><span>web_logs.ndjson.gz — Structure</span>
+                </div>
+                <button
+                  class="window__shot"
+                  type="button"
+                  data-zoom
+                  aria-label="Enlarge the screenshot"
+                >
                   <img
-                    src="assets/shots/json-structure-crop.webp"
-                    width="1840"
-                    height="1150"
-                    alt="The structure of 2,072,884 JSON records as a graph: the top-level keys with their types, user_id present in 80% of records, the nested http object, and the tags array with its average and maximum length."
+                    class="only-light"
+                    src="assets/shots/json-light-1280.webp"
+                    srcset="
+                      assets/shots/json-light-1280.webp 1280w,
+                      assets/shots/json-light-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1240px) 1160px, 92vw"
+                    width="1280"
+                    height="532"
                     loading="lazy"
-                    decoding="async"
+                    alt="The structure of web_logs.ndjson.gz: 2,072,884 records with their keys and types, the nested http object and the tags array."
                   />
-                </figure>
-                <figure class="window stack__float">
-                  <div class="window__bar">
-                    <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
-                    ><span class="window__title">Record 2 of 2,072,884</span>
-                  </div>
                   <img
-                    src="assets/shots/json-record-crop.webp"
-                    width="1344"
-                    height="840"
-                    alt="One record drawn as cards: its eight keys, with the http object and the tags array branching off."
+                    class="only-dark"
+                    src="assets/shots/json-dark-1280.webp"
+                    srcset="
+                      assets/shots/json-dark-1280.webp 1280w,
+                      assets/shots/json-dark-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1240px) 1160px, 92vw"
+                    width="1280"
+                    height="532"
                     loading="lazy"
-                    decoding="async"
+                    alt="The same structure view in the dark theme."
                   />
-                </figure>
+                </button>
               </div>
-            </div>
+            </figure>
           </article>
 
-          <article class="dive dive--flip">
-            <div class="dive__copy" data-reveal>
-              <h3>Group, pivot, join and append. No SQL needed.</h3>
+          <article class="feature reveal" aria-labelledby="f-chart">
+            <div class="feature__text">
+              <p class="feature__no">03.3 · Charts</p>
+              <h3 id="f-chart">Charts from the whole file, not a sample.</h3>
               <p>
-                Pick the columns, pick the calculations, and get the result as a new tab you can
-                filter, chart and export like any file. Each long-running tool shows a timer and a
-                Stop button.
+                Bar, line, pie, histogram, scatter and box plots, computed by the engine over every
+                row. Group by a date, split by a column, stack it. Export as PNG or SVG, or copy the
+                chart's SQL.
               </p>
               <ul class="ticks">
-                <li>
-                  <svg aria-hidden="true"><use href="#i-check" /></svg>Count, sum, average, median,
-                  95th percentile and more
-                </li>
-                <li>
-                  <svg aria-hidden="true"><use href="#i-check" /></svg>Join two open files, or stack
-                  several into one
-                </li>
-                <li>
-                  <svg aria-hidden="true"><use href="#i-check" /></svg>Random samples and a summary
-                  of every column
-                </li>
+                <li>Dates bucketed by day, month or year</li>
+                <li>Sum, average, count and more</li>
+                <li>Follows your filters as you change them</li>
               </ul>
+              <p class="feature__stat"><b>543 ms</b> for 60 bars over 9.2M rows</p>
             </div>
-            <div class="dive__media" data-reveal="rise">
-              <figure class="window">
-                <div class="window__bar">
-                  <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
-                  ><span class="window__title">Group by / pivot — DataLiq</span>
+            <figure class="feature__shot">
+              <div class="window">
+                <div class="window__bar" aria-hidden="true">
+                  <i></i><i></i><i></i><span>orders.csv — Chart</span>
                 </div>
-                <img
-                  src="assets/shots/pivot-dialog-crop.webp"
-                  width="1488"
-                  height="930"
-                  alt="The Group by / pivot dialog over the grid: one row per country, with a count, a sum and an average of total, spread across columns by category."
-                  loading="lazy"
-                  decoding="async"
-                />
-              </figure>
-            </div>
-          </article>
-
-          <article class="dive dive--wide">
-            <div class="dive__copy dive__copy--center" data-reveal>
-              <h3>Light when you want it. Dark when you need it.</h3>
-              <p>
-                Both themes meet WCAG 2.2 AA contrast, and everything is reachable from the
-                keyboard. Drag the handle.
-              </p>
-            </div>
-            <div class="compare" data-compare data-reveal="rise">
-              <figure class="window compare__window">
-                <div class="window__bar">
-                  <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
-                  ><span class="window__title">orders.csv — DataLiq</span>
-                </div>
-                <div class="compare__stage">
+                <button
+                  class="window__shot"
+                  type="button"
+                  data-zoom
+                  aria-label="Enlarge the screenshot"
+                >
                   <img
-                    data-lazy="hero-dark"
+                    class="only-light"
+                    src="assets/shots/chart-light-1280.webp"
+                    srcset="
+                      assets/shots/chart-light-1280.webp 1280w,
+                      assets/shots/chart-light-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1240px) 1160px, 92vw"
                     width="1280"
                     height="800"
-                    alt="DataLiq in its dark theme."
                     loading="lazy"
-                    decoding="async"
+                    alt="A stacked bar chart of monthly revenue by category from 2020 to 2024, 60 points computed in 543 ms."
                   />
                   <img
-                    class="compare__top"
-                    data-lazy="hero-light"
+                    class="only-dark"
+                    src="assets/shots/chart-dark-1280.webp"
+                    srcset="
+                      assets/shots/chart-dark-1280.webp 1280w,
+                      assets/shots/chart-dark-2560.webp 2560w
+                    "
+                    sizes="(min-width: 1240px) 1160px, 92vw"
                     width="1280"
                     height="800"
-                    alt="DataLiq in its light theme."
                     loading="lazy"
-                    decoding="async"
+                    alt="The same chart in the dark theme."
                   />
-                  <span class="compare__handle" aria-hidden="true"><i></i></span>
-                  <input
-                    class="compare__range"
-                    type="range"
-                    min="0"
-                    max="100"
-                    value="52"
-                    aria-label="How much of the window shows the light theme"
-                  />
-                </div>
-              </figure>
-            </div>
+                </button>
+              </div>
+            </figure>
           </article>
-        </div>
-      </section>
 
-      <!-- ───────────────────────── Bento ───────────────────────── -->
-      <section class="section bento-wrap" aria-labelledby="more-title">
-        <div class="container">
-          <header class="section__head" data-reveal>
-            <p class="eyebrow">And the details that save your day</p>
-            <h2 id="more-title">Small things, done properly.</h2>
-          </header>
-
-          <div class="bento">
-            <article class="tile tile--shot tile--a" data-reveal>
-              <div class="tile__copy">
-                <h3>Find problems before they find you</h3>
-                <p>
-                  One click checks the whole file for empty columns, mixed types, stray spaces,
-                  mixed date formats, outliers and duplicates, and shows you the rows.
-                </p>
+          <div class="more reveal">
+            <h3 class="more__title">And everything else you reach for.</h3>
+            <div class="table" role="table" aria-label="More features">
+              <div class="table__head" role="row">
+                <span role="columnheader"><abbr title="Row">#</abbr></span>
+                <span role="columnheader">A · Feature</span>
+                <span role="columnheader">B · What it does</span>
               </div>
-              <div class="tile__shot tile__shot--quality">
-                <img
-                  data-lazy="quality-light"
-                  width="1280"
-                  height="800"
-                  alt="The Data quality panel reporting one warning in 9,221,261 rows: the note column is mostly empty."
-                  loading="lazy"
-                  decoding="async"
-                />
+              <div class="table__row" role="row">
+                <span role="cell">1</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-filter" /></svg>Filter, sort, search</span
+                >
+                <span role="cell"
+                  >Stack filters as chips, pick values with counts, search every column.</span
+                >
               </div>
-            </article>
-
-            <article class="tile tile--b" data-reveal>
-              <h3>Never lose your place</h3>
-              <p>
-                Open files, filters, layouts and recipes come back after a restart or a crash. Undo
-                and redo any filter, sort or column change.
-              </p>
-              <div class="keys" aria-hidden="true"><kbd>Ctrl</kbd><kbd>Z</kbd></div>
-            </article>
-
-            <article class="tile tile--c" data-reveal>
-              <h3>Compare two files</h3>
-              <p>
-                See which rows were added, removed or changed between two versions of a file, cell
-                by cell.
-              </p>
-              <div class="diff" aria-hidden="true">
-                <span class="diff__add">+ added rows</span
-                ><span class="diff__del">− removed rows</span
-                ><span class="diff__chg">~ changed cells</span>
+              <div class="table__row" role="row">
+                <span role="cell">2</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-sigma" /></svg>Column profile</span
+                >
+                <span role="cell"
+                  >Nulls, distinct values, a histogram and the most common values of any
+                  column.</span
+                >
               </div>
-            </article>
-
-            <article class="tile tile--shot tile--d" data-reveal>
-              <div class="tile__copy">
-                <h3>Every action, one shortcut away</h3>
-                <p>
-                  The command palette lists everything the app can do. Workspaces save your open
-                  files, filters and charts to reopen later.
-                </p>
+              <div class="table__row" role="row">
+                <span role="cell">3</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-wand" /></svg>Clean</span
+                >
+                <span role="cell"
+                  >Trim, change types, find and replace, fill empty cells; save the steps as a
+                  recipe.</span
+                >
               </div>
-              <div class="tile__shot tile__shot--palette">
-                <img
-                  src="assets/shots/palette-crop.webp"
-                  width="1224"
-                  height="766"
-                  alt="The command palette open over the grid, listing commands such as New workspace, Open folder as one table and Open URL, with their shortcuts."
-                  loading="lazy"
-                  decoding="async"
-                />
+              <div class="table__row" role="row">
+                <span role="cell">4</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-shield" /></svg>Data quality</span
+                >
+                <span role="cell"
+                  >Empty columns, mixed types, stray spaces, outliers and duplicates, with their
+                  rows.</span
+                >
               </div>
-            </article>
-
-            <article class="tile tile--e" data-reveal>
-              <h3>Columns your way</h3>
-              <p>
-                Hide, reorder, pin and rename. Highlight cells with rules and colour scales. Save
-                filters as presets for files with the same columns.
-              </p>
-            </article>
-
-            <article class="tile tile--f" data-reveal>
-              <h3>Copy as anything</h3>
-              <p>
-                A selection becomes CSV, an Excel-friendly paste, JSON, a Markdown table or SQL
-                <code>INSERT</code> statements.
-              </p>
-            </article>
-
-            <article class="tile tile--g" data-reveal>
-              <h3>Knows when a file changes</h3>
-              <p>
-                If the file is edited on disk while it is open, DataLiq offers to reload it and
-                keeps your filters, sort and columns.
-              </p>
-            </article>
+              <div class="table__row" role="row">
+                <span role="cell">5</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-compare" /></svg>Compare files</span
+                >
+                <span role="cell"
+                  >Rows added, removed or changed between two versions, cell by cell.</span
+                >
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">6</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-pivot" /></svg>Group by and pivot</span
+                >
+                <span role="cell"
+                  >Counts, sums, medians and percentiles as a new tab. No SQL needed.</span
+                >
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">7</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-merge" /></svg>Join, append, sample</span
+                >
+                <span role="cell"
+                  >Join two files, stack several into one, or open a random sample.</span
+                >
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">8</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-export" /></svg>Export and convert</span
+                >
+                <span role="cell"
+                  >CSV, Parquet, JSON or Excel: one file, a folder per value, or a whole folder at
+                  once.</span
+                >
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">9</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-database" /></svg>Databases and URLs</span
+                >
+                <span role="cell">MySQL and PostgreSQL tables, files over HTTPS and from S3.</span>
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">10</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-history" /></svg>Never lose your
+                  place</span
+                >
+                <span role="cell"
+                  >Files, filters and layouts come back after a restart. Undo and redo every
+                  change.</span
+                >
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">11</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-command" /></svg>Command palette</span
+                >
+                <span role="cell"
+                  >Every action by name with Ctrl+K. Workspaces save tabs, filters and charts.</span
+                >
+              </div>
+              <div class="table__row" role="row">
+                <span role="cell">12</span>
+                <span role="cell"
+                  ><svg aria-hidden="true"><use href="#i-contrast" /></svg>Light, dark,
+                  keyboard</span
+                >
+                <span role="cell"
+                  >Both themes meet WCAG 2.2 AA contrast; everything works from the keyboard.</span
+                >
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- ───────────────────────── Automate ───────────────────────── -->
-      <section class="section automate" id="automate" aria-labelledby="automate-title">
-        <div class="container automate__grid">
-          <div class="automate__copy" data-reveal>
-            <p class="eyebrow">Automation</p>
-            <h2 id="automate-title">Run it without the window. Or hand it to your AI assistant.</h2>
-            <p>
+      <!-- 04 · Automation -->
+      <section class="automation" id="automation" aria-labelledby="auto-title">
+        <div class="shead">
+          <span>04 / Automation</span>
+          <span class="shead__meta">Command line · MCP for AI assistants</span>
+        </div>
+        <div class="wrap automation__grid">
+          <div class="automation__text">
+            <h2 class="display reveal" id="auto-title">Run it without the window.</h2>
+            <p class="reveal">
               Save your cleaning steps as a recipe and apply them from the command line: reports on
-              a schedule, with no window.
+              a schedule, with no window. Or turn on the built-in MCP server and let Claude Desktop,
+              Claude Code or any MCP client list, describe and query the folders you choose. It is
+              read-only, limited to those folders, every call is logged, and it is off until you
+              turn it on.
             </p>
-            <p>
-              Or turn on the built-in <abbr title="Model Context Protocol">MCP</abbr> server and let
-              Claude Desktop, Claude Code or any MCP client list, describe and query the folders you
-              choose. It is read-only, limited to those folders, and every call is logged. It is off
-              until you turn it on in Settings.
-            </p>
-          </div>
-          <div class="automate__code" data-reveal="rise">
-            <figure class="term">
-              <div class="term__bar">
-                <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
-                ><span>Terminal</span>
+            <div class="tools reveal" role="table" aria-label="What an assistant can do">
+              <div role="row">
+                <code role="cell">list_files</code
+                ><span role="cell">The data files in the folders you share</span>
               </div>
-              <pre><code><span class="c"># Apply a saved recipe and write a report</span>
-<span class="p">$</span> dataliq run monthly.json <span class="f">--in</span> orders.csv.gz <span class="f">--out</span> report.xlsx
+              <div role="row">
+                <code role="cell">describe_file</code
+                ><span role="cell">Row count, columns and types, first rows</span>
+              </div>
+              <div role="row">
+                <code role="cell">profile_column</code
+                ><span role="cell">Nulls, distinct values, ranges, common values</span>
+              </div>
+              <div role="row">
+                <code role="cell">query</code
+                ><span role="cell">One read-only SQL query at a time</span>
+              </div>
+              <div role="row">
+                <code role="cell">open_in_dataliq</code
+                ><span role="cell">Show a file in the app, as a new tab</span>
+              </div>
+            </div>
+          </div>
+          <div class="term reveal" data-term>
+            <div class="term__bar" aria-hidden="true">
+              <i></i><i></i><i></i><span>Terminal</span>
+            </div>
+            <pre
+              class="term__body"
+            ><code><span class="c"># Apply a saved recipe and write a report</span>
+<span class="p">$</span> <span data-type>dataliq run monthly.json --in orders.csv.gz --out report.xlsx</span>
 
 <span class="c"># Open files in the running app</span>
-<span class="p">$</span> dataliq orders.csv web_logs.ndjson.gz
+<span class="p">$</span> <span data-type>dataliq orders.csv web_logs.ndjson.gz</span>
 
 <span class="c"># Start the MCP server for AI assistants</span>
-<span class="p">$</span> dataliq mcp</code></pre>
-            </figure>
-            <figure class="term term--light">
-              <div class="term__bar">
-                <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span
-                ><span>What an assistant can do</span>
-              </div>
-              <ul class="tools">
-                <li><code>list_files</code><span>The data files in the folders you share</span></li>
-                <li>
-                  <code>describe_file</code><span>Row count, columns and types, first rows</span>
-                </li>
-                <li>
-                  <code>profile_column</code
-                  ><span>Nulls, distinct values, ranges, common values</span>
-                </li>
-                <li><code>query</code><span>One read-only SQL query at a time</span></li>
-                <li>
-                  <code>open_in_dataliq</code><span>Show a file in the app, as a new tab</span>
-                </li>
-              </ul>
-            </figure>
+<span class="p">$</span> <span data-type>dataliq mcp</span></code></pre>
           </div>
         </div>
       </section>
 
-      <!-- ───────────────────────── Privacy ───────────────────────── -->
-      <section class="privacy" aria-labelledby="privacy-title">
-        <div class="container privacy__inner" data-reveal>
-          <div>
-            <h2 id="privacy-title">Your data stays on your computer.</h2>
-            <p>
-              No account, no telemetry, no upload. The only network requests are the URLs and
-              databases you open yourself, DuckDB extensions the first time one is needed, and an
-              optional daily check for a new version.
-            </p>
+      <!-- 05 · Privacy -->
+      <section class="privacy" id="privacy" aria-labelledby="privacy-title">
+        <div class="shead">
+          <span>05 / Privacy</span>
+          <span class="shead__meta">Offline by design</span>
+        </div>
+        <div class="wrap">
+          <p class="privacy__big reveal" aria-hidden="true"><span>0</span> bytes uploaded.</p>
+          <h2 class="privacy__title reveal" id="privacy-title">
+            Your data stays on your computer.
+          </h2>
+          <div class="privacy__grid reveal">
+            <div class="pcell">
+              <svg aria-hidden="true"><use href="#i-user" /></svg><b>No account</b
+              ><span>Open the app and work. Nothing to sign up for.</span>
+            </div>
+            <div class="pcell">
+              <svg aria-hidden="true"><use href="#i-eye" /></svg><b>No telemetry</b
+              ><span>No tracking, no analytics, no upload.</span>
+            </div>
+            <div class="pcell">
+              <svg aria-hidden="true"><use href="#i-lock" /></svg><b>Files untouched</b
+              ><span>Everything happens in a view. You write a new file when you export.</span>
+            </div>
           </div>
-          <ul class="privacy__list">
-            <li>
-              <svg aria-hidden="true"><use href="#i-check" /></svg>Works fully offline
-            </li>
-            <li>
-              <svg aria-hidden="true"><use href="#i-check" /></svg>Your files are never modified
-            </li>
-            <li>
-              <svg aria-hidden="true"><use href="#i-check" /></svg>Open source under the MIT licence
-            </li>
-          </ul>
+          <p class="privacy__small reveal">
+            The only network requests are the URLs and databases you open yourself, DuckDB
+            extensions the first time one is needed, and an optional daily check for a new version.
+            Open source under the MIT licence.
+          </p>
         </div>
       </section>
 
-      <!-- ───────────────────────── Download ───────────────────────── -->
-      <section class="section download" id="download" aria-labelledby="download-title">
-        <div class="container">
-          <header class="section__head" data-reveal>
-            <img class="download__icon" src="assets/icon.svg" width="72" height="72" alt="" />
-            <p class="eyebrow">Download</p>
-            <h2 id="download-title">Get DataLiq <span data-release-version></span></h2>
-            <p class="section__lead" data-release-meta aria-live="polite">
+      <!-- 06 · Download -->
+      <section class="download" id="download" aria-labelledby="download-title">
+        <div class="shead">
+          <span>06 / Get DataLiq</span>
+          <span class="shead__meta">Free · open source · no account</span>
+        </div>
+        <div class="wrap">
+          <div class="download__head">
+            <h2 class="display" id="download-title">
+              Get DataLiq <span class="tag tag--lg" data-release-version>Latest</span>
+            </h2>
+            <p class="download__meta" data-release-meta>
               Installers for Windows, macOS and Linux are published on GitHub Releases.
             </p>
-          </header>
-
-          <div class="os" data-release-os>
-            <article class="os__card" data-os="windows">
-              <header>
-                <svg aria-hidden="true"><use href="#i-windows" /></svg>
-                <h3>Windows</h3>
-              </header>
-              <div class="os__list" data-os-list>
-                <span class="skeleton"></span><span class="skeleton"></span>
-              </div>
-            </article>
-            <article class="os__card" data-os="macos">
-              <header>
-                <svg aria-hidden="true"><use href="#i-apple" /></svg>
-                <h3>macOS</h3>
-              </header>
-              <div class="os__list" data-os-list>
-                <span class="skeleton"></span><span class="skeleton"></span>
-              </div>
-            </article>
-            <article class="os__card" data-os="linux">
-              <header>
-                <svg aria-hidden="true"><use href="#i-linux" /></svg>
-                <h3>Linux</h3>
-              </header>
-              <div class="os__list" data-os-list>
-                <span class="skeleton"></span><span class="skeleton"></span
-                ><span class="skeleton"></span>
-              </div>
-            </article>
           </div>
 
-          <p class="download__links" data-reveal>
-            <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
-              >All releases</a
-            >
-            <a href="#" data-release-checksums hidden rel="noopener">SHA-256 checksums</a>
-            <a href="https://github.com/Mukesh-devs/dataliq#building-from-source" rel="noopener"
-              >Build from source</a
-            >
-          </p>
           <noscript>
-            <p class="download__links">
-              <a href="https://github.com/Mukesh-devs/dataliq/releases/latest"
-                >Download the latest release from GitHub</a
+            <p class="download__nojs">
+              <a href="https://github.com/Mukesh-devs/dataliq/releases/latest">
+                Download the latest release from GitHub</a
               >
             </p>
           </noscript>
 
+          <div class="platforms" data-platforms>
+            <article class="platform" data-os="windows" aria-labelledby="os-windows">
+              <header class="platform__head">
+                <span class="platform__kicker" data-os-kicker>Platform</span>
+                <span class="platform__no">01</span>
+              </header>
+              <div class="platform__body">
+                <h3 class="platform__name" id="os-windows">
+                  <span class="platform__icon"
+                    ><svg aria-hidden="true"><use href="#i-windows" /></svg
+                  ></span>
+                  Windows
+                </h3>
+                <div class="platform__main" data-os-main>
+                  <p class="platform__loading">Looking up the latest release…</p>
+                </div>
+                <p class="platform__label">Other files for Windows</p>
+                <div class="files" data-os-list></div>
+              </div>
+            </article>
+            <article class="platform" data-os="macos" aria-labelledby="os-macos">
+              <header class="platform__head">
+                <span class="platform__kicker" data-os-kicker>Platform</span>
+                <span class="platform__no">02</span>
+              </header>
+              <div class="platform__body">
+                <h3 class="platform__name" id="os-macos">
+                  <span class="platform__icon"
+                    ><svg aria-hidden="true"><use href="#i-apple" /></svg
+                  ></span>
+                  macOS
+                </h3>
+                <div class="platform__main" data-os-main>
+                  <p class="platform__loading">Looking up the latest release…</p>
+                </div>
+                <p class="platform__label">Other files for macOS</p>
+                <div class="files" data-os-list></div>
+              </div>
+            </article>
+            <article class="platform" data-os="linux" aria-labelledby="os-linux">
+              <header class="platform__head">
+                <span class="platform__kicker" data-os-kicker>Platform</span>
+                <span class="platform__no">03</span>
+              </header>
+              <div class="platform__body">
+                <h3 class="platform__name" id="os-linux">
+                  <span class="platform__icon"
+                    ><svg aria-hidden="true"><use href="#i-linux" /></svg
+                  ></span>
+                  Linux
+                </h3>
+                <div class="platform__main" data-os-main>
+                  <p class="platform__loading">Looking up the latest release…</p>
+                </div>
+                <p class="platform__label">Other files for Linux</p>
+                <div class="files" data-os-list></div>
+              </div>
+            </article>
+          </div>
+
+          <div class="download__links">
+            <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener"
+              ><svg aria-hidden="true"><use href="#i-history" /></svg>All releases</a
+            >
+            <a href="#" data-release-checksums hidden rel="noopener"
+              ><svg aria-hidden="true"><use href="#i-shield" /></svg>SHA-256 checksums</a
+            >
+            <a href="https://github.com/Mukesh-devs/dataliq#build-from-source" rel="noopener"
+              ><svg aria-hidden="true"><use href="#i-terminal" /></svg>Build from source</a
+            >
+          </div>
+
           <details class="notes" data-release-notes hidden>
             <summary>
               <span>What's new in <span data-release-name>this release</span></span>
+              <svg aria-hidden="true"><use href="#i-down" /></svg>
             </summary>
             <div class="notes__body" data-release-body></div>
-            <p class="notes__more">
-              <a
-                href="https://github.com/Mukesh-devs/dataliq/releases"
-                data-release-link
-                rel="noopener"
-                >Read it on GitHub</a
-              >
-            </p>
+            <a class="notes__link" href="#" data-release-link rel="noopener"
+              >Read it on GitHub <svg aria-hidden="true"><use href="#i-out" /></svg
+            ></a>
           </details>
+        </div>
+      </section>
 
-          <div class="faq" data-reveal>
+      <!-- 07 · Questions -->
+      <section class="questions" id="questions" aria-labelledby="q-title">
+        <div class="shead">
+          <span>07 / Questions</span>
+          <span class="shead__meta">Short answers</span>
+        </div>
+        <div class="wrap questions__grid">
+          <h2 class="display" id="q-title">Good to know.</h2>
+          <div class="faq">
             <details>
-              <summary>Is it really free?</summary>
+              <summary>
+                Is it really free?<svg aria-hidden="true"><use href="#i-down" /></svg>
+              </summary>
               <p>
                 Yes. DataLiq is open source under the MIT licence, free for personal and commercial
                 use, with no paid tier.
               </p>
             </details>
             <details>
-              <summary>How big a file can it open?</summary>
+              <summary>
+                How big a file can it open?<svg aria-hidden="true"><use href="#i-down" /></svg>
+              </summary>
               <p>
-                Files larger than your memory are fine: a 5&nbsp;GB CSV with 46 million rows and a
+                Files larger than your memory are fine: a 5 GB CSV with 46 million rows and a
                 50-million-row Parquet file are part of its benchmarks. Parquet is read in place;
                 other formats are imported once into a cache on disk.
               </p>
             </details>
             <details>
-              <summary>Does it change my files?</summary>
+              <summary>
+                Does it change my files?<svg aria-hidden="true"><use href="#i-down" /></svg>
+              </summary>
               <p>
-                Never. Filters, cleaning steps and edits to the layout are applied to a view of the
-                data. You write a new file when you export.
+                Never. Filters, cleaning steps and layout changes apply to a view of the data. You
+                write a new file when you export.
               </p>
             </details>
             <details>
-              <summary>macOS or Windows warns me about the app. Why?</summary>
+              <summary>
+                Will it take over my CSV and Excel files?<svg aria-hidden="true">
+                  <use href="#i-down" />
+                </svg>
+              </summary>
+              <p>
+                No. DataLiq is the default program only for its own files (.parquet, .duckdb,
+                .dataliq). For CSV, Excel, JSON and SQLite your current program stays the default,
+                and DataLiq is under Open with.
+              </p>
+            </details>
+            <details>
+              <summary>
+                macOS or Windows warns me about the app. Why?<svg aria-hidden="true">
+                  <use href="#i-down" />
+                </svg>
+              </summary>
               <p>
                 The installers are built on GitHub from the public source, and each release lists
                 SHA-256 checksums. If your system says the app can't be verified, open it once with
@@ -1094,11 +1634,11 @@
     </main>
 
     <footer class="footer">
-      <div class="container footer__inner">
-        <a class="brand brand--light" href="#top" aria-label="DataLiq, back to top">
-          <img src="assets/icon.svg" width="30" height="30" alt="" />
-          <span>DataLiq</span>
-        </a>
+      <div class="footer__top">
+        <div class="footer__brand">
+          <img src="assets/icon.svg" width="40" height="40" alt="" />
+          <p>Open huge data files in seconds. A desktop app for Windows, macOS and Linux.</p>
+        </div>
         <nav class="footer__links" aria-label="Project">
           <a href="https://github.com/Mukesh-devs/dataliq" rel="noopener">GitHub</a>
           <a href="https://github.com/Mukesh-devs/dataliq/releases" rel="noopener">Releases</a>
@@ -1110,15 +1650,22 @@
             >MIT licence</a
           >
         </nav>
-        <p class="footer__fine">
-          A desktop app for Windows, macOS and Linux. Built with DuckDB and Tauri.
-        </p>
       </div>
+      <p class="footer__mark" aria-hidden="true"><span data-fit>DATALIQ</span></p>
+      <p class="footer__base">
+        <span>Built with DuckDB and Tauri</span>
+        <span>Free and open source</span>
+        <a href="#top"
+          >Back to top <svg aria-hidden="true"><use href="#i-arrow" /></svg
+        ></a>
+      </p>
     </footer>
 
-    <dialog class="lightbox" data-lightbox aria-label="Screenshot, larger">
-      <form method="dialog"><button class="lightbox__close" aria-label="Close">×</button></form>
-      <img alt="" />
+    <dialog class="lightbox" data-lightbox aria-label="Screenshot">
+      <button class="lightbox__close" type="button" aria-label="Close" data-lightbox-close>
+        <svg aria-hidden="true"><use href="#i-close" /></svg>
+      </button>
+      <img alt="" data-lightbox-img />
     </dialog>
 
     <script type="module" src="js/main.js"></script>

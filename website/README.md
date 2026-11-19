@@ -26,10 +26,21 @@ Then open <http://localhost:4321/>. (Modules need a server; opening the file dir
 - **The icon** (`assets/icon.svg`, the favicons) is written by `pnpm icons`, from the same
   drawing as the app's.
 - **Screenshots** (`assets/shots/`) are real captures of the app at 1280 × 800, 2× scale,
-  saved as WebP at two widths (`name-1280.webp`, `name-2560.webp`). To add or replace one,
-  capture the app window at that size, save both widths, and reference it by name in
-  `index.html` (`data-lazy="name"`, or `data-shot="name"` for the tour). Timings quoted
-  beside a screenshot are the ones its status bar shows; change both together.
+  saved as WebP at two widths (`name-light-1280.webp`, `name-light-2560.webp`, and the same
+  for `-dark`). Each picture has a light and a dark version; the page shows the one that
+  matches its theme (`only-light` / `only-dark`). There are four: the hero (`hero`) and three
+  features (`sql`, `json`, `chart`). Timings quoted beside a screenshot are the ones its
+  status bar shows; change both together.
+
+## The design
+
+The page is a sheet: hairline rules, numbered sections (`01 / DataLiq`), a hero laid on a
+cell grid with column letters and row numbers where a highlighted cell follows the pointer,
+the speed figures as cells with references and a formula bar, the other features as a
+table, and a row header (left) and a scroll ruler (right) on wide screens. Display type is
+Archivo at its widest (Expanded; SIL Open Font License), labels are JetBrains Mono, text is
+Inter, all served from `assets/fonts/`. Light and dark themes follow the system until the
+visitor picks one with the button in the bar (remembered in the browser).
 
 ## Files
 
@@ -38,8 +49,8 @@ Then open <http://localhost:4321/>. (Modules need a server; opening the file dir
 | `index.html` | The page: every section, in order |
 | `css/site.css` | Design tokens, then the pieces, then the sections top to bottom |
 | `js/main.js` | Starts the two parts below |
-| `js/site.js` | Navigation, reveals, the tour, the light/dark slider, counters, parallax, lightbox |
-| `js/releases.js` | The latest release: lookup, download cards, release notes (sanitized) |
+| `js/site.js` | Theme, menu, the hero's cell grid, reveals, the tilted showcase, ruler, counters, formula bar, ticker, terminal typing, lightbox, the footer's fitted wordmark |
+| `js/releases.js` | The latest release: lookup, the download columns (your system first), release notes (sanitized) |
 | `js/release-assets.js` | Pure functions: which file is which download, which system the visitor has |
 | `404.html`, `robots.txt`, `sitemap.xml`, `site.webmanifest` | For GitHub Pages and search engines |
 

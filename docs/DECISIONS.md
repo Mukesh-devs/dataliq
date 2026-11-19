@@ -1296,3 +1296,30 @@ The hook was checked by compiling it with NSIS and running it under Wine
 against the registry states an install leaves (first install, reinstall, no
 previous default, uninstall). `scripts/installer.test.mjs` keeps its list of
 types the same as the config's.
+
+## D80 — The website as a sheet
+
+The second design of the website (D75 set out its rules, which still hold)
+takes its idea from the product: the page is a spreadsheet. Sections are
+numbered rows (`03 / Features`) with a row header on the left and a scroll
+ruler on the right of wide screens; the hero sits on a cell grid with column
+letters and row numbers, and a highlighted cell (with Excel's fill handle)
+follows the pointer; the speed figures are cells with references and a
+formula bar; the features beyond the three main ones are a table.
+
+- **Few screenshots, shown large.** Four real captures of version 1.8 (the
+  grid with a profile, SQL with a column being dragged in, the JSON
+  structure, a chart), each at the page's full width so the app reads at
+  close to its real size, and each in light and dark to match the page's
+  theme. The rest of the features are words in a table, not pictures.
+- **Type.** Archivo at its widest and heaviest for headings and numbers,
+  JetBrains Mono (the app's data font) for labels, Inter for text. Archivo
+  is the variable font with a width axis, so one 90 KB file gives every
+  width; all fonts are served from the site.
+- **Theme.** The page follows the system until the visitor picks light or
+  dark with the button in the bar; the choice is kept in the browser and
+  applied before the first paint.
+- **Downloads.** One column per system, the visitor's first and marked
+  "Your system": its recommended file with a large button, then its other
+  files with their file names and sizes. Everything still comes from the
+  GitHub Releases API, as in D75.

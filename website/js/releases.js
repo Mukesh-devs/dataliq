@@ -180,19 +180,48 @@ function notesFragment(release) {
   return frag;
 }
 
-function downloadLink(d, primary) {
-  return el(
-    "a",
-    { class: primary ? "dl dl--primary" : "dl", href: d.url, rel: "noopener", download: "" },
-    [
-      el("span", { class: "dl__label", text: d.label }),
-      el("span", { class: "dl__detail", text: d.detail }),
-      el("span", { class: "dl__size" }, [
-        d.size ? document.createTextNode(d.size) : null,
+/** ".exe", ".dmg", ".AppImage": the kind of file, from its name. */
+const extOf = (name) => `.${name.split(".").pop()}`;
+
+/** "Installer · .exe", "AppImage" (its name says the kind already). */
+const kindOf = (d) => {
+  const ext = extOf(d.name);
+  return d.label.toLowerCase().includes(ext.slice(1).toLowerCase())
+    ? d.label
+    : `${d.label} · ${ext}`;
+};
+
+/** A download's detail without the trailing ".exe" (the button says it). */
+const plainDetail = (detail) => detail.replace(/ · \.\w+$/, "");
+
+/** One of the "other files" rows: label, detail, file name, size. */
+function fileRow(d) {
+  return el("a", { class: "file", href: d.url, rel: "noopener", download: "" }, [
+    el("span", { class: "file__label", text: d.label }),
+    el("span", { class: "file__detail", text: plainDetail(d.detail) }),
+    el("span", { class: "file__name", text: d.name, title: d.name }),
+    el("span", { class: "file__get" }, [
+      d.size ? document.createTextNode(d.size) : null,
+      icon("i-download"),
+    ]),
+  ]);
+}
+
+/** The recommended download of a system: what it is, and a big button. */
+function mainBlock(d, strong) {
+  return [
+    el("h4", { text: d.label }),
+    el("p", { text: plainDetail(d.detail) }),
+    el(
+      "a",
+      { class: strong ? "btn btn--ink" : "btn", href: d.url, rel: "noopener", download: "" },
+      [
         icon("i-download"),
-      ]),
-    ],
-  );
+        el("span", { text: `Download ${extOf(d.name)}` }),
+        d.size ? el("small", { text: d.size }) : null,
+      ],
+    ),
+  ];
 }
 
 function setPrimaryButtons({ href, label, note }) {
@@ -200,7 +229,7 @@ function setPrimaryButtons({ href, label, note }) {
     a.setAttribute("href", href);
     const text = $("[data-download-label]", a);
     if (text)
-      text.textContent = a.classList.contains("btn--sm")
+      text.textContent = a.classList.contains("nav__get")
         ? label.replace(/^Download for /, "Get for ")
         : label;
   }
@@ -217,62 +246,70 @@ function showProblem(kind) {
         ? "GitHub is limiting requests from your network right now. The downloads are on the releases page."
         : "The latest release couldn't be looked up just now. The downloads are on the releases page.";
   if (meta) meta.textContent = text;
-  for (const list of $$("[data-os-list]")) {
-    list.replaceChildren(
+  for (const card of $$("[data-os]")) {
+    $("[data-os-main]", card).replaceChildren(
+      el("p", { class: "platform__empty", text: "Find the installers on GitHub." }),
       el(
         "a",
         {
-          class: "dl",
+          class: "btn",
           href: kind === "none" ? RELEASES_URL : `${RELEASES_URL}/latest`,
           rel: "noopener",
         },
-        [
-          el("span", {
-            class: "dl__label",
-            text: kind === "none" ? "Releases on GitHub" : "Open the latest release",
-          }),
-          el("span", { class: "dl__detail", text: "github.com" }),
-          el("span", { class: "dl__size" }, [icon("i-arrow")]),
-        ],
+        [icon("i-out"), el("span", { text: kind === "none" ? "Releases" : "Latest release" })],
       ),
     );
+    $("[data-os-list]", card).replaceChildren();
+    const label = $(".platform__label", card);
+    if (label) label.hidden = true;
   }
   setPrimaryButtons({ href: "#download", label: "Download DataLiq", note: "" });
 }
 
 function render(release, os) {
   const version = release.version;
-  for (const node of $$("[data-release-version]")) node.textContent = version;
-  const pill = $("[data-release-pill]");
-  if (pill) pill.textContent = `Version ${version} · free and open source`;
+  for (const node of $$("[data-release-version]")) node.textContent = `v${version}`;
   const date = formatDate(release.publishedAt);
   const meta = $("[data-release-meta]");
   if (meta)
-    meta.textContent = `Version ${version}${date ? `, released ${date}` : ""}. Free, with no account. Pick your system below.`;
+    meta.textContent = `Version ${version}${date ? `, released ${date}` : ""}. Free, with no account. Your system is first.`;
 
   for (const card of $$("[data-os]")) {
     const name = card.dataset.os;
-    const list = $("[data-os-list]", card);
     const items = release.downloads[name] ?? [];
     const yours = name === os;
     card.classList.toggle("is-yours", yours);
-    if (yours) {
-      card.style.order = "-1";
-      if (!$(".os__badge", card))
-        $("header", card).append(el("span", { class: "os__badge", text: "Your system" }));
-    }
+    const kicker = $("[data-os-kicker]", card);
+    if (kicker) kicker.textContent = yours ? "Your system" : "Platform";
+    const main = $("[data-os-main]", card);
+    const list = $("[data-os-list]", card);
+    const label = $(".platform__label", card);
     if (items.length === 0) {
-      list.replaceChildren(
-        el("p", { class: "os__empty" }, [
+      main.replaceChildren(
+        el("p", { class: "platform__empty" }, [
           document.createTextNode(`This release has no ${OS_NAMES[name]} build. `),
           el("a", { href: RELEASES_URL, rel: "noopener", text: "See earlier releases" }),
         ]),
       );
+      list.replaceChildren();
+      if (label) label.hidden = true;
       continue;
     }
-    // The recommended download stands out on the visitor's own system
-    // (on every card when the system isn't a desktop we know).
-    list.replaceChildren(...items.map((d, i) => downloadLink(d, i === 0 && (yours || !os))));
+    // The recommended file stands out on the visitor's own system (on
+    // every card when the system isn't a desktop we know).
+    main.replaceChildren(...mainBlock(items[0], yours || !os));
+    list.replaceChildren(...items.slice(1).map(fileRow));
+    if (label) label.hidden = items.length < 2;
+  }
+
+  // Numbered in the order shown: the visitor's system first.
+  const cards = $$("[data-os]");
+  const ordered = cards
+    .filter((c) => c.classList.contains("is-yours"))
+    .concat(cards.filter((c) => !c.classList.contains("is-yours")));
+  for (const [i, c] of ordered.entries()) {
+    const no = $(".platform__no", c);
+    if (no) no.textContent = String(i + 1).padStart(2, "0");
   }
 
   const sums = $("[data-release-checksums]");
@@ -295,15 +332,13 @@ function render(release, os) {
     setPrimaryButtons({
       href: mine.url,
       label: `Download for ${OS_NAMES[os]}`,
-      note: `Version ${version}${mine.size ? ` · ${mine.size}` : ""} · ${mine.label === "Installer" ? mine.detail.split(" · ")[0] : `${mine.label}, ${mine.detail.split(" · ")[0]}`}.`,
+      note: `For ${OS_NAMES[os]} · ${kindOf(mine)}${mine.size ? ` · ${mine.size}` : ""}`,
     });
   } else {
     setPrimaryButtons({
       href: "#download",
       label: os ? `Download for ${OS_NAMES[os]}` : "Download for desktop",
-      note: os
-        ? `Version ${version}.`
-        : `Version ${version}. DataLiq is a desktop app for Windows, macOS and Linux.`,
+      note: os ? `Version ${version}` : "DataLiq is a desktop app for Windows, macOS and Linux",
     });
   }
 }
@@ -314,8 +349,6 @@ export async function initReleases() {
     platform: navigator.userAgentData?.platform ?? navigator.platform ?? "",
     maxTouchPoints: navigator.maxTouchPoints ?? 0,
   });
-  const meta = $("[data-release-meta]");
-  if (meta) meta.textContent = "Looking up the latest release…";
   const result = await latestRelease();
   if (result.release && result.release.hasDownloads) render(result.release, os);
   else if (result.release) {

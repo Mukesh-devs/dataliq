@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The website has a new design: an editorial "sheet" look (numbered sections, a hero on a
+  cell grid where a highlighted cell follows the pointer, the speed figures as cells, the
+  other features as a table), wide display type, light and dark themes with a switch, and a
+  cleaner download section with your system first. It shows four real screenshots of
+  version 1.8, each in light and dark.
+
 ## [1.8.0] - 2026-11-18
 
 Faster SQL writing and side panels you can size.
