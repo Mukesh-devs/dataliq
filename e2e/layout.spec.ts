@@ -290,3 +290,35 @@ test("short of room, the file's toolbar shows icons (names kept), then scrolls s
     await expect.poll(() => bar.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   }
 });
+
+test("zoom the window with Ctrl+= / Ctrl+- / Ctrl+0, from the View menu, and back from the status bar", async ({
+  page,
+}) => {
+  await open(page);
+  const zoomed = async () => (await invokes(page, "plugin:webview|set_webview_zoom")).at(-1)?.value;
+  await page.keyboard.press("Control+=");
+  await expect.poll(zoomed).toBe(1.1);
+  const badge = page.getByRole("contentinfo").getByRole("button", { name: /^Zoom 110%/ });
+  await expect(badge).toBeVisible();
+  await page.keyboard.press("Control+-");
+  await page.keyboard.press("Control+-");
+  await expect.poll(zoomed).toBe(0.9);
+  await page.keyboard.press("Control+0");
+  await expect.poll(zoomed).toBe(1);
+  await expect(page.getByRole("contentinfo").getByRole("button", { name: /^Zoom/ })).toHaveCount(0);
+  // From the View menu, and the status bar puts it back.
+  await page.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitem", { name: /^Zoom in/ }).click();
+  await expect.poll(zoomed).toBe(1.1);
+  await page
+    .getByRole("contentinfo")
+    .getByRole("button", { name: /^Zoom 110%/ })
+    .click();
+  await expect.poll(zoomed).toBe(1);
+  // The smallest window has room up to 110% only.
+  await page.setViewportSize({ width: 720, height: 480 });
+  await page.keyboard.press("Control+=");
+  await page.keyboard.press("Control+=");
+  await expect.poll(zoomed).toBe(1.1);
+  await expect(page.getByRole("status").first()).toContainText("too small to zoom in");
+});

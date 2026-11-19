@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { isMac } from "../lib/platform";
+import { zoomKey } from "../lib/zoom";
 
 export interface ShortcutHandlers {
   openFile: () => void;
@@ -23,6 +24,8 @@ export interface ShortcutHandlers {
   /** Ctrl+B: left sidebar; Ctrl+Alt+B: right panel (column profile). */
   toggleSidebar: () => void;
   toggleProfile: () => void;
+  /** Ctrl+= (or Ctrl++), Ctrl+-, Ctrl+0: the window's zoom. */
+  zoom: (step: "in" | "out" | "reset") => void;
 }
 
 /**
@@ -32,6 +35,12 @@ export interface ShortcutHandlers {
 export function useShortcuts(handlers: ShortcutHandlers) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const zoom = zoomKey(e, isMac);
+      if (zoom) {
+        e.preventDefault();
+        handlers.zoom(zoom);
+        return;
+      }
       const mod = isMac ? e.metaKey : e.ctrlKey;
       const key = e.key.toLowerCase();
       if (e.ctrlKey && key === "tab") {

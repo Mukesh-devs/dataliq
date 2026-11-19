@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { isWindows } from "../lib/platform";
+import { MAX_ZOOM, MIN_ZOOM } from "../lib/zoom";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
@@ -20,6 +21,9 @@ interface SettingsState {
   /** Who draws the title bar (Windows and Linux; macOS keeps its own). */
   titleBar: TitleBarStyle;
   setTitleBar: (style: TitleBarStyle) => void;
+  /** The whole window's zoom (1 = 100%), as Ctrl+= and Ctrl+- set it. */
+  zoom: number;
+  setZoom: (zoom: number) => void;
   /** Small histograms under the column titles. */
   headerCharts: boolean;
   setHeaderCharts: (on: boolean) => void;
@@ -53,6 +57,8 @@ export const useSettings = create<SettingsState>()(
       // Windows first; Linux desktops differ more, so they keep theirs unless asked.
       titleBar: isWindows ? "custom" : "system",
       setTitleBar: (titleBar) => set({ titleBar }),
+      zoom: 1,
+      setZoom: (zoom) => set({ zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)) }),
       headerCharts: true,
       setHeaderCharts: (headerCharts) => set({ headerCharts }),
       checkUpdates: true,
@@ -72,6 +78,7 @@ export const useSettings = create<SettingsState>()(
         theme: s.theme,
         density: s.density,
         titleBar: s.titleBar,
+        zoom: s.zoom,
         headerCharts: s.headerCharts,
         checkUpdates: s.checkUpdates,
         restoreSession: s.restoreSession,

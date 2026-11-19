@@ -22,7 +22,8 @@ import {
 } from "../../lib/files";
 import { cn } from "../../lib/cn";
 import { formatBytes } from "../../lib/format";
-import { isMac } from "../../lib/platform";
+import { isMac, modKey } from "../../lib/platform";
+import { ZOOM_LEVELS, zoomLabel } from "../../lib/zoom";
 import { matchesQuery, SECTIONS } from "../../lib/settingsSearch";
 import { useApp, type SettingsSection } from "../../stores/app";
 import { useExport, type ExportDefaults } from "../../stores/export";
@@ -463,6 +464,23 @@ export function SettingsPage() {
                     >
                       <option value="comfortable">Comfortable</option>
                       <option value="compact">Compact</option>
+                    </select>
+                  </Field>
+                  <Field
+                    label="Zoom"
+                    terms="scale size bigger smaller text"
+                    hint={`The whole window. Also ${modKey}+= and ${modKey}+- (${modKey}+0 for 100%).`}
+                  >
+                    <select
+                      className={`${inputClass} w-48`}
+                      value={String(ui.zoom)}
+                      onChange={(e) => ui.setZoom(Number(e.target.value))}
+                    >
+                      {ZOOM_LEVELS.map((z) => (
+                        <option key={z} value={String(z)}>
+                          {zoomLabel(z)}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                   {!isMac && (

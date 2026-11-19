@@ -1449,3 +1449,26 @@ the rest of the time their place stays empty but they can still be grabbed.
   already behave like this and follow the system setting.
 - They don't fade in and out as VS Code's do: those are drawn by VS Code
   itself, and the system's bars, even restyled, can only appear or not.
+
+## D85 — Zoom is DataLiq's own, remembered, and stops before it cramps
+
+Ctrl + and Ctrl − did nothing: Tauri turns the web view's zoom keys off,
+and DataLiq had no zoom of its own. It has one now, as code editors do.
+
+- **Keys and menus.** Ctrl+= (or Ctrl++), Ctrl+− and Ctrl+0 (Cmd on macOS),
+  from the main keys or the number pad and whatever the keyboard layout
+  puts on Shift (`zoomKey`); View › Zoom in, Zoom out, Reset zoom; the same
+  three in the command palette and the shortcuts list; native accelerators
+  in macOS's menu bar.
+- **Levels.** 50 % to 200 % in the steps code editors use (67, 80, 90, 110,
+  125, 150, 175 %). The level is a setting (Settings › Appearance › Zoom),
+  kept between sessions and applied at start with Tauri's
+  `webview.setZoom` (permission `core:webview:allow-set-webview-zoom`).
+- **Where it shows.** A short notice says the new level; while it isn't
+  100 %, the status bar shows it, and clicking that puts it back.
+- **A floor.** Zooming in stops when the window, at the new level, would be
+  narrower than 640 or shorter than 400 CSS pixels, where the sidebar, the
+  grid and the toolbars get too cramped (the smallest window, 720 × 480,
+  goes up to 110 %); the notice says so.
+- The web view's own zoom (`zoomHotkeysEnabled`) was the other way: no
+  menus, no setting, not remembered, and no floor.

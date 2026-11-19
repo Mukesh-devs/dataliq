@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   Sun,
   TriangleAlert,
+  ZoomIn,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { engineMemory, type MemoryUsage } from "../../lib/files";
@@ -20,6 +21,8 @@ import { useNotice } from "../../stores/notice";
 import { useSelection } from "../../stores/selection";
 import { useSettings, type ThemePreference } from "../../stores/settings";
 import { Button, IconButton } from "../ui/Button";
+import { modKey } from "../../lib/platform";
+import { zoomLabel } from "../../lib/zoom";
 import { JobsIndicator } from "./JobsIndicator";
 
 const themeIcon: Record<ThemePreference, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
@@ -41,6 +44,8 @@ export function StatusBar({ message, action }: StatusBarProps) {
   const theme = useSettings((s) => s.theme);
   const cycleTheme = useSettings((s) => s.cycleTheme);
   const headerCharts = useSettings((s) => s.headerCharts);
+  const zoom = useSettings((s) => s.zoom);
+  const setZoom = useSettings((s) => s.setZoom);
   const setHeaderCharts = useSettings((s) => s.setHeaderCharts);
   const Icon = themeIcon[theme];
   return (
@@ -57,6 +62,18 @@ export function StatusBar({ message, action }: StatusBarProps) {
       <span className="flex-1" />
       <SelectionStatsStrip />
       <MemoryIndicator />
+      {zoom !== 1 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-5 gap-1 px-1.5 tabular"
+          aria-label={`Zoom ${zoomLabel(zoom)}: reset to 100%`}
+          title={`Zoom ${zoomLabel(zoom)}: reset to 100% (${modKey}+0)`}
+          onClick={() => setZoom(1)}
+        >
+          <ZoomIn className="size-3.5" aria-hidden /> {zoomLabel(zoom)}
+        </Button>
+      )}
       <IconButton
         label={headerCharts ? "Hide column histograms" : "Show column histograms"}
         aria-pressed={headerCharts}
