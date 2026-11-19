@@ -14,7 +14,7 @@ export function ExcelSettings({ info, onChange }: ExcelSettingsProps) {
   return (
     <div className="flex items-center gap-3 text-[12px] text-fg-muted">
       <label className="flex items-center gap-1.5">
-        Sheet
+        <span className="tb-label">Sheet</span>
         <select
           aria-label="Sheet"
           className={selectClass}
@@ -30,7 +30,7 @@ export function ExcelSettings({ info, onChange }: ExcelSettingsProps) {
         </select>
       </label>
       <label className="flex items-center gap-1.5">
-        Header
+        <span className="tb-label">Header</span>
         <select
           aria-label="Header row"
           className={selectClass}

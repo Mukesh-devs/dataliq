@@ -1405,3 +1405,26 @@ scrolls by itself when it has more than fits.
   narrower than the menus and window buttons (the search gives way); in
   Settings, labels go above their controls and the section list folds away
   when the page is narrow (searching still finds everything).
+
+## D83 — Toolbars give up their labels, then scroll, rather than spill out
+
+A file's toolbar (Grid/Chart, Clean, Quality, Compare, Open in SQL, Export,
+and the Excel, table or import settings) was one row that couldn't shrink:
+on a small window, or beside the sidebar, it ran past the window's edge.
+Toolbars now fit in two steps, with CSS container queries on the bar itself
+(`.toolbar` in `index.css`), so they react to their own width, not the
+window's:
+
+- **Icons only.** Below 68 rem, the less used buttons (Compare, Open in
+  SQL) show only their icons; below 54 rem, all of them do, and the Excel
+  and table pickers drop their words. The name is visually hidden, not
+  removed: it stays the button's accessible name, and the tooltip shows it.
+  The SQL panel's toolbar does the same below 40 rem (Run keeps its word).
+- **Then sideways.** If even the icons don't fit, the bar scrolls sideways
+  inside itself, and the mouse wheel scrolls it (`scrollSideways`, also
+  used by the tabs). The file's name keeps a little room and shortens with
+  an ellipsis.
+- A "More" menu for what doesn't fit was the other way: it would need a
+  second form of every control (menu items for buttons, and the Excel
+  pickers don't fit in a menu), for a case only the narrowest windows
+  reach. Scrolling the bar keeps one form of each control.

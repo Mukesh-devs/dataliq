@@ -19,6 +19,7 @@ import { COPY_FORMATS, formatRows, quoteIdent, tableName, type CopyFormat } from
 import { formatSql } from "../../lib/sqlFormat";
 import { useSql } from "../../stores/sql";
 import { isMac, modKey } from "../../lib/platform";
+import { scrollSideways } from "../../lib/wheel";
 import { useRegisterCommands, type Command } from "../../stores/commands";
 import { useNotice } from "../../stores/notice";
 import { baseOf, useTabs } from "../../stores/tabs";
@@ -1185,8 +1186,12 @@ export function FileView({
         onReload={onReload}
         onIgnore={() => useTabs.getState().ignoreOnDisk(tab.id)}
       />
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="truncate font-medium text-fg" title={tab.path}>
+      {/* Short of room, the buttons show their icons only; shorter still, the bar scrolls sideways. */}
+      <div
+        className="toolbar flex h-9 shrink-0 items-center gap-2 border-b border-border px-3"
+        onWheel={scrollSideways}
+      >
+        <span className="min-w-16 truncate font-medium text-fg" title={tab.path}>
           {tab.title}
         </span>
         {tab.info && (
@@ -1232,7 +1237,7 @@ export function FileView({
                   mode === m ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg"
                 }`}
               >
-                <Icon className="size-3.5" aria-hidden /> {name}
+                <Icon className="size-3.5" aria-hidden /> <span className="tb-label">{name}</span>
               </button>
             ))}
           </div>
@@ -1246,7 +1251,8 @@ export function FileView({
             onClick={() => (recipeOpen ? setRecipeOpen(tab.id, false) : openClean())}
             title="Cleaning steps: rename, change types, trim, replace, split, …"
           >
-            <WandSparkles className="size-3.5" aria-hidden /> Clean
+            <WandSparkles className="size-3.5" aria-hidden />{" "}
+            <span className="tb-label">Clean</span>
             {recipeSteps.length > 0 && (
               <span className="rounded-full bg-accent-soft px-1.5 text-[11px] text-fg tabular">
                 {recipeSteps.length}
@@ -1263,7 +1269,8 @@ export function FileView({
             onClick={() => setQualityOpen(tab.id, !qualityOpen)}
             title="Data quality: empty columns, stray spaces, mixed types, dates, outliers, duplicates"
           >
-            <ListChecks className="size-3.5" aria-hidden /> Quality
+            <ListChecks className="size-3.5" aria-hidden />{" "}
+            <span className="tb-label">Quality</span>
             {quality?.base === baseId && quality.report && quality.report.warnings.length > 0 && (
               <span className="rounded-full bg-accent-soft px-1.5 text-[11px] text-fg tabular">
                 {quality.report.warnings.length}
@@ -1278,7 +1285,8 @@ export function FileView({
             onClick={startCompare}
             title="Compare with another open file: added, removed and changed rows"
           >
-            <GitCompareArrows className="size-3.5" aria-hidden /> Compare
+            <GitCompareArrows className="size-3.5" aria-hidden />{" "}
+            <span className="tb-label-wide">Compare</span>
           </Button>
         )}
         {tab.status === "ready" && baseId && sqlTable && (
@@ -1288,12 +1296,13 @@ export function FileView({
             onClick={() => void openViewInSql()}
             title={`The view as a query over ${sqlTable}, to edit and run`}
           >
-            <SquareTerminal className="size-3.5" aria-hidden /> Open in SQL
+            <SquareTerminal className="size-3.5" aria-hidden />{" "}
+            <span className="tb-label-wide">Open in SQL</span>
           </Button>
         )}
         {canExport && (
           <Button size="sm" variant="ghost" onClick={openExport} title={`Export (${modKey}+E)`}>
-            <Download className="size-3.5" aria-hidden /> Export
+            <Download className="size-3.5" aria-hidden /> <span className="tb-label">Export</span>
           </Button>
         )}
         {tab.info?.excel && (

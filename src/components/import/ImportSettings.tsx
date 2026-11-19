@@ -57,7 +57,8 @@ export function ImportSettings({ options, sniffed, onApply }: ImportSettingsProp
     >
       <Popover.Trigger asChild>
         <Button size="sm" variant="ghost" aria-label="Import settings">
-          <SlidersHorizontal className="size-3.5" aria-hidden /> Import settings
+          <SlidersHorizontal className="size-3.5" aria-hidden />{" "}
+          <span className="tb-label">Import settings</span>
         </Button>
       </Popover.Trigger>
       <Popover.Portal>

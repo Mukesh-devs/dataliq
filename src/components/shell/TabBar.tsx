@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { LoaderCircle, Plus, Settings, Table2, X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { modKey } from "../../lib/platform";
+import { scrollSideways } from "../../lib/wheel";
 import type { Tab } from "../../stores/tabs";
 import { IconButton } from "../ui/Button";
 
@@ -80,9 +81,7 @@ export function TabBar({
         role="tablist"
         aria-label="Open files"
         className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
-        onWheel={(e) => {
-          if (e.deltaY && !e.shiftKey) e.currentTarget.scrollLeft += e.deltaY;
-        }}
+        onWheel={scrollSideways}
         // Tabs pattern: one tab in the Tab order, arrows move between them,
         // Delete closes one.
         onKeyDown={(e) => {

@@ -267,3 +267,26 @@ test("the window itself never scrolls; the status bar's buttons fit in it", asyn
   });
   expect(fits).toEqual({ scrolls: false, outside: 0 });
 });
+
+test("short of room, the file's toolbar shows icons (names kept), then scrolls sideways", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 800 });
+  await open(page);
+  const clean = page.getByRole("button", { name: /^Clean/ });
+  const width = async () => (await clean.boundingBox())!.width;
+  expect(await width()).toBeGreaterThan(50);
+  await page.setViewportSize({ width: 1024, height: 640 });
+  await expect.poll(width).toBeLessThan(40);
+  await expect(clean).toHaveAccessibleName(/Clean/);
+  // Narrower still: the bar scrolls within itself, the window doesn't.
+  await page.setViewportSize({ width: 720, height: 480 });
+  const bar = page.locator(".toolbar").first();
+  const sizes = await bar.evaluate((el) => [el.scrollWidth, el.clientWidth]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(720);
+  if (sizes[0]! > sizes[1]!) {
+    await bar.hover();
+    await page.mouse.wheel(0, 200);
+    await expect.poll(() => bar.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  }
+});
