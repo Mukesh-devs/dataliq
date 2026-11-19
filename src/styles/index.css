@@ -64,6 +64,40 @@
     background: var(--accent-soft);
   }
 
+  /* Scroll bars as in code editors (Windows and Linux; macOS keeps its own
+     overlay bars): thin, no arrows, shown on the panel you point at or
+     scroll (see useScrollbars), hidden the rest of the time but still there
+     to grab. */
+  :root:not([data-platform="mac"]) {
+    & ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    & ::-webkit-scrollbar-track,
+    & ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    & ::-webkit-scrollbar-button {
+      display: none;
+    }
+    & ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+      background-color: transparent;
+    }
+    & :hover::-webkit-scrollbar-thumb,
+    & .is-scrolling::-webkit-scrollbar-thumb,
+    /* The grid draws on a canvas beside its scroller: pointing at it counts. */
+    & [data-testid="data-grid"]:hover ::-webkit-scrollbar-thumb {
+      background-color: var(--scrollbar);
+    }
+    & ::-webkit-scrollbar-thumb:hover,
+    & ::-webkit-scrollbar-thumb:active {
+      background-color: var(--scrollbar-strong);
+    }
+  }
+
   /* The grid draws on a canvas: ring the whole grid while it has the
      keyboard focus (the selected cell shows where in it). */
   [data-testid="data-grid"]:has(canvas:focus-visible) {

@@ -41,6 +41,9 @@
   --accent-fg: #ffffff;
   --accent-soft: rgb(79 70 229 / 0.12);
   --focus-ring: rgb(79 70 229 / 0.85);
+  /* Scroll bars: the thumb, and while it's pointed at or dragged. */
+  --scrollbar: rgb(24 24 27 / 0.22);
+  --scrollbar-strong: rgb(24 24 27 / 0.4);
   /* Behind a dialog: dims the window. */
   --overlay: rgb(15 15 20 / 0.28);
   --danger: #c62020;
@@ -98,6 +101,8 @@
   --accent-fg: #111113;
   --accent-soft: rgb(129 140 248 / 0.16);
   --focus-ring: rgb(129 140 248 / 0.7);
+  --scrollbar: rgb(236 236 239 / 0.2);
+  --scrollbar-strong: rgb(236 236 239 / 0.38);
   --overlay: rgb(0 0 0 / 0.55);
   --danger: #f87171;
   --warning: #fbbf24;

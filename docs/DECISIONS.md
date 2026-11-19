@@ -1428,3 +1428,24 @@ window's:
   second form of every control (menu items for buttons, and the Excel
   pickers don't fit in a menu), for a case only the narrowest windows
   reach. Scrolling the bar keeps one form of each control.
+
+## D84 — Scroll bars show while you use a panel, as in code editors
+
+On Windows the web view draws the system's classic scroll bars: thick, with
+arrow buttons, always there. They are now thin (10 px), rounded and without
+arrows, and they show only on the panel you point at or that is scrolling;
+the rest of the time their place stays empty but they can still be grabbed.
+
+- CSS `::-webkit-scrollbar` styles, which WebView2 (Windows) and WebKitGTK
+  (Linux) both follow. The thumb's colours are tokens (`--scrollbar`,
+  `--scrollbar-strong`) for the light and dark themes.
+- "While scrolling" is a class (`is-scrolling`) put on whatever scrolls,
+  from one listener for scroll events, and taken off 0.9 s after it stops
+  (`showScrollbarsWhileScrolling`): wheel, keyboard and dragging all count,
+  wherever the pointer is.
+- The grid draws on a canvas beside its scroller, so pointing anywhere on
+  the grid shows its bars.
+- macOS is left alone (`data-platform="mac"`): its own overlay scroll bars
+  already behave like this and follow the system setting.
+- They don't fade in and out as VS Code's do: those are drawn by VS Code
+  itself, and the system's bars, even restyled, can only appear or not.
