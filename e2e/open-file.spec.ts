@@ -87,4 +87,21 @@ test("Excel files show a sheet picker and header row choice", async ({ page }) =
       .at(-1),
   );
   expect(lastOpen?.args.options).toEqual({ excel: { sheet: "Notes" } });
+
+  // The header row is a number: any row, typed (0 for none), applied on Enter.
+  const header = page.getByLabel("Header row", { exact: true });
+  await header.fill("12");
+  await header.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __invokes: { cmd: string; args: { options: unknown } }[] }
+          ).__invokes
+            .filter((i) => i.cmd === "open_file")
+            .at(-1)?.args.options,
+      ),
+    )
+    .toMatchObject({ excel: { headerRow: 12 } });
 });

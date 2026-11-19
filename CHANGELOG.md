@@ -37,6 +37,11 @@ you're working, and zoom.
 
 ### Fixed
 
+- An Excel file's header row is now a number you type instead of a list of rows 1 to 10:
+  it shows the row DataLiq found (say 12), any row can be typed, and 0 means no header row.
+  It applies on Enter or when you leave the box; Esc puts it back. Before, a sheet whose
+  header was found on row 12 couldn't go back to 12 once row 1 was picked. After choosing a
+  row, ↺ finds the header again.
 - The SQL editor's focus border goes round the whole editor and is no longer cut by the line
   numbers or the current line's highlight.
 - The status bar's buttons were taller than the bar, which made the window scroll by a few

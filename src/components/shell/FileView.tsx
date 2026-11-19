@@ -1308,6 +1308,8 @@ export function FileView({
         {tab.info?.excel && (
           <ExcelSettings
             info={tab.info.excel}
+            // Chosen (a number typed) or found by DataLiq.
+            auto={tab.options.excel?.headerRow === undefined}
             onChange={(excel) => onReopen({ ...tab.options, excel })}
           />
         )}
