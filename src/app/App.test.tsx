@@ -7,7 +7,9 @@ import { App } from "./App";
 
 describe("App shell", () => {
   beforeEach(() => {
-    act(() => useSettings.setState({ theme: "system", density: "comfortable" }));
+    act(() =>
+      useSettings.setState({ theme: "system", density: "comfortable", titleBar: "system" }),
+    );
   });
 
   it("renders the layout regions", () => {
@@ -16,6 +18,18 @@ describe("App shell", () => {
     expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Ready");
+  });
+
+  it("puts the tabs in their own row above the file with DataLiq's own title bar", () => {
+    act(() => useSettings.setState({ titleBar: "custom" }));
+    render(<App />);
+    const bar = screen.getByRole("banner");
+    expect(within(bar).queryByRole("tablist")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("main")).getByRole("tablist", { name: "Open files" }),
+    ).toBeInTheDocument();
+    act(() => useSettings.setState({ titleBar: "system" }));
+    expect(within(screen.getByRole("banner")).getByRole("tablist")).toBeInTheDocument();
   });
 
   it("keeps the engine's version out of the status bar", () => {

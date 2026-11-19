@@ -27,7 +27,12 @@ import { matchesQuery, SECTIONS } from "../../lib/settingsSearch";
 import { useApp, type SettingsSection } from "../../stores/app";
 import { useExport, type ExportDefaults } from "../../stores/export";
 import { useNotice } from "../../stores/notice";
-import { useSettings, type Density, type ThemePreference } from "../../stores/settings";
+import {
+  useSettings,
+  type Density,
+  type ThemePreference,
+  type TitleBarStyle,
+} from "../../stores/settings";
 import { Button } from "../ui/Button";
 import { McpSettings } from "./McpSettings";
 
@@ -460,6 +465,22 @@ export function SettingsPage() {
                       <option value="compact">Compact</option>
                     </select>
                   </Field>
+                  {!isMac && (
+                    <Field
+                      label="Title bar"
+                      terms="window frame caption menu row"
+                      hint="DataLiq's own puts the menus, search and window buttons in one row, with the tabs below. The system's brings back your desktop's title bar."
+                    >
+                      <select
+                        className={`${inputClass} w-48`}
+                        value={ui.titleBar}
+                        onChange={(e) => ui.setTitleBar(e.target.value as TitleBarStyle)}
+                      >
+                        <option value="custom">DataLiq&apos;s own</option>
+                        <option value="system">The system&apos;s</option>
+                      </select>
+                    </Field>
+                  )}
                   <Check checked={ui.headerCharts} onChange={ui.setHeaderCharts} terms="charts">
                     Small histograms under the column names
                   </Check>

@@ -1348,3 +1348,36 @@ labels are sentence case, and nothing is set in wide or spaced-out capitals.
   are strong when the visitor isn't on a desktop). Everything is on screen
   at once, with no tabs to find. It all still comes from the GitHub
   Releases API, as in D75.
+
+## D81 — DataLiq draws its own title bar on Windows
+
+On Windows the system's title bar was a row of its own (the app's name and
+the window buttons), with DataLiq's row of menus, tabs, search and panel
+buttons below it: two rows of chrome before any data. DataLiq now draws the
+title bar itself, as VS Code does: one row with the app's icon, the menus,
+the search in the middle of the window, the panel buttons and the window's
+minimise, maximise and close buttons. The file tabs move to a row of their
+own above the file, beside the sidebar, as VS Code's editor tabs do: flat
+tabs, the one in front taking the file's background and a line in the
+accent colour, many tabs scrolling sideways instead of widening the window.
+
+- **How.** `tauri.windows.conf.json` starts the window without the system's
+  bar (`decorations: false`); it repeats the main window's settings, which a
+  test keeps the same. The empty parts of the row are Tauri drag regions:
+  pressing them moves the window and a double click maximises it, and the
+  system still snaps the window to screen edges and resizes it from its
+  edges. The window buttons are drawn like the system's (grey on hover, red
+  for close) and call Tauri's window functions; they are not in the Tab
+  order, as the system's aren't. The window's name follows the tab in front
+  ("orders.csv — DataLiq"), so the taskbar and Alt+Tab say which file is
+  open now that the name isn't written at the top.
+- **A way back.** Settings › Appearance › Title bar: "The system's" turns
+  the system's bar back on at once and puts the tabs back in DataLiq's row,
+  as before. Linux keeps the system's bar unless that setting asks
+  otherwise, because desktops there differ more; macOS keeps its own (its
+  menus are in the screen's menu bar already) until its version is tried
+  on a Mac.
+- **Not yet.** Windows 11's Snap Layouts appear only on the system's own
+  maximise button; the drawn one doesn't show them yet (Win+arrow keys and
+  dragging to an edge still snap).
+

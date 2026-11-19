@@ -197,6 +197,13 @@ export async function mockTauri(page: Page, options: MockOptions = {}) {
                   info: { ...(recorded.info as object), ...folder.info },
                 }
               : recorded;
+          // The window itself (title, frame, minimise …): recorded, nothing to do.
+          if (cmd.startsWith("plugin:window|")) {
+            if (cmd === "plugin:window|is_maximized") return false;
+            if (cmd === "plugin:window|is_decorated") return w.__decorated ?? true;
+            if (cmd === "plugin:window|set_decorations") w.__decorated = args.value;
+            return null;
+          }
           switch (cmd) {
             case "run_query": {
               const sql = w.__sql as SqlAnswer | undefined;

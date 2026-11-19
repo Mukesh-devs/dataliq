@@ -6,6 +6,8 @@ import { EmptyState } from "../components/shell/EmptyState";
 import { Sidebar } from "../components/shell/Sidebar";
 import { StatusBar } from "../components/shell/StatusBar";
 import { SETTINGS_TAB, TabBar } from "../components/shell/TabBar";
+import { TitleBar } from "../components/shell/TitleBar";
+import { inAppWindow, useOwnTitleBar, useWindowTitle } from "./windowChrome";
 import { OpenPattern } from "../components/shell/OpenPattern";
 import { OpenUrl } from "../components/shell/OpenUrl";
 import { HelpDialog, type HelpTopic } from "../components/shell/HelpDialog";
@@ -168,6 +170,7 @@ function AppMenus() {
 }
 
 export function App() {
+  const ownTitleBar = useOwnTitleBar();
   const {
     tabs,
     activeId,
@@ -721,22 +724,34 @@ export function App() {
     if (importsDone > 0) void refreshCache();
   }, [importsDone, refreshCache]);
 
+  // The window's name follows the tab in front (taskbar, Alt+Tab).
+  useWindowTitle(settingsActive ? "Settings" : active?.title);
+
+  const tabBar = (
+    <TabBar
+      tabs={tabs}
+      activeId={activeId}
+      onSelect={selectFile}
+      onClose={close}
+      onOpen={() => void openFile()}
+      settings={
+        settingsOpen
+          ? { active: settingsActive, onSelect: () => showSettings(), onClose: closeSettings }
+          : undefined
+      }
+      variant={ownTitleBar ? "row" : "inline"}
+    />
+  );
+
   return (
     <div className="flex h-full flex-col">
       <ThemeController />
-      <TabBar
-        tabs={tabs}
-        activeId={activeId}
-        onSelect={selectFile}
-        onClose={close}
-        onOpen={() => void openFile()}
-        settings={
-          settingsOpen
-            ? { active: settingsActive, onSelect: () => showSettings(), onClose: closeSettings }
-            : undefined
-        }
-        onCommands={() => setPalette({ query: "" })}
+      <TitleBar
+        own={ownTitleBar}
+        controls={ownTitleBar && inAppWindow()}
         menu={isMac ? undefined : <AppMenus />}
+        tabs={ownTitleBar ? undefined : tabBar}
+        onCommands={() => setPalette({ query: "" })}
         panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
         onTogglePanel={(panel) =>
           panel === "left"
@@ -780,6 +795,8 @@ export function App() {
           />
         )}
         <main className="relative flex min-w-0 flex-1 flex-col bg-bg">
+          {/* With DataLiq's own title bar, the tabs get their own row, beside the sidebar. */}
+          {ownTitleBar && tabBar}
           <CrashNotice />
           {/* Kept while it's open, so its search and place survive a visit to a file. */}
           {settingsOpen && (

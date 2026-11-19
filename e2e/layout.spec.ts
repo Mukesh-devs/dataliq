@@ -48,9 +48,11 @@ async function open(page: Page) {
     }),
   });
   await page.goto("/");
+  // The Home page's button (with DataLiq's own title bar, the tab row's + is in main too).
   await page
     .getByRole("main")
     .getByRole("button", { name: /Open file/ })
+    .last()
     .click();
   await expect(page.getByRole("status").first()).toContainText("1,000 rows");
   await fileShown(page);
@@ -214,4 +216,37 @@ test("drag the sidebar's and the profile's edges to resize them, for this window
   await page.reload();
   await expect(page.getByRole("complementary", { name: "Sidebar" })).toBeVisible();
   expect(await width(page.getByRole("complementary", { name: "Sidebar" }))).toBe(240);
+});
+
+test("DataLiq's own title bar: one row, the tabs below it, the window's buttons at the end", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("dataliq.settings", JSON.stringify({ state: { titleBar: "custom" } })),
+  );
+  await open(page);
+  const bar = page.getByRole("banner");
+  // The system's title bar is turned off, and the empty parts move the window.
+  await expect
+    .poll(async () => (await invokes(page, "plugin:window|set_decorations")).at(-1))
+    .toEqual(expect.objectContaining({ value: false }));
+  await expect(bar).toHaveAttribute("data-tauri-drag-region", "");
+  await expect(bar.getByRole("menubar", { name: "Menu bar" })).toBeVisible();
+  await expect(bar.getByRole("tablist")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("tablist", { name: "Open files" })).toBeVisible();
+  // The window's name follows the file in front.
+  await expect
+    .poll(async () => (await invokes(page, "plugin:window|set_title")).at(-1))
+    .toEqual(expect.objectContaining({ value: "comma.csv — DataLiq" }));
+  // The window's own buttons, at the right end of the row.
+  const buttons = bar.getByRole("group", { name: "Window" });
+  await buttons.getByRole("button", { name: "Minimize" }).click();
+  await buttons.getByRole("button", { name: "Maximize" }).click();
+  expect(await invokes(page, "plugin:window|minimize")).toHaveLength(1);
+  expect(await invokes(page, "plugin:window|toggle_maximize")).toHaveLength(1);
+  const right = (await bar.boundingBox())!;
+  const close = (await buttons.getByRole("button", { name: "Close" }).boundingBox())!;
+  expect(Math.round(close.x + close.width)).toBe(Math.round(right.x + right.width));
+  // Nothing sticks out of the window.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

@@ -3,6 +3,10 @@ export const isMac: boolean =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
+/** True when running on Windows. */
+export const isWindows: boolean =
+  typeof navigator !== "undefined" && /Win/.test(navigator.platform || navigator.userAgent);
+
 /** Label for the primary shortcut modifier on this platform. */
 export const modKey: string = isMac ? "⌘" : "Ctrl";
 
