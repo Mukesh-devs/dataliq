@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { Command, PanelBottom, PanelLeft, PanelRight, Search } from "lucide-react";
+import { PanelBottom, PanelLeft, PanelRight } from "lucide-react";
 import icon from "../../../assets/icon-small.svg";
-import { cn } from "../../lib/cn";
 import { modKey } from "../../lib/platform";
 import { IconButton } from "../ui/Button";
 import { WindowControls } from "./WindowControls";
@@ -19,7 +18,8 @@ interface TitleBarProps {
   menu?: ReactNode;
   /** The file tabs, when they share this row (under the system's title bar). */
   tabs?: ReactNode;
-  onCommands?: () => void;
+  /** The search box (the command search), in the middle of the row. */
+  search?: ReactNode;
   /** Which panels are shown, and toggling them. */
   panels?: { left: boolean; right: boolean; bottom: boolean };
   onTogglePanel?: (panel: "left" | "right" | "bottom") => void;
@@ -39,28 +39,10 @@ export function TitleBar({
   controls,
   menu,
   tabs,
-  onCommands,
+  search,
   panels,
   onTogglePanel,
 }: TitleBarProps) {
-  const search = (
-    <button
-      type="button"
-      className={cn(
-        "flex h-7 shrink-0 items-center gap-2 rounded-[var(--radius)] border border-border bg-bg px-2 text-fg-subtle hover:border-border-strong",
-        own ? "w-full min-w-0" : "w-56",
-      )}
-      aria-label="Search commands"
-      title={`Command palette (${modKey}+K)`}
-      onClick={onCommands}
-    >
-      <Search className="size-3.5" aria-hidden />
-      <span className="flex-1 text-left">Search…</span>
-      <span className="flex items-center gap-0.5 text-[11px]">
-        {modKey === "⌘" ? <Command className="size-3" aria-hidden /> : "Ctrl+"}K
-      </span>
-    </button>
-  );
   const panelButtons = panels && onTogglePanel && (
     <div className="ml-1 flex shrink-0 items-center" role="group" aria-label="Panels">
       {PANELS.map(({ id, icon: Icon, name, key }) => {

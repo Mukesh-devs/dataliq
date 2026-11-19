@@ -1,6 +1,6 @@
 import { FileUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { CommandPalette } from "../components/palette/CommandPalette";
+import { CommandSearch } from "../components/palette/CommandSearch";
 import { ExportDialog } from "../components/export/ExportDialog";
 import { EmptyState } from "../components/shell/EmptyState";
 import { Sidebar } from "../components/shell/Sidebar";
@@ -790,7 +790,15 @@ export function App() {
         controls={ownTitleBar && inAppWindow()}
         menu={isMac ? undefined : <AppMenus />}
         tabs={ownTitleBar ? undefined : tabBar}
-        onCommands={() => setPalette({ query: "" })}
+        search={
+          <CommandSearch
+            request={palette}
+            // A click or typing opens it with what's typed; closing forgets it.
+            onOpen={(query) => setPalette((p) => p ?? { query })}
+            onClose={() => setPalette(null)}
+            className={ownTitleBar ? "w-full min-w-0" : "w-56 shrink-0"}
+          />
+        }
         panels={{ left: sidebar, right: profileOpen, bottom: sqlOpen }}
         onTogglePanel={(panel) =>
           panel === "left"
@@ -817,13 +825,6 @@ export function App() {
       {isMac && <AppMenus />}
       <HelpDialog topic={help} onClose={() => setHelp(null)} />
       <UpdateDialog />
-      <CommandPalette
-        // A fresh body (and starting text) each time it opens.
-        key={palette ? `open:${palette.query}` : "closed"}
-        open={palette !== null}
-        onOpenChange={(o) => !o && setPalette(null)}
-        initialQuery={palette?.query}
-      />
       <div className="flex min-h-0 flex-1">
         {sidebar && (
           <Sidebar

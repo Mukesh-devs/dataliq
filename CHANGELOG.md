@@ -20,6 +20,8 @@ you're working, and zoom.
 
 ### Changed
 
+- The search is the title bar's box itself: type there, and the matching actions drop down
+  right under it, instead of a second box opening elsewhere. Ctrl+K puts the cursor in it.
 - The window itself never scrolls any more, as in code editors: each panel scrolls on its
   own when it has more than fits, so there are no scroll bars around the whole window.
 - Scroll bars are thin, without arrows, and show only on the panel you point at or are

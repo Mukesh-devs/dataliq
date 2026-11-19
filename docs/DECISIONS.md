@@ -1472,3 +1472,21 @@ and DataLiq had no zoom of its own. It has one now, as code editors do.
   goes up to 110 %); the notice says so.
 - The web view's own zoom (`zoomHotkeysEnabled`) was the other way: no
   menus, no setting, not remembered, and no floor.
+
+## D86 — The search is the title bar's own box
+
+The title bar's "Search… Ctrl+K" was a button that opened the command
+palette: a second box with its own input, lower down in the middle of the
+window. You looked at one place and typed in another. Now the title bar's
+box is where you type, and the matching actions drop down right under it,
+as in code editors and browsers' address bars (`CommandSearch`).
+
+- One combobox (`role="combobox"`, "Search commands") with its listbox in a
+  popover anchored to the box: at least 30 rem wide (wider than the box on a
+  small window), centred under it and kept inside the window.
+- Ctrl+K puts the cursor in it; Shift+Ctrl+C opens it with "Copy " typed; a
+  click or typing opens it too. Arrows, Enter and Escape work as before, and
+  after an action or Escape the focus goes back to where it was.
+- The focus never leaves the box while the list shows: clicking an action
+  or the list's scroll bar keeps it there; Tab or a click elsewhere closes
+  the list.

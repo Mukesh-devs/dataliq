@@ -27,13 +27,12 @@ function fakeWindow(maximized = false) {
 
 describe("TitleBar", () => {
   it("is one row with the menus, the search in the middle and the panels (own title bar)", async () => {
-    const onCommands = vi.fn();
     const onTogglePanel = vi.fn();
     const { container } = render(
       <TitleBar
         own
         menu={<nav aria-label="Menu bar">File Edit</nav>}
-        onCommands={onCommands}
+        search={<input aria-label="Search commands" />}
         panels={panels}
         onTogglePanel={onTogglePanel}
       />,
@@ -42,14 +41,12 @@ describe("TitleBar", () => {
     // The empty parts move the window; the buttons in it don't.
     expect(bar).toHaveAttribute("data-tauri-drag-region");
     expect(container.querySelectorAll("[data-tauri-drag-region]").length).toBeGreaterThan(3);
-    expect(screen.getByRole("button", { name: "Search commands" })).not.toHaveAttribute(
+    expect(screen.getByRole("textbox", { name: "Search commands" })).not.toHaveAttribute(
       "data-tauri-drag-region",
     );
     expect(screen.getByRole("navigation", { name: "Menu bar" })).toBeInTheDocument();
     // The tabs live in their own row, not here.
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Search commands" }));
-    expect(onCommands).toHaveBeenCalledOnce();
     await userEvent.click(screen.getByRole("button", { name: /Show SQL panel/ }));
     expect(onTogglePanel).toHaveBeenCalledWith("bottom");
   });
