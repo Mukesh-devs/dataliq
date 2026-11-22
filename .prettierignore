@@ -9,3 +9,5 @@ e2e/__screenshots__
 fixtures
 *.md
 .github
+# Search engines' site verification files: served exactly as given.
+website/google*.html
