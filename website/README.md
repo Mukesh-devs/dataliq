@@ -23,8 +23,11 @@ Then open <http://localhost:4321/>. (Modules need a server; opening the file dir
   Publishing a release updates the site; nothing is deployed again. If GitHub can't be
   reached, limits requests, or there is no release, the page says so and links to the
   releases page.
-- **The icon** (`assets/icon.svg`, the favicons) is written by `pnpm icons`, from the same
-  drawing as the app's.
+- **The icon** (`assets/icon.svg`, the favicons, `favicon.ico`) is written by `pnpm icons`,
+  from the same drawing as the app's. Google's results use a square icon of a multiple of
+  48 px (`favicon-48.png`, `favicon-96.png`, `icon-192.png`) or the SVG, but only the one on
+  the home page of `mukesh-devs.github.io`: an icon linked from `/dataliq/` alone shows in
+  browser tabs, bookmarks and home screens, not in search results.
 - **Screenshots** (`assets/shots/`) are real captures of the app at 1280 × 800, 2× scale,
   saved as WebP at two widths (`name-light-1280.webp`, `name-light-2560.webp`, and the same
   for `-dark`). Each picture has a light and a dark version; the page shows the one that

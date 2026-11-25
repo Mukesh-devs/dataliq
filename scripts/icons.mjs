@@ -6,7 +6,7 @@
 // Writes the SVG sources in assets/ and, in src-tauri/icons/, the PNGs
 // (Linux, Windows tiles), icon.ico (Windows), icon.icns (macOS) and the
 // Windows installer's header and sidebar pictures (nsis-*.bmp); also the
-// website's copy of the icon and its favicons (website/assets/).
+// website's copy of the icon and its favicons (website/assets/, website/favicon.ico).
 //
 // Three drawings of one design, as desktop icons are made:
 // - icon.svg, for macOS: Apple's grid, an 824 px tile in a 1024 px canvas
@@ -306,16 +306,24 @@ async function main() {
     writeFileSync(join(icons, name), (await sized(size)).png);
 
   // The website (website/, GitHub Pages): its logo, favicons and home-screen icons.
+  // Google's search results take a square favicon of a multiple of 48 px
+  // (48, 96, 192) or the SVG; browsers' tabs take 32 px and favicon.ico.
   const site = join(root, "website", "assets");
   mkdirSync(site, { recursive: true });
   writeFileSync(join(site, "icon.svg"), svg.full);
   for (const [name, size] of Object.entries({
     "favicon-32.png": 32,
+    "favicon-48.png": 48,
+    "favicon-96.png": 96,
     "apple-touch-icon.png": 180,
     "icon-192.png": 192,
     "icon-512.png": 512,
   }))
     writeFileSync(join(site, name), (await sized(size)).png);
+  writeFileSync(
+    join(root, "website", "favicon.ico"),
+    ico([await sized(16), await sized(32), await sized(48)]),
+  );
 
   // Windows: every size Explorer, the taskbar and the title bar ask for.
   const layers = [];
